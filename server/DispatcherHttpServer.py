@@ -126,7 +126,7 @@ class DispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             mapping = RequestMapping.GET
         if path not in mapping.keys():
             res.statusCode = 404
-            res.body = "Cannot find controller for your path"
+            res.body = '{"error":"Cannot find controller for your path"}'
         else:
             fun = mapping[path]
             ctx = FilterContex(self, req, res, fun)
