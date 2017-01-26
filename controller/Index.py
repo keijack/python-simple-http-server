@@ -23,9 +23,15 @@ class Index:
 
     def filter(self, ctx):
         if ctx.request.parameter("stop") == "true":
+            ctx.response.statusCode = 403
             ctx.send_response()
             return False
         ctx.request.parameters["filter-add"] = ["0001"]
         ctx.go_on()
         ctx.response.statusCode = 404
         return True
+
+    def f2(self, ctx):
+        print("f2.......")
+        ctx.request.parameters["f2"] = ["xxxxx"]
+        ctx.go_on()

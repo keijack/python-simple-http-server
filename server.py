@@ -7,6 +7,7 @@ from server.DispatcherHttpServer import RequestMapping, DispatcherHttpServer, Fi
 
 index = Index()
 FilterMapping.filter("/.*$", index.filter)
+FilterMapping.filter("/index$", index.f2)
 
 # Map request to controllers
 RequestMapping.map("/index", index.index)

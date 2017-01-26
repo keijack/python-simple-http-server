@@ -99,6 +99,8 @@ class FilterContex:
         self.__req_handler._send_response(self.response)
 
     def go_on(self):
+        if self.response.is_sent:
+            return
         if len(self.__filters) == 0:
             self.__controller(self.request, self.response)
         else:
@@ -184,7 +186,7 @@ class DispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def _send_response(self, response):
         if response.is_sent:
             return
-        self.sent = True
+        response.is_sent = True
         self.send_response(response.statusCode)
 
         self.send_header("Content-Type", response.contentType)
