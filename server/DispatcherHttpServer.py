@@ -52,6 +52,8 @@ class RequestMapping:
             RequestMapping.GET[url] = fun
         elif method.upper() == "POST":
             RequestMapping.POST[url] = fun
+        else:
+            Logger.error("Method[" + method + "] is not supported yet")
 
 
 class Request:
