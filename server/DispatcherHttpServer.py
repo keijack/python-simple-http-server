@@ -75,6 +75,7 @@ class Response:
     """Response"""
 
     def __init__(self):
+        self.is_sent = False
         self.statusCode = 200
         self.contentType = "application/json; charset=utf8"
         self.headers = {}
@@ -84,21 +85,26 @@ class Response:
 class FilterContex:
     """Context of a filter"""
 
-    def __init__(self, handler, req, res, controller, nxt=None):
+    def __init__(self, handler, req, res, controller):
         self.request = req
         self.response = res
-        self.__controller = controller
-        self.__next = nxt
         self.__req_handler = handler
+        self.__controller = controller
+        self.__filters = []
+
+    def _add_filter(self, filter):
+        self.__filters.append(filter)
 
     def send_response(self):
         self.__req_handler._send_response(self.response)
 
     def go_on(self):
-        if self.__next:
-            self.__next(self);
-        else:
+        if len(self.__filters) == 0:
             self.__controller(self.request, self.response)
+        else:
+            fun = self.__filters[0]
+            self.__filters = self.__filters[1:]
+            fun(self)
 
 
 class DispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
@@ -121,7 +127,11 @@ class DispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             res.body = "Cannot find controller for your path"
         else:
             fun = mapping[path]
-            fun(req, res)
+            ctx = FilterContex(self, req, res, fun)
+            filters = FilterMapping._get_matched_filters(path)
+            for f in filters:
+                ctx._add_filter(f)
+            ctx.go_on()
         return res
 
     def __prepare_request(self, method):
@@ -172,6 +182,9 @@ class DispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         return joins
 
     def _send_response(self, response):
+        if response.is_sent:
+            return
+        self.sent = True
         self.send_response(response.statusCode)
 
         self.send_header("Content-Type", response.contentType)
