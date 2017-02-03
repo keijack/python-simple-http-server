@@ -63,9 +63,9 @@ class Request:
         self.path = ""
         self.parameters = {}
 
-    def parameter(self, key):
+    def parameter(self, key, default=None):
         if key not in self.parameters.keys():
-            return None
+            return default
         else:
             return self.parameters[key][0]
 
