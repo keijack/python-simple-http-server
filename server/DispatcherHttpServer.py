@@ -14,7 +14,6 @@ class FilterMapping:
     """Filter Mapping"""
 
     __SORTED_KEYS = []
-
     __FILTER = {}
 
     def __init__(self):
@@ -37,23 +36,21 @@ class FilterMapping:
 class RequestMapping:
     """Request Mapping"""
 
-    GET = {}
-    POST = {}
+    COMMON = {}
+    SPECIFIC = {}
 
     def __init__(self):
         pass
 
     @staticmethod
     def map(url, fun, method=""):
-        if method == "":
-            RequestMapping.GET[url] = fun
-            RequestMapping.POST[url] = fun
-        elif method.upper() == "GET":
-            RequestMapping.GET[url] = fun
-        elif method.upper() == "POST":
-            RequestMapping.POST[url] = fun
+        if method is None or method == "":
+            RequestMapping.COMMON[url] = fun
         else:
-            Logger.error("Method[" + method + "] is not supported yet")
+            mth = method.upper()
+            if mth not in RequestMapping.SPECIFIC.keys():
+                RequestMapping.SPECIFIC[mth] = {}
+            RequestMapping.SPECIFIC[mth][url] = fun
 
 
 class Request:
@@ -114,35 +111,39 @@ class FilterContex:
 class DispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     """The Class will dispatch the request to the controller configured in RequestMapping"""
 
-    def do_GET(self):
-        res = self.__process("GET")
-        self._send_response(res)
-
     def __process(self, method):
-        path, req = self.__prepare_request(method)
-        res = Response()
+        mth = method.upper()
 
-        if method == "POST":
-            mapping = RequestMapping.POST
+        req = self.__prepare_request(mth)
+        path = req.path
+
+        if mth == "HEAD":
+            # seek controller from GET configuration
+            mth = "GET"
+        if mth in RequestMapping.SPECIFIC.keys() and path in RequestMapping.SPECIFIC[mth].keys():
+            ctrl = RequestMapping.SPECIFIC[mth][path]
+        elif path in RequestMapping.COMMON.keys():
+            ctrl = RequestMapping.COMMON[path]
         else:
-            mapping = RequestMapping.GET
-        if path not in mapping.keys():
+            ctrl = None
+
+        res = Response()
+        if ctrl is None:
             res.statusCode = 404
             res.body = '{"error":"Cannot find controller for your path"}'
         else:
-            fun = mapping[path]
-            ctx = FilterContex(self, req, res, fun)
+            ctx = FilterContex(self, req, res, ctrl)
             filters = FilterMapping._get_matched_filters(path)
             for f in filters:
                 ctx._add_filter(f)
             ctx.go_on()
-        return res
+        return req, res
 
     def __prepare_request(self, method):
-        Logger.debug(self.path)
         path = self.__get_path(self.path)
         Logger.debug(path + " [" + method + "] is bing visited")
         req = Request()
+        req.path = path
         req.headers = self.headers
         Logger.debug("Headers: " + str(req.headers))
         req.method = method
@@ -154,7 +155,7 @@ class DispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             self.rfile.close()
             data_params = self.__decode_query_string(data)
             req.parameters = self.__merge(data_params, req.parameters)
-        return path, req
+        return req
 
     def __decode_query_string(self, query_string):
         params = {}
@@ -185,7 +186,7 @@ class DispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             joins += str(item)
         return joins
 
-    def _send_response(self, response):
+    def _send_response(self, (request, response)):
         if response.is_sent:
             return
         response.is_sent = True
@@ -199,18 +200,25 @@ class DispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
         self.end_headers()
         Logger.debug("body::" + response.body)
-        if response.body is not None:
+
+        if request.method != "HEAD":
             self.wfile.write(response.body)
             self.wfile.close()
 
+    def do_GET(self):
+        self._send_response(self.__process("GET"))
+
     def do_HEAD(self):
-        res = self.__process("HEAD")
-        res.body = None
-        self._send_response(res)
+        self._send_response(self.__process("HEAD"))
 
     def do_POST(self):
-        res = self.__process("POST")
-        self._send_response(res)
+        self._send_response(self.__process("POST"))
+
+    def do_PUT(self):
+        self._send_response(self.__process("PUT"))
+
+    def do_DELETE(self):
+        self._send_response(self.__process("DELETE"))
 
     def __merge(self, dic0, dic1):
         """Merge tow dictionaries of which the structure is {k:[v1, v2]}"""

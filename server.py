@@ -3,7 +3,7 @@
 
 from controller.Index import Index
 
-from server.DispatcherHttpServer import RequestMapping, DispatcherHttpServer, FilterMapping
+from server.DispatcherHttpServer import RequestMapping, FilterMapping, DispatcherHttpServer
 
 index = Index()
 FilterMapping.filter("/.*$", index.filter)
