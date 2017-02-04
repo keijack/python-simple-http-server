@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 
-from json import JSONEncoder
+import json
 
 
 class Index:
@@ -19,7 +19,7 @@ class Index:
                 params[k] = v[0]
             else:
                 params[k] = v
-        res.body = JSONEncoder().encode(params)
+        res.body = json.dumps(params, ensure_ascii=False)
 
     def filter(self, ctx):
         if ctx.request.parameter("stop") == "true":
