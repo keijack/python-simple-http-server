@@ -10,49 +10,6 @@ from urllib import unquote
 from Logger import Logger
 
 
-class FilterMapping:
-    """Filter Mapping"""
-
-    __SORTED_KEYS = []
-    __FILTER = {}
-
-    def __init__(self):
-        pass
-
-    @staticmethod
-    def filter(key, ft):
-        FilterMapping.__SORTED_KEYS.append(key)
-        FilterMapping.__FILTER[key] = ft
-
-    @staticmethod
-    def _get_matched_filters(path):
-        available_filters = []
-        for key in FilterMapping.__SORTED_KEYS:
-            if re.match(key, path):
-                available_filters.append(FilterMapping.__FILTER[key])
-        return available_filters
-
-
-class RequestMapping:
-    """Request Mapping"""
-
-    COMMON = {}
-    SPECIFIC = {}
-
-    def __init__(self):
-        pass
-
-    @staticmethod
-    def map(url, fun, method=""):
-        if method is None or method == "":
-            RequestMapping.COMMON[url] = fun
-        else:
-            mth = method.upper()
-            if mth not in RequestMapping.SPECIFIC.keys():
-                RequestMapping.SPECIFIC[mth] = {}
-            RequestMapping.SPECIFIC[mth][url] = fun
-
-
 class Request:
     """Request"""
 
@@ -106,6 +63,49 @@ class FilterContex:
             fun = self.__filters[0]
             self.__filters = self.__filters[1:]
             fun(self)
+
+
+class FilterMapping:
+    """Filter Mapping"""
+
+    __SORTED_KEYS = []
+    __FILTER = {}
+
+    def __init__(self):
+        pass
+
+    @staticmethod
+    def filter(key, ft):
+        FilterMapping.__SORTED_KEYS.append(key)
+        FilterMapping.__FILTER[key] = ft
+
+    @staticmethod
+    def _get_matched_filters(path):
+        available_filters = []
+        for key in FilterMapping.__SORTED_KEYS:
+            if re.match(key, path):
+                available_filters.append(FilterMapping.__FILTER[key])
+        return available_filters
+
+
+class RequestMapping:
+    """Request Mapping"""
+
+    COMMON = {}
+    SPECIFIC = {}
+
+    def __init__(self):
+        pass
+
+    @staticmethod
+    def map(url, fun, method=""):
+        if method is None or method == "":
+            RequestMapping.COMMON[url] = fun
+        else:
+            mth = method.upper()
+            if mth not in RequestMapping.SPECIFIC.keys():
+                RequestMapping.SPECIFIC[mth] = {}
+            RequestMapping.SPECIFIC[mth][url] = fun
 
 
 class DispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
@@ -249,6 +249,12 @@ class DispatcherHttpServer:
 
     class __ThreadingServer(ThreadingMixIn, BaseHTTPServer.HTTPServer):
         pass
+
+    def filter(self, pattern, filter_fun):
+        FilterMapping.filter(pattern, filter_fun)
+
+    def map_request(self, url, fun, method=""):
+        RequestMapping.map(url, fun, method)
 
     def __init__(self, host=('', 8888), multithread=True):
         self.host = host
