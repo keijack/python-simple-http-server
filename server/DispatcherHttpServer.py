@@ -265,4 +265,5 @@ class DispatcherHttpServer:
             server = self.__ThreadingServer(self.host, DispatcherHttpRequestHandler)
         else:
             server = BaseHTTPServer.HTTPServer(self.host, DispatcherHttpRequestHandler)
+        Logger.info("Dispatcher Http Server starts. Listen to port [" + str(self.host[1]) + "]")
         server.serve_forever()
