@@ -4,11 +4,11 @@
 from controller.Index import Index
 from controller.RunCmdCtrl import run_cmd
 
-from server.DispatcherHttpServer import DispatcherHttpServer
+from server.SimpleDispatcherHttpServer import SimpleDispatcherHttpServer
 
 index = Index()
 
-server = DispatcherHttpServer(('', 10087))
+server = SimpleDispatcherHttpServer(('', 10087))
 
 # filter configuration
 server.map_filter("/.*$", index.filter)

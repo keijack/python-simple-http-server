@@ -108,7 +108,7 @@ class RequestMapping:
             RequestMapping.SPECIFIC[mth][url] = fun
 
 
-class DispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
+class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     """The Class will dispatch the request to the controller configured in RequestMapping"""
 
     def __process(self, method):
@@ -244,7 +244,7 @@ class DispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         return path
 
 
-class DispatcherHttpServer:
+class SimpleDispatcherHttpServer:
     """Dispatcher Http server"""
 
     class __ThreadingServer(ThreadingMixIn, BaseHTTPServer.HTTPServer):
@@ -262,8 +262,8 @@ class DispatcherHttpServer:
 
     def start(self):
         if self.multithread:
-            server = self.__ThreadingServer(self.host, DispatcherHttpRequestHandler)
+            server = self.__ThreadingServer(self.host, SimpleDispatcherHttpRequestHandler)
         else:
-            server = BaseHTTPServer.HTTPServer(self.host, DispatcherHttpRequestHandler)
+            server = BaseHTTPServer.HTTPServer(self.host, SimpleDispatcherHttpRequestHandler)
         Logger.info("Dispatcher Http Server starts. Listen to port [" + str(self.host[1]) + "]")
         server.serve_forever()
