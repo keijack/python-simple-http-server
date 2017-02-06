@@ -250,7 +250,7 @@ class DispatcherHttpServer:
     class __ThreadingServer(ThreadingMixIn, BaseHTTPServer.HTTPServer):
         pass
 
-    def filter(self, pattern, filter_fun):
+    def map_filter(self, pattern, filter_fun):
         FilterMapping.filter(pattern, filter_fun)
 
     def map_request(self, url, fun, method=""):
