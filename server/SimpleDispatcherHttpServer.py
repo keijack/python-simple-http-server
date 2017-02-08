@@ -1,15 +1,17 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-
+import sys
 import BaseHTTPServer
 import re
 from SocketServer import ThreadingMixIn
 from urllib import unquote
 
-from Logger import Logger
+import logging
 
-logger = Logger()
+logger = logging.getLogger("SimpleDispatcherHttpServer")
+logger.setLevel("WARN")
+logger.addHandler(logging.StreamHandler(sys.stdout))
 
 
 class Request:
