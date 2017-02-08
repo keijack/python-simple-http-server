@@ -10,7 +10,7 @@ from urllib import unquote
 import logging
 
 logger = logging.getLogger("SimpleDispatcherHttpServer")
-logger.setLevel("WARN")
+logger.setLevel("INFO")
 logger.addHandler(logging.StreamHandler(sys.stdout))
 
 
@@ -175,6 +175,29 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             req.parameters = self.__merge(data_params, req.parameters)
         return req
 
+    def __merge(self, dic0, dic1):
+        """Merge tow dictionaries of which the structure is {k:[v1, v2]}"""
+        dic = dic1
+        for k, v in dic0.items():
+            if k not in dic.keys():
+                dic[k] = v
+            else:
+                for i in v:
+                    dic[k].append(i)
+        return dic
+
+    def __get_query_string(self, oriPath):
+        parts = oriPath.split('?')
+        if len(parts) == 2:
+            return parts[1]
+        else:
+            return ""
+
+    def __get_path(self, oriPath):
+        path = oriPath.split('?', 1)[0]
+        path = path.split('#', 1)[0]
+        return path
+
     def __decode_multipart(self, content_type, data):
         boundary = "--" + content_type.split("; ")[1].split("=")[1]
         fields = data.split(boundary)
@@ -292,29 +315,6 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
     def do_DELETE(self):
         self._send_response(self.__process("DELETE"))
-
-    def __merge(self, dic0, dic1):
-        """Merge tow dictionaries of which the structure is {k:[v1, v2]}"""
-        dic = dic1
-        for k, v in dic0.items():
-            if k not in dic.keys():
-                dic[k] = v
-            else:
-                for i in v:
-                    dic[k].append(i)
-        return dic
-
-    def __get_query_string(self, oriPath):
-        parts = oriPath.split('?')
-        if len(parts) == 2:
-            return parts[1]
-        else:
-            return ""
-
-    def __get_path(self, oriPath):
-        path = oriPath.split('?', 1)[0]
-        path = path.split('#', 1)[0]
-        return path
 
 
 class SimpleDispatcherHttpServer:
