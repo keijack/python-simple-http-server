@@ -9,6 +9,8 @@ from urllib import unquote
 
 from Logger import Logger
 
+logger = Logger()
+
 
 class Request:
     """Request"""
@@ -16,7 +18,7 @@ class Request:
     def __init__(self):
         self.method = ""
         self.headers = {}
-        self.queryString = ""
+        self.query_string = ""
         self.path = ""
         self.parameters = {}
 
@@ -27,13 +29,22 @@ class Request:
             return self.parameters[key][0]
 
 
+class MultipartFile:
+    """Multipart file"""
+
+    def __init__(self):
+        self.filename = ""
+        self.content_type = ""
+        self.content = ""
+
+
 class Response:
     """Response"""
 
     def __init__(self):
         self.is_sent = False
-        self.statusCode = 200
-        self.contentType = "application/json; charset=utf8"
+        self.status_code = 200
+        self.content_type = "application/json; charset=utf8"
         self.headers = {}
         self.body = ""
 
@@ -129,7 +140,7 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
         res = Response()
         if ctrl is None:
-            res.statusCode = 404
+            res.status_code = 404
             res.body = '{"error":"Cannot find controller for your path"}'
         else:
             ctx = FilterContex(self, req, res, ctrl)
@@ -141,26 +152,82 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
     def __prepare_request(self, method):
         path = self.__get_path(self.path)
-        Logger.debug(path + " [" + method + "] is bing visited")
+        logger.debug(path + " [" + method + "] is bing visited")
         req = Request()
         req.path = path
         req.headers = self.headers
-        Logger.debug("Headers: " + str(req.headers))
+        logger.debug("Headers: " + str(req.headers))
         req.method = method
         query_string = self.__get_query_string(self.path)
-        Logger.debug("query string: " + query_string)
+        logger.debug("query string: " + query_string)
         req.parameters = self.__decode_query_string(query_string)
+
         if "content-length" in self.headers.keys():
             data = self.rfile.read(int(self.headers["content-length"]))
             self.rfile.close()
-            data_params = self.__decode_query_string(data)
+            content_type = self.headers["content-type"]
+            if content_type.lower().startswith("multipart/form-data"):
+                data_params = self.__decode_multipart(content_type, data)
+            else:
+                data_params = self.__decode_query_string(data)
             req.parameters = self.__merge(data_params, req.parameters)
         return req
+
+    def __decode_multipart(self, content_type, data):
+        boundary = "--" + content_type.split("; ")[1].split("=")[1]
+        fields = data.split(boundary)
+        fields = fields[1: len(fields) - 1]  # ignore the first empty row and the last end symbol
+        params = {}
+        for field in fields:
+            key, val = self.__decode_multipart_field(field.strip())
+            self.__put_to(params, key, val)
+        return params
+
+    def __decode_multipart_field(self, field):
+        # first line: Content-Disposition
+        line, rest = self.__read_line(field)
+        logger.debug("line::" + line)
+        kvs = self.__decode_content_disposition(line)
+        if len(kvs) == 1:
+            # this is a string field, the second line is an empty line, the rest is the value
+            empty_line, val = self.__read_line(rest)
+        elif len(kvs) == 2:
+            # this is a file field
+            val = MultipartFile()
+            val.filename = kvs["filename"]
+            # the second line is Content-Type line
+            ct_line, rest = self.__read_line(rest)
+            val.content_type = ct_line.split(":")[1].strip()
+            # the third line is an empty line, the rest is the value
+            empty_line, val.content = self.__read_line(rest)
+        else:
+            val = "UNKNOWN"
+
+        return kvs["name"], val
+
+    def __decode_content_disposition(self, line):
+        cont_dis = {}
+        es = line.split(";")[1:]
+        for e in es:
+            e = e.strip()
+            kv = e.split("=")
+            k = kv[0]
+            v = kv[1]
+            v = v[1: len(v) - 1]  # ignore the '"' symbol
+            cont_dis[k] = v
+        return cont_dis
+
+    def __read_line(self, txt, line_breaker="\r\n"):
+        try:
+            idx = txt.index(line_breaker)
+            return txt[0: idx], txt[idx + 2:]
+        except ValueError:
+            return txt, None
 
     def __decode_query_string(self, query_string):
         params = {}
         pairs = query_string.split("&")
-        Logger.debug("pairs: " + str(pairs))
+        logger.debug("pairs: " + str(pairs))
         for item in pairs:
             apair = item.split("=")
             if len(apair) == 0:
@@ -168,15 +235,19 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             key = apair[0]
             val = ""
             if len(apair) >= 2:
+                # join back, there may be some parameters like a=b=c
                 val = self.__join(apair[1:], "=")
             val = unquote(val)
 
-            if key not in params.keys():
-                params[key] = [val]
-            else:
-                params[key].append(val)
+            self.__put_to(params, key, val)
 
         return params
+
+    def __put_to(self, params, key, val):
+        if key not in params.keys():
+            params[key] = [val]
+        else:
+            params[key].append(val)
 
     def __join(self, list, mid=""):
         joins = ""
@@ -190,16 +261,16 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         if response.is_sent:
             return
         response.is_sent = True
-        self.send_response(response.statusCode)
+        self.send_response(response.status_code)
 
-        self.send_header("Content-Type", response.contentType)
+        self.send_header("Content-Type", response.content_type)
         self.send_header("Last-Modified", str(self.date_time_string()))
         for (k, v) in response.headers.items():
             self.send_header(k, v)
         self.send_header("Content-Length", len(response.body))
 
         self.end_headers()
-        Logger.debug("body::" + response.body)
+        logger.debug("body::" + response.body)
 
         if request.method != "HEAD":
             self.wfile.write(response.body)
@@ -265,5 +336,5 @@ class SimpleDispatcherHttpServer:
             server = self.__ThreadingServer(self.host, SimpleDispatcherHttpRequestHandler)
         else:
             server = BaseHTTPServer.HTTPServer(self.host, SimpleDispatcherHttpRequestHandler)
-        Logger.info("Dispatcher Http Server starts. Listen to port [" + str(self.host[1]) + "]")
+        logger.info("Dispatcher Http Server starts. Listen to port [" + str(self.host[1]) + "]")
         server.serve_forever()

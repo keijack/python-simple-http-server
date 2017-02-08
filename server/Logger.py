@@ -8,18 +8,15 @@ class Logger:
     def __init__(self):
         pass
 
-    @staticmethod
-    def debug(msg):
-        print(msg)
+    def debug(self, msg):
+        # print("[DEBUG] " + str(msg))
+        pass
 
-    @staticmethod
-    def info(msg):
-        print(msg)
+    def info(self, msg):
+        print("[INFO] " + str(msg))
 
-    @staticmethod
-    def warn(msg):
-        print(msg)
+    def warn(self, msg):
+        print("[WARN] " + str(msg))
 
-    @staticmethod
-    def error(msg):
-        print(msg)
+    def error(self, msg):
+        print("[ERROR]" + str(msg))

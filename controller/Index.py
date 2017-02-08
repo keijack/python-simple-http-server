@@ -3,6 +3,7 @@
 
 
 import json
+from server.SimpleDispatcherHttpServer import MultipartFile
 
 
 class Index:
@@ -16,7 +17,13 @@ class Index:
         params = {}
         for k, v in req.parameters.items():
             if len(v) == 1:
-                params[k] = v[0]
+                val = v[0]
+                if isinstance(val, MultipartFile):
+                    params[k] = val.filename
+                    print(k + "-> file content-type ->" + val.content_type)
+                    print(k + "-> file content -> " + val.content)
+                else:
+                    params[k] = val
             else:
                 params[k] = v
         res.body = json.dumps(params, ensure_ascii=False)
