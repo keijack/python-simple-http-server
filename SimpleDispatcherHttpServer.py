@@ -88,7 +88,7 @@ class FilterMapping:
         pass
 
     @staticmethod
-    def filter(key, ft):
+    def map(key, ft):
         FilterMapping.__SORTED_KEYS.append(key)
         FilterMapping.__FILTER[key] = ft
 
@@ -324,7 +324,7 @@ class SimpleDispatcherHttpServer:
         pass
 
     def map_filter(self, pattern, filter_fun):
-        FilterMapping.filter(pattern, filter_fun)
+        FilterMapping.map(pattern, filter_fun)
 
     def map_request(self, url, fun, method=""):
         RequestMapping.map(url, fun, method)
