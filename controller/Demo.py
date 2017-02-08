@@ -3,7 +3,27 @@
 
 
 import json
-from server.SimpleDispatcherHttpServer import MultipartFile
+
+from SimpleDispatcherHttpServer import MultipartFile
+
+
+class Filter:
+    """Filter Demod"""
+
+    def __init__(self):
+        pass
+
+    def filter1(self, ctx):
+        if ctx.request.parameter("to403") == "true":
+            ctx.response.statusCode = 403
+            ctx.send_response()
+            return
+        ctx.request.parameters["filter-add"] = ["0001"]
+        ctx.go_on()
+
+    def filter2(self, ctx):
+        ctx.request.parameters["filter2"] = ["xxxxx"]
+        ctx.go_on()
 
 
 class Index:
@@ -27,16 +47,3 @@ class Index:
             else:
                 params[k] = v
         res.body = json.dumps(params, ensure_ascii=False)
-
-    def filter(self, ctx):
-        if ctx.request.parameter("stop") == "true":
-            ctx.response.statusCode = 403
-            ctx.send_response()
-            return
-        ctx.request.parameters["filter-add"] = ["0001"]
-        ctx.go_on()
-
-    def f2(self, ctx):
-        print("f2.......")
-        ctx.request.parameters["f2"] = ["xxxxx"]
-        ctx.go_on()

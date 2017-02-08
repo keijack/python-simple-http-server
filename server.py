@@ -1,18 +1,18 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from controller.Index import Index
+from SimpleDispatcherHttpServer import SimpleDispatcherHttpServer
+from controller.Demo import Filter, Index
 from controller.RunCmdCtrl import run_cmd
 
-from server.SimpleDispatcherHttpServer import SimpleDispatcherHttpServer
-
+filters = Filter()
 index = Index()
 
 server = SimpleDispatcherHttpServer(('', 10087))
 
 # filter configuration
-server.map_filter("/.*$", index.filter)
-server.map_filter("/index$", index.f2)
+server.map_filter("/.*$", filters.filter1)
+server.map_filter("/index$", filters.filter2)
 
 # request mapping
 server.map_request("/index", index.index)
