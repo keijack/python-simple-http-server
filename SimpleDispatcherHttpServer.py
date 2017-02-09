@@ -204,7 +204,8 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         fields = fields[1: len(fields) - 1]  # ignore the first empty row and the last end symbol
         params = {}
         for field in fields:
-            key, val = self.__decode_multipart_field(field.strip())
+            f = field[field.index("\r\n") + 2: field.rindex("\r\n")]  # trim the first and the last empty row
+            key, val = self.__decode_multipart_field(f)
             self.__put_to(params, key, val)
         return params
 
@@ -234,18 +235,18 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         cont_dis = {}
         es = line.split(";")[1:]
         for e in es:
-            e = e.strip()
-            kv = e.split("=")
-            k = kv[0]
-            v = kv[1]
-            v = v[1: len(v) - 1]  # ignore the '"' symbol
-            cont_dis[k] = v
+            k, v = self.__break(e.strip(), "=")
+            cont_dis[k] = v[1: len(v) - 1]  # ignore the '"' symbol
         return cont_dis
 
-    def __read_line(self, txt, line_breaker="\r\n"):
+    def __read_line(self, txt):
+        logger.debug("txt is -> " + str(txt))
+        return self.__break(txt, "\r\n")
+
+    def __break(self, txt, separator):
         try:
-            idx = txt.index(line_breaker)
-            return txt[0: idx], txt[idx + 2:]
+            idx = txt.index(separator)
+            return txt[0: idx], txt[idx + len(separator):]
         except ValueError:
             return txt, None
 
@@ -254,17 +255,9 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         pairs = query_string.split("&")
         logger.debug("pairs: " + str(pairs))
         for item in pairs:
-            apair = item.split("=")
-            if len(apair) == 0:
-                continue
-            key = apair[0]
-            val = ""
-            if len(apair) >= 2:
-                # join back, there may be some parameters like a=b=c
-                val = self.__join(apair[1:], "=")
-            val = unquote(val)
-
-            self.__put_to(params, key, val)
+            key, val = self.__break(item, "=")
+            if val is None: val = ""
+            self.__put_to(params, key, unquote(val))
 
         return params
 
@@ -273,14 +266,6 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             params[key] = [val]
         else:
             params[key].append(val)
-
-    def __join(self, list, mid=""):
-        joins = ""
-        for item in list:
-            if joins != "":
-                joins += mid
-            joins += str(item)
-        return joins
 
     def _send_response(self, (request, response)):
         if response.is_sent:
