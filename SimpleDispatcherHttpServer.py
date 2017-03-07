@@ -23,6 +23,7 @@ class Request:
         self.query_string = ""
         self.path = ""
         self.parameters = {}
+        self.body = ""
 
     def parameter(self, key, default=None):
         if key not in self.parameters.keys():
@@ -167,11 +168,14 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         if "content-length" in self.headers.keys():
             data = self.rfile.read(int(self.headers["content-length"]))
             self.rfile.close()
+            req.body = data
             content_type = self.headers["content-type"]
-            if content_type.lower().startswith("multipart/form-data"):
+            if content_type.lower().startwith("application/x-www-form-urlencoded"):
+                data_params = self.__decode_query_string(data)
+            elif content_type.lower().startswith("multipart/form-data"):
                 data_params = self.__decode_multipart(content_type, data)
             else:
-                data_params = self.__decode_query_string(data)
+                data_params = {}
             req.parameters = self.__merge(data_params, req.parameters)
         return req
 
@@ -275,7 +279,7 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
         self.send_header("Content-Type", response.content_type)
         self.send_header("Last-Modified", str(self.date_time_string()))
-        for (k, v) in response.headers.items():
+        for k, v in response.headers.items():
             self.send_header(k, v)
         self.send_header("Content-Length", len(response.body))
 
@@ -286,20 +290,23 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             self.wfile.write(response.body)
             self.wfile.close()
 
+    def do_method(self, method):
+        self._send_response(self.__process(method))
+
     def do_GET(self):
-        self._send_response(self.__process("GET"))
+        self.do_method("GET")
 
     def do_HEAD(self):
-        self._send_response(self.__process("HEAD"))
+        self.do_method("HEAD")
 
     def do_POST(self):
-        self._send_response(self.__process("POST"))
+        self.do_method("POST")
 
     def do_PUT(self):
-        self._send_response(self.__process("PUT"))
+        self.do_method("PUT")
 
     def do_DELETE(self):
-        self._send_response(self.__process("DELETE"))
+        self.do_method("DELETE")
 
 
 class SimpleDispatcherHttpServer:
