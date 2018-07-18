@@ -150,7 +150,11 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             filters = FilterMapping._get_matched_filters(path)
             for f in filters:
                 ctx._add_filter(f)
-            ctx.go_on()
+            try:
+                ctx.go_on()
+            except Exception as e:
+                res.status_code = 500
+                res.body = '{"error": "' + e.message + '"}'
         return req, res
 
     def __prepare_request(self, method):
