@@ -26,7 +26,7 @@ pip install simple_http_server
 
 ```python
 from simple_http_server.server import request_map
-from simple_http_server.simple_http_server import Response
+from simple_http_server.http_server import Response
 
 
 @request_map("/index")

@@ -19,6 +19,7 @@ except ImportError:
 
 from simple_http_server.__logger__ import getLogger
 
+
 _logger = getLogger("SimpleHttpServer")
 
 
