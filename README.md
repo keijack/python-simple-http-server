@@ -25,15 +25,36 @@ pip install simple_http_server
 ### Write Controllers
 
 ```python
+f
 from simple_http_server.server import request_map
+from simple_http_server.simple_http_server import Response
+
 
 @request_map("/index")
-def my_ctrl(paramters=None,
+def my_ctrl(parameters=None,
             json=None,
             **kargs  # This is required, for there are still other key arguments that will set to call this function
             ):
 
-    return {"code": 0, "message": "success"} # You can return a dictionary, a string or a `simple_http_server.simple_http_server.Response` object.
+    return {"code": 0, "message": "success"}  # You can return a dictionary, a string or a `simple_http_server.simple_http_server.Response` object.
+
+
+@request_map("/say_hello", method="GET")
+def my_ctrl2(
+        parameter=None,
+        **kargs):
+    return "<!DOCTYPE html><html><body>hello, %s</body></html>" % parameter["name"]
+
+
+@request_map("/error")
+def my_ctrl3(**kargs):
+    return Response(status_code=500)
+
+
+@request_map("/")
+def my_ctrl4(response=None,
+             **kargs):
+    response.send_redirect("/index")
 ```
 
 ### Start your server

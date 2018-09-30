@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
-from py_simple_http_server.simple_http_server import SimpleDispatcherHttpServer
-from py_simple_http_server.__logger__ import getLogger
+from simple_http_server.simple_http_server import SimpleDispatcherHttpServer
+from simple_http_server.__logger__ import getLogger
 
 __logger = getLogger("server")
 

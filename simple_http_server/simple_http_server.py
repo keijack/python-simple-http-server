@@ -22,7 +22,7 @@ from simple_http_server.__logger__ import getLogger
 _logger = getLogger("SimpleHttpServer")
 
 
-class Request:
+class Request(object):
     """Request"""
 
     def __init__(self):
@@ -30,15 +30,31 @@ class Request:
         self.headers = {}  # Request headers
         self.query_string = ""  # Query String
         self.path = ""  # Path
-        self.parameters = {}  # Parameters, merged by query string and request body if the `Content-Type` in request header is `application/x-www-form-urlencoded` or `multipart/form-data`
+        self.__parameters = {}  # Parameters, key-value array, merged by query string and request body if the `Content-Type` in request header is `application/x-www-form-urlencoded` or `multipart/form-data`
+        self.__parameter = {} # Parameters, key-value, if more than one parameters with the same key, only the first one will be stored.
         self.body = ""  # Request body
         self.json = None  # A dictionary if the `Content-Type` in request header is `application/json`
 
-    def parameter(self, key, default=None):
+    @property
+    def parameters(self):
+        return self.__parameters
+
+    @parameters.setter
+    def parameters(self, val):
+        self.__parameters = val
+        self.__parameter = {}
+        for k, v in self.__parameters.items():
+            self.__parameter[k] = v[0]
+
+    @property
+    def parameter(self):
+        return self.__parameter
+
+    def get_parameter(self, key, default=None):
         if key not in self.parameters.keys():
             return default
         else:
-            return self.parameters[key][0]
+            return self.parameter[key]
 
 
 class MultipartFile:
@@ -138,6 +154,7 @@ class FilterContex:
             ctr_res = self.__controller(request=self.request,
                                         response=self.response,
                                         headers=self.request.headers,
+                                        parameter=self.request.parameter, 
                                         parameters=self.request.parameters,
                                         body=self.request.body,
                                         json=self.request.json,
@@ -165,7 +182,8 @@ class FilterContex:
                 assert False, "Cannot reconize response type %s " % str(type(ctr_res))
             if self.request.method.upper() == "HEAD":
                 self.response.body = ""
-            self.response.send_response()
+            if not self.response.is_sent:
+                self.response.send_response()
         else:
             fun = self.__filters[0]
             self.__filters = self.__filters[1:]
