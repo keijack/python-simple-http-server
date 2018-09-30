@@ -25,7 +25,6 @@ pip install simple_http_server
 ### Write Controllers
 
 ```python
-f
 from simple_http_server.server import request_map
 from simple_http_server.simple_http_server import Response
 
