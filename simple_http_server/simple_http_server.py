@@ -31,7 +31,7 @@ class Request(object):
         self.query_string = ""  # Query String
         self.path = ""  # Path
         self.__parameters = {}  # Parameters, key-value array, merged by query string and request body if the `Content-Type` in request header is `application/x-www-form-urlencoded` or `multipart/form-data`
-        self.__parameter = {} # Parameters, key-value, if more than one parameters with the same key, only the first one will be stored.
+        self.__parameter = {}  # Parameters, key-value, if more than one parameters with the same key, only the first one will be stored.
         self.body = ""  # Request body
         self.json = None  # A dictionary if the `Content-Type` in request header is `application/json`
 
@@ -154,14 +154,14 @@ class FilterContex:
             ctr_res = self.__controller(request=self.request,
                                         response=self.response,
                                         headers=self.request.headers,
-                                        parameter=self.request.parameter, 
+                                        parameter=self.request.parameter,
                                         parameters=self.request.parameters,
                                         body=self.request.body,
                                         json=self.request.json,
                                         data=self.request.json)
             if isinstance(ctr_res, dict):
                 self.response.set_header("Content-Type", "application/json; charset=utf8")
-                self.response.body = json.dumps(ctr_res)
+                self.response.body = json.dumps(ctr_res, ensure_ascii=False)
             elif isinstance(ctr_res, Response):
                 self.response.status_code = ctr_res.status_code
                 self.response.body = ctr_res.body
