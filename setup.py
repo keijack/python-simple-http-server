@@ -5,11 +5,11 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="py_eureka_client",
-    version="0.0.2",
+    name="simple_http_server",
+    version="0.0.1",
     author="Keijack",
     author_email="keijack.wu@gmail.com",
-    description="An eureka client written in python, you can easily intergrate your python components with spring cloud.",
+    description="This is a simple http server, use MVC like design.",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/keijack/python-simple-http-server",

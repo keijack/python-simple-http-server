@@ -17,7 +17,7 @@ try:
 except ImportError:
     from urllib import unquote
 
-from py_simple_http_server.__logger__ import getLogger
+from simple_http_server.__logger__ import getLogger
 
 _logger = getLogger("SimpleHttpServer")
 
@@ -26,13 +26,13 @@ class Request:
     """Request"""
 
     def __init__(self):
-        self.method = ""
-        self.headers = {}
-        self.query_string = ""
-        self.path = ""
-        self.parameters = {}
-        self.body = ""
-        self.json = None
+        self.method = ""  # GET, POST, PUT, DELETE, HEAD, etc.
+        self.headers = {}  # Request headers
+        self.query_string = ""  # Query String
+        self.path = ""  # Path
+        self.parameters = {}  # Parameters, merged by query string and request body if the `Content-Type` in request header is `application/x-www-form-urlencoded` or `multipart/form-data`
+        self.body = ""  # Request body
+        self.json = None  # A dictionary if the `Content-Type` in request header is `application/json`
 
     def parameter(self, key, default=None):
         if key not in self.parameters.keys():
