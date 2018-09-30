@@ -1,17 +1,25 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 import sys
-import BaseHTTPServer
 import re
-from SocketServer import ThreadingMixIn
-from urllib import unquote
+import json
+from threading import Thread
+try:
+    import http.server as BaseHTTPServer
+except ImportError:
+    import BaseHTTPServer
+try:
+    from socketserver import ThreadingMixIn
+except ImportError:
+    from SocketServer import ThreadingMixIn
+try:
+    from urllib.parse import unquote
+except ImportError:
+    from urllib import unquote
 
-import logging
+from py_simple_http_server.__logger__ import getLogger
 
-logger = logging.getLogger("SimpleDispatcherHttpServer")
-logger.setLevel("INFO")
-logger.addHandler(logging.StreamHandler(sys.stdout))
+_logger = getLogger("SimpleHttpServer")
 
 
 class Request:
@@ -24,6 +32,7 @@ class Request:
         self.path = ""
         self.parameters = {}
         self.body = ""
+        self.json = None
 
     def parameter(self, key, default=None):
         if key not in self.parameters.keys():
@@ -41,38 +50,122 @@ class MultipartFile:
         self.content = ""
 
 
-class Response:
+class Response(object):
     """Response"""
 
-    def __init__(self):
-        self.is_sent = False
-        self.status_code = 200
-        self.content_type = "application/json; charset=utf8"
-        self.headers = {}
+    def __init__(self,
+                 status_code=200,
+                 content_type="application/json; charset=utf8",
+                 headers=None,
+                 body=""):
+        self.status_code = status_code
+        self.content_type = content_type
+        self.__headers = headers if headers is not None else {}
         self.body = ""
+
+    @property
+    def headers(self):
+        return self.__headers
+
+    def set_header(self, key, value):
+        self.__headers[key] = value
+
+
+class ResponseWrapper(object):
+    """ """
+
+    def __init__(self, handler,
+                 status_code=200,
+                 headers=None):
+        self.status_code = status_code
+        self.__headers = headers if headers is not None else {}
+        self.__headers["Content-Type"] = "text/plain"
+        self.__body = ""
+        self.__req_handler = handler
+        self.__is_sent = False
+
+    @property
+    def headers(self):
+        return self.__headers
+
+    @property
+    def body(self):
+        return self.__body
+
+    @body.setter
+    def body(self, body):
+        assert not self.__is_sent, "This response has benn sent"
+        _logger.debug("body set:: %s" % body)
+        self.__body = body
+
+    @property
+    def is_sent(self):
+        return self.__is_sent
+
+    def set_header(self, key, value):
+        self.__headers[key] = value
+
+    def send_redirect(self, url):
+        self.status_code = 302
+        self.set_header("Location", url)
+        self.__body = ""
+        self.send_response()
+
+    def send_response(self):
+        assert not self.__is_sent, "This response has benn sent"
+        self.__is_sent = True
+        _logger.debug("send response...")
+        self.__req_handler._send_response({
+            "status_code": self.status_code,
+            "headers": self.__headers,
+            "body": self.__body
+        })
 
 
 class FilterContex:
     """Context of a filter"""
 
-    def __init__(self, handler, req, res, controller):
+    def __init__(self, req, res, controller, filters=None):
         self.request = req
         self.response = res
-        self.__req_handler = handler
         self.__controller = controller
-        self.__filters = []
+        self.__filters = filters if filters is not None else []
 
-    def _add_filter(self, filter):
-        self.__filters.append(filter)
-
-    def send_response(self):
-        self.__req_handler._send_response(self.response)
-
-    def go_on(self):
+    def do_chain(self):
         if self.response.is_sent:
             return
         if len(self.__filters) == 0:
-            self.__controller(self.request, self.response)
+            ctr_res = self.__controller(request=self.request,
+                                        response=self.response,
+                                        headers=self.request.headers,
+                                        parameters=self.request.parameters,
+                                        body=self.request.body,
+                                        json=self.request.json,
+                                        data=self.request.json)
+            if isinstance(ctr_res, dict):
+                self.response.set_header("Content-Type", "application/json; charset=utf8")
+                self.response.body = json.dumps(ctr_res)
+            elif isinstance(ctr_res, Response):
+                self.response.status_code = ctr_res.status_code
+                self.response.body = ctr_res.body
+                for k, v in ctr_res.headers.items():
+                    self.response.set_header(k, v)
+                if ctr_res.content_type is not None and ctr_res.content_type != "":
+                    self.response.set_header("Content-Type", ctr_res.content_type)
+            elif isinstance(ctr_res, str):
+                ctr_res = ctr_res.strip()
+                self.response.body = ctr_res
+                if ctr_res.startswith("<?xml") and ctr_res.endswith(">"):
+                    self.response.set_header("Content-Type", "text/xml")
+                elif ctr_res.startswith("<!DOCTYPE html") and ctr_res.endswith(">"):
+                    self.response.set_header("Content-Type", "text/html")
+                else:
+                    self.response.set_header("Content-Type", "text/plain")
+            else:
+                assert False, "Cannot reconize response type %s " % str(type(ctr_res))
+            if self.request.method.upper() == "HEAD":
+                self.response.body = ""
+            self.response.send_response()
         else:
             fun = self.__filters[0]
             self.__filters = self.__filters[1:]
@@ -131,9 +224,6 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         req = self.__prepare_request(mth)
         path = req.path
 
-        if mth == "HEAD":
-            # seek controller from GET configuration
-            mth = "GET"
         if mth in RequestMapping.SPECIFIC.keys() and path in RequestMapping.SPECIFIC[mth].keys():
             ctrl = RequestMapping.SPECIFIC[mth][path]
         elif path in RequestMapping.COMMON.keys():
@@ -141,32 +231,32 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         else:
             ctrl = None
 
-        res = Response()
+        res = ResponseWrapper(self)
         if ctrl is None:
             res.status_code = 404
             res.body = '{"error":"Cannot find controller for your path"}'
+            res.send_response()
         else:
-            ctx = FilterContex(self, req, res, ctrl)
             filters = FilterMapping._get_matched_filters(path)
-            for f in filters:
-                ctx._add_filter(f)
+            ctx = FilterContex(req, res, ctrl, filters)
             try:
-                ctx.go_on()
+                ctx.do_chain()
             except Exception as e:
+                _logger.exception("error occurs! returning 500")
                 res.status_code = 500
-                res.body = '{"error": "' + e.message + '"}'
-        return req, res
+                res.body = '{"error": "' + str(e) + '"}'
+                res.send_response()
 
     def __prepare_request(self, method):
         path = self.__get_path(self.path)
-        logger.debug(path + " [" + method + "] is bing visited")
+        _logger.debug(path + " [" + method + "] is bing visited")
         req = Request()
         req.path = path
         req.headers = self.headers
-        logger.debug("Headers: " + str(req.headers))
+        _logger.debug("Headers: " + str(req.headers))
         req.method = method
         query_string = self.__get_query_string(self.path)
-        logger.debug("query string: " + query_string)
+        _logger.debug("query string: " + query_string)
         req.parameters = self.__decode_query_string(query_string)
 
         if "content-length" in self.headers.keys():
@@ -174,10 +264,12 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             self.rfile.close()
             req.body = data
             content_type = self.headers["content-type"]
-            if content_type.lower().startwith("application/x-www-form-urlencoded"):
+            if content_type.lower().startswith("application/x-www-form-urlencoded"):
                 data_params = self.__decode_query_string(data)
             elif content_type.lower().startswith("multipart/form-data"):
                 data_params = self.__decode_multipart(content_type, data)
+            elif content_type.lower().startswith("application/json"):
+                req.json = json.loads(data)
             else:
                 data_params = {}
             req.parameters = self.__merge(data_params, req.parameters)
@@ -209,10 +301,12 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def __decode_multipart(self, content_type, data):
         boundary = "--" + content_type.split("; ")[1].split("=")[1]
         fields = data.split(boundary)
-        fields = fields[1: len(fields) - 1]  # ignore the first empty row and the last end symbol
+        # ignore the first empty row and the last end symbol
+        fields = fields[1: len(fields) - 1]
         params = {}
         for field in fields:
-            f = field[field.index("\r\n") + 2: field.rindex("\r\n")]  # trim the first and the last empty row
+            # trim the first and the last empty row
+            f = field[field.index("\r\n") + 2: field.rindex("\r\n")]
             key, val = self.__decode_multipart_field(f)
             self.__put_to(params, key, val)
         return params
@@ -220,11 +314,11 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def __decode_multipart_field(self, field):
         # first line: Content-Disposition
         line, rest = self.__read_line(field)
-        logger.debug("line::" + line)
+        _logger.debug("line::" + line)
         kvs = self.__decode_content_disposition(line)
         if len(kvs) == 1:
             # this is a string field, the second line is an empty line, the rest is the value
-            empty_line, val = self.__read_line(rest)
+            val = self.__read_line(rest)[1]
         elif len(kvs) == 2:
             # this is a file field
             val = MultipartFile()
@@ -233,7 +327,7 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             ct_line, rest = self.__read_line(rest)
             val.content_type = ct_line.split(":")[1].strip()
             # the third line is an empty line, the rest is the value
-            empty_line, val.content = self.__read_line(rest)
+            val.content = self.__read_line(rest)[1]
         else:
             val = "UNKNOWN"
 
@@ -248,7 +342,7 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         return cont_dis
 
     def __read_line(self, txt):
-        logger.debug("txt is -> " + str(txt))
+        _logger.debug("txt is -> " + str(txt))
         return self.__break(txt, "\r\n")
 
     def __break(self, txt, separator):
@@ -260,11 +354,14 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
     def __decode_query_string(self, query_string):
         params = {}
+        if not query_string:
+            return params
         pairs = query_string.split("&")
-        logger.debug("pairs: " + str(pairs))
+        _logger.debug("pairs: " + str(pairs))
         for item in pairs:
             key, val = self.__break(item, "=")
-            if val is None: val = ""
+            if val is None:
+                val = ""
             self.__put_to(params, key, unquote(val))
 
         return params
@@ -275,27 +372,22 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         else:
             params[key].append(val)
 
-    def _send_response(self, (request, response)):
-        if response.is_sent:
-            return
-        response.is_sent = True
-        self.send_response(response.status_code)
-
-        self.send_header("Content-Type", response.content_type)
+    def _send_response(self, response):
+        self.send_response(response["status_code"])
         self.send_header("Last-Modified", str(self.date_time_string()))
-        for k, v in response.headers.items():
+        for k, v in response["headers"].items():
             self.send_header(k, v)
-        self.send_header("Content-Length", len(response.body))
+        body = response["body"]
+        self.send_header("Content-Length", len(body))
 
         self.end_headers()
-        logger.debug("body::" + response.body)
+        _logger.debug("body::" + body)
 
-        if request.method != "HEAD":
-            self.wfile.write(response.body)
-            self.wfile.close()
+        if body is not None and body != "":
+            self.wfile.write(body.encode("utf8"))
 
     def do_method(self, method):
-        self._send_response(self.__process(method))
+        self.__process(method)
 
     def do_GET(self):
         self.do_method("GET")
@@ -311,6 +403,13 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
     def do_DELETE(self):
         self.do_method("DELETE")
+
+    # @override
+    def log_message(self, format, *args):
+        _logger.info("%s - - [%s] %s\n" %
+                     (self.client_address[0],
+                      self.log_date_time_string(),
+                      format % args))
 
 
 class SimpleDispatcherHttpServer:
@@ -328,11 +427,19 @@ class SimpleDispatcherHttpServer:
     def __init__(self, host=('', 8888), multithread=True):
         self.host = host
         self.multithread = multithread
+        if self.multithread:
+            self.server = self.__ThreadingServer(
+                self.host, SimpleDispatcherHttpRequestHandler)
+        else:
+            self.server = BaseHTTPServer.HTTPServer(
+                self.host, SimpleDispatcherHttpRequestHandler)
 
     def start(self):
-        if self.multithread:
-            server = self.__ThreadingServer(self.host, SimpleDispatcherHttpRequestHandler)
-        else:
-            server = BaseHTTPServer.HTTPServer(self.host, SimpleDispatcherHttpRequestHandler)
-        logger.info("Dispatcher Http Server starts. Listen to port [" + str(self.host[1]) + "]")
-        server.serve_forever()
+        _logger.info("Dispatcher Http Server starts. Listen to port [" + str(self.host[1]) + "]")
+        self.server.serve_forever()
+
+    def shutdown(self):
+        # server must shutdown in a separate thread, or it will be deadlocking...WTF!
+        t = Thread(target=self.server.shutdown)
+        t.daemon = True
+        t.start()
