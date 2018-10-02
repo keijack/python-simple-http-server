@@ -40,8 +40,13 @@ def my_ctrl(parameters=None,
 
 @request_map("/say_hello", method="GET")
 def my_ctrl2(
-        parameter=None,
+        parameter={"name": "1"}, # default values, if there are no name parameter in the request, the one here will be use
+        parameters={"name": "2"},
+        json={"name": "3"},
         **kargs):
+    print("parameter name %s " % parameter["name"])
+    print("parameters name %s " % str(parameters["name"]))
+    print("json name %s " % json["name"])
     return "<!DOCTYPE html><html><body>hello, %s</body></html>" % parameter["name"]
 
 

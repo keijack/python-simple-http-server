@@ -3,6 +3,9 @@
 import sys
 import re
 import json
+import copy
+import inspect
+from collections import OrderedDict
 from threading import Thread
 try:
     import http.server as BaseHTTPServer
@@ -152,14 +155,26 @@ class FilterContex:
         if self.response.is_sent:
             return
         if len(self.__filters) == 0:
+            defaults = _get_function_defaults(self.__controller)
+            default_headers = defaults["headers"] if "headers" in defaults else None
+            default_param = defaults["parameter"] if "parameter" in defaults else None
+            default_params = defaults["parameters"] if "parameters" in defaults else None
+            default_json = defaults["json"] if "json" in defaults else None
+            default_data = defaults["data"] if "data" in defaults else None
+            headers = self.__merge_default(self.request.headers, default_headers)
+            # headers = self.request.headers
+            param = self.__merge_default(self.request.parameter, default_param)
+            params = self.__merge_default_to_list(self.request.parameters, default_params)
+            json = self.__merge_default(self.request.json, default_json)
+            json = self.__merge_default(json, default_data)
             ctr_res = self.__controller(request=self.request,
                                         response=self.response,
-                                        headers=self.request.headers,
-                                        parameter=self.request.parameter,
-                                        parameters=self.request.parameters,
+                                        headers=headers,
+                                        parameter=param,
+                                        parameters=params,
                                         body=self.request.body,
-                                        json=self.request.json,
-                                        data=self.request.json)
+                                        json=json,
+                                        data=json)
             if isinstance(ctr_res, dict):
                 self.response.set_header("Content-Type", "application/json; charset=utf8")
                 self.response.body = json.dumps(ctr_res, ensure_ascii=False)
@@ -189,6 +204,32 @@ class FilterContex:
             fun = self.__filters[0]
             self.__filters = self.__filters[1:]
             fun(self)
+
+    def __merge_default(self, ori_dict, default_dict):
+        ori_dict_c = copy.deepcopy(ori_dict) if ori_dict is not None else {}
+        if default_dict is None:
+            return ori_dict_c
+        for k, v in default_dict.items():
+            if k not in ori_dict_c:
+                ori_dict_c[k] = v
+        return ori_dict_c
+
+    def __merge_default_to_list(self, ori_dict, default_dict):
+        ori_dict_c = copy.deepcopy(ori_dict) if ori_dict is not None else {}
+        if default_dict is None:
+            return ori_dict_c
+        for k, v in default_dict.items():
+            if k not in ori_dict_c:
+                if isinstance(v, list):
+                    ori_dict_c[k] = v
+                else:
+                    ori_dict_c[k] = [v]
+        return ori_dict_c
+
+
+def _get_function_defaults(func):
+    args = inspect.getargspec(func)
+    return OrderedDict(zip(args.args[-len(args.defaults):], args.defaults))
 
 
 class FilterMapping:
@@ -271,7 +312,11 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         _logger.debug(path + " [" + method + "] is bing visited")
         req = Request()
         req.path = path
-        req.headers = self.headers
+        headers = {}
+        for k in self.headers.keys():
+            headers[k] = self.headers[k]
+        req.headers = headers
+
         _logger.debug("Headers: " + str(req.headers))
         req.method = method
         query_string = self.__get_query_string(self.path)

@@ -19,12 +19,15 @@ def request_map(url, method=""):
             "method": method,
             "func": ctrl_fun
         })
+        # return the original function, so you can use a decoration chain
+        return ctrl_fun
     return map
 
 
 def filter(pattern):
     def map(filter_fun):
         __filters.append({"url_pattern": pattern, "func": filter_fun})
+        return filter_fun
     return map
 
 
