@@ -61,13 +61,26 @@ class Request(object):
             return self.parameter[key]
 
 
-class MultipartFile:
+class MultipartFile(object):
     """Multipart file"""
 
     def __init__(self):
         self.filename = ""
         self.content_type = ""
-        self.content = ""
+        self.__content = None
+
+    @property
+    def content(self):
+        return self.__content
+
+    @content.setter
+    def content(self, value):
+        assert self.__content is None, "This field `content` cannot be set"
+        self.__content = value
+
+    def save_to_file(self, file_path):
+        with open(file_path, "wb") as f:
+            f.write(self.__content)
 
 
 class Response(object):
@@ -115,7 +128,7 @@ class ResponseWrapper(object):
     @body.setter
     def body(self, body):
         assert not self.__is_sent, "This response has benn sent"
-        _logger.debug("body set:: %s" % body)
+        # _logger.debug("body set:: %s" % body)
         self.__body = body
 
     @property
@@ -185,15 +198,15 @@ class FilterContex:
                     self.response.set_header(k, v)
                 if ctr_res.content_type is not None and ctr_res.content_type != "":
                     self.response.set_header("Content-Type", ctr_res.content_type)
-            elif isinstance(ctr_res, str):
+            elif isinstance(ctr_res, str) or type(ctr_res).__name__ == "unicode":
                 ctr_res = ctr_res.strip()
                 self.response.body = ctr_res
                 if ctr_res.startswith("<?xml") and ctr_res.endswith(">"):
-                    self.response.set_header("Content-Type", "text/xml")
+                    self.response.set_header("Content-Type", "text/xml; charset=utf8")
                 elif ctr_res.startswith("<!DOCTYPE html") and ctr_res.endswith(">"):
-                    self.response.set_header("Content-Type", "text/html")
+                    self.response.set_header("Content-Type", "text/html; charset=utf8")
                 else:
-                    self.response.set_header("Content-Type", "text/plain")
+                    self.response.set_header("Content-Type", "text/plain; charset=utf8")
             else:
                 assert False, "Cannot reconize response type %s " % str(type(ctr_res))
             if self.request.method.upper() == "HEAD":
@@ -229,7 +242,10 @@ class FilterContex:
 
 def _get_function_defaults(func):
     args = inspect.getargspec(func)
-    return OrderedDict(zip(args.args[-len(args.defaults):], args.defaults))
+    if args is None or args.defaults is None:
+        return {}
+    else:
+        return OrderedDict(zip(args.args[-len(args.defaults):], args.defaults))
 
 
 class FilterMapping:
@@ -313,8 +329,10 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         req = Request()
         req.path = path
         headers = {}
+        _headers_in_lowers = {}
         for k in self.headers.keys():
             headers[k] = self.headers[k]
+            _headers_in_lowers[k.lower()] = self.headers[k]
         req.headers = headers
 
         _logger.debug("Headers: " + str(req.headers))
@@ -323,11 +341,11 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         _logger.debug("query string: " + query_string)
         req.parameters = self.__decode_query_string(query_string)
 
-        if "content-length" in self.headers.keys():
-            data = self.rfile.read(int(self.headers["content-length"]))
+        if "content-length" in _headers_in_lowers.keys():
+            data = self.rfile.read(int(_headers_in_lowers["content-length"])).decode("ISO-8859-1")
             self.rfile.close()
             req.body = data
-            content_type = self.headers["content-type"]
+            content_type = _headers_in_lowers["content-type"]
             if content_type.lower().startswith("application/x-www-form-urlencoded"):
                 data_params = self.__decode_query_string(data)
             elif content_type.lower().startswith("multipart/form-data"):
@@ -363,7 +381,9 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         return path
 
     def __decode_multipart(self, content_type, data):
+        _logger.debug("decode multipart...")
         boundary = "--" + content_type.split("; ")[1].split("=")[1]
+        _logger.debug("data's type is %s " % type(data))
         fields = data.split(boundary)
         # ignore the first empty row and the last end symbol
         fields = fields[1: len(fields) - 1]
@@ -378,11 +398,12 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def __decode_multipart_field(self, field):
         # first line: Content-Disposition
         line, rest = self.__read_line(field)
-        _logger.debug("line::" + line)
+        # _logger.debug("line::" + line)
         kvs = self.__decode_content_disposition(line)
         if len(kvs) == 1:
             # this is a string field, the second line is an empty line, the rest is the value
-            val = self.__read_line(rest)[1]
+            val = self.__read_line(rest)[1].encode("ISO-8859-1").decode("UTF-8")
+            _logger.debug("value is ::" + val)
         elif len(kvs) == 2:
             # this is a file field
             val = MultipartFile()
@@ -391,7 +412,7 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             ct_line, rest = self.__read_line(rest)
             val.content_type = ct_line.split(":")[1].strip()
             # the third line is an empty line, the rest is the value
-            val.content = self.__read_line(rest)[1]
+            val.content = self.__read_line(rest)[1].encode("ISO-8859-1")
         else:
             val = "UNKNOWN"
 
@@ -406,7 +427,7 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         return cont_dis
 
     def __read_line(self, txt):
-        _logger.debug("txt is -> " + str(txt))
+        # _logger.debug("txt is -> " + str(txt))
         return self.__break(txt, "\r\n")
 
     def __break(self, txt, separator):
@@ -421,7 +442,7 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         if not query_string:
             return params
         pairs = query_string.split("&")
-        _logger.debug("pairs: " + str(pairs))
+        # _logger.debug("pairs: " + str(pairs))
         for item in pairs:
             key, val = self.__break(item, "=")
             if val is None:
@@ -445,7 +466,7 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         self.send_header("Content-Length", len(body))
 
         self.end_headers()
-        _logger.debug("body::" + body)
+        # _logger.debug("body::" + body)
 
         if body is not None and body != "":
             self.wfile.write(body.encode("utf8"))
