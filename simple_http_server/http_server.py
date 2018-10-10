@@ -351,7 +351,8 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             elif content_type.lower().startswith("multipart/form-data"):
                 data_params = self.__decode_multipart(content_type, data)
             elif content_type.lower().startswith("application/json"):
-                req.json = json.loads(data)
+                req.body = data.encode("ISO-8859-1").decode("UTF-8")
+                req.json = json.loads(req.body)
             else:
                 data_params = {}
             req.parameters = self.__merge(data_params, req.parameters)
