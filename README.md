@@ -59,6 +59,17 @@ def my_ctrl3(**kargs):
 def my_ctrl4(response=None,
              **kargs):
     response.send_redirect("/index")
+
+@request_map("/upload", method="POST")
+def my_upload(parameter={},
+              **kargs):
+    root = os.path.dirname(os.path.abspath(__file__))
+
+    img = parameter["img"]  # <input type="file" name="img">
+    print(img.filename + " => " + img.content_type)
+    img.save_to_file(root + "/my_dev/imgs/" + img.filename)
+
+    return "<!DOCTYPE html><html><body>upload ok!</body></html>"
 ```
 
 ### Start your server
