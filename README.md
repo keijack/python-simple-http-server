@@ -25,51 +25,51 @@ pip install simple_http_server
 ### Write Controllers
 
 ```python
-from simple_http_server.server import request_map
-from simple_http_server.http_server import Response
+from simple_http_server import request_map
+from simple_http_server import Response
+from simple_http_server import MultipartFile
+from simple_http_server import Parameter
+from simple_http_server import Parameters
+from simple_http_server import Header
+from simple_http_server import JSONBody
+from simple_http_server import HttpError
 
 
 @request_map("/index")
-def my_ctrl(parameters=None,
-            json=None,
-            **kargs  # This is required, for there are still other key arguments that will set to call this function
-            ):
-
+def my_ctrl():
     return {"code": 0, "message": "success"}  # You can return a dictionary, a string or a `simple_http_server.simple_http_server.Response` object.
 
 
-@request_map("/say_hello", method="GET")
-def my_ctrl2(
-        parameter={"name": "1"}, # default values, if there are no name parameter in the request, the one here will be use
-        parameters={"name": "2"},
-        json={"name": "3"},
-        **kargs):
-    print("parameter name %s " % parameter["name"])
-    print("parameters name %s " % str(parameters["name"]))
-    print("json name %s " % json["name"])
-    return "<!DOCTYPE html><html><body>hello, %s</body></html>" % parameter["name"]
+@request_map("/say_hello", method=["GET", "POST"])
+def my_ctrl2(name, name2=Parameter("name", default="KEIJACK")):
+    """name and name2 is the same"""
+    return "<!DOCTYPE html><html><body>hello, %s, %s</body></html>" % (name, name2)
 
 
 @request_map("/error")
-def my_ctrl3(**kargs):
+def my_ctrl3():
     return Response(status_code=500)
 
 
-@request_map("/")
-def my_ctrl4(response=None,
-             **kargs):
-    response.send_redirect("/index")
+@request_map("/exception")
+def exception_ctrl():
+    raise HttpError(400, "Exception")
+
 
 @request_map("/upload", method="POST")
-def my_upload(parameter={},
-              **kargs):
+def my_upload(img=MultipartFile("img")):
     root = os.path.dirname(os.path.abspath(__file__))
 
-    img = parameter["img"]  # <input type="file" name="img">
-    print(img.filename + " => " + img.content_type)
     img.save_to_file(root + "/my_dev/imgs/" + img.filename)
 
     return "<!DOCTYPE html><html><body>upload ok!</body></html>"
+
+
+@request_map("/upload", method="GET")
+def show_upload():
+    root = os.path.dirname(os.path.abspath(__file__))
+    with open(root + "/my_dev/my_test_index.html", "r") as html:
+        return html.read()
 ```
 
 ### Start your server
