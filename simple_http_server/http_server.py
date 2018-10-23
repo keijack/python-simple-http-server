@@ -28,7 +28,7 @@ except NameError:
 from simple_http_server.__logger__ import getLogger
 
 
-_logger = getLogger("SimpleHttpServer")
+_logger = getLogger("simple_http_server.http_server")
 
 from simple_http_server import Request
 from simple_http_server import MultipartFile
