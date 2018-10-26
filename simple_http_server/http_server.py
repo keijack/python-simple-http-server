@@ -136,7 +136,7 @@ class FilterContex:
                 self.response.body = ctr_res
                 if ctr_res.startswith("<?xml") and ctr_res.endswith(">"):
                     self.response.set_header("Content-Type", "text/xml; charset=utf8")
-                elif ctr_res.startswith("<!DOCTYPE html") and ctr_res.endswith(">"):
+                elif ctr_res.lower().startswith("<!doctype html") and ctr_res.endswith(">"):
                     self.response.set_header("Content-Type", "text/html; charset=utf8")
                 else:
                     self.response.set_header("Content-Type", "text/plain; charset=utf8")
@@ -411,13 +411,12 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
         if "content-length" in _headers_keys_in_lowers.keys():
             req.body = self.rfile.read(int(_headers_keys_in_lowers["content-length"]))
-            data = req.body.decode("ISO-8859-1")
             self.rfile.close()
             content_type = _headers_keys_in_lowers["content-type"]
             if content_type.lower().startswith("application/x-www-form-urlencoded"):
-                data_params = self.__decode_query_string(data)
+                data_params = self.__decode_query_string(req.body.decode("UTF-8"))
             elif content_type.lower().startswith("multipart/form-data"):
-                data_params = self.__decode_multipart(content_type, data)
+                data_params = self.__decode_multipart(content_type, req.body.decode("ISO-8859-1"))
             elif content_type.lower().startswith("application/json"):
                 req.json = json.loads(req.body.decode("UTF-8"))
                 data_params = {}
@@ -516,6 +515,12 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             key, val = self.__break(item, "=")
             if val is None:
                 val = ""
+            """ 
+            " for python 2.7: val here is a unicode, after unquote, 
+            " it still is a unicode, and may cause a encoding problem,
+            " so here we fource to change it into a str
+            """
+            val = str(val)
             self.__put_to(params, key, unquote(val))
 
         return params
@@ -538,7 +543,11 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         # _logger.debug("body::" + body)
 
         if body is not None and body != "":
-            self.wfile.write(body.encode("utf8"))
+            try:
+                self.wfile.write(body.encode("utf8"))
+            except:
+                # for python 2.7
+                self.wfile.write(body)
 
     def do_method(self, method):
         self.__process(method)
