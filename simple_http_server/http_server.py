@@ -57,6 +57,7 @@ class ResponseWrapper(Response):
         self.status_code = status_code
         self.__headers = headers if headers is not None else {}
         self.__headers["Content-Type"] = "text/plain"
+        # self.__headers["Content-Security-Policy"] = "default-src 'self'"
         self.__body = ""
         self.__req_handler = handler
         self.__is_sent = False
@@ -258,8 +259,8 @@ class FilterContex:
             return val
 
     def __build_json_body(self):
-        if "content_type" not in self.request._headers_keys_in_lowcase.keys() or \
-                not self.request._headers_keys_in_lowcase["content_type"].lower().startswith("application/json"):
+        if "content-type" not in self.request._headers_keys_in_lowcase.keys() or \
+                not self.request._headers_keys_in_lowcase["content-type"].lower().startswith("application/json"):
             raise HttpError(400, 'The content type of this request must be "application/json"')
         return JSONBody(self.request.json)
 
@@ -409,17 +410,17 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         req.parameters = self.__decode_query_string(query_string)
 
         if "content-length" in _headers_keys_in_lowers.keys():
-            data = self.rfile.read(int(_headers_keys_in_lowers["content-length"])).decode("ISO-8859-1")
+            req.body = self.rfile.read(int(_headers_keys_in_lowers["content-length"]))
+            data = req.body.decode("ISO-8859-1")
             self.rfile.close()
-            req.body = data
             content_type = _headers_keys_in_lowers["content-type"]
             if content_type.lower().startswith("application/x-www-form-urlencoded"):
                 data_params = self.__decode_query_string(data)
             elif content_type.lower().startswith("multipart/form-data"):
                 data_params = self.__decode_multipart(content_type, data)
             elif content_type.lower().startswith("application/json"):
-                req.body = data.encode("ISO-8859-1").decode("UTF-8")
-                req.json = json.loads(req.body)
+                req.json = json.loads(req.body.decode("UTF-8"))
+                data_params = {}
             else:
                 data_params = {}
             req.parameters = self.__merge(data_params, req.parameters)
