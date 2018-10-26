@@ -474,7 +474,7 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             val = self.__read_line(rest)[1].encode("ISO-8859-1").decode("UTF-8")
             _logger.debug("value is ::" + val)
         elif len(kvs) == 2:
-            filename = kvs["filename"]
+            filename = kvs["filename"].encode("ISO-8859-1").decode("UTF-8")
             # the second line is Content-Type line
             ct_line, rest = self.__read_line(rest)
             content_type = ct_line.split(":")[1].strip()
