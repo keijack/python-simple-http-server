@@ -16,6 +16,11 @@ Python 2.7 / 3.6+ (It should also work at 3.5, not test)
 
 ## Change log
 
+### Version 0.1.1 2018-10-26
+
+1, You can post JSON in a request body now.
+2, request.body will be the raw data which is byte array in python 3.6 and origianl string in python 2.7 now.
+
 ### Version 0.1.0 2018-10-23
 
 1, Move all the Interface Class and method to simple_http_server.
