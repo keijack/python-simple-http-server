@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import sys
+import os
 import re
 import json
 import copy
@@ -33,6 +34,7 @@ _logger = getLogger("simple_http_server.http_server")
 from simple_http_server import Request
 from simple_http_server import MultipartFile
 from simple_http_server import Response
+from simple_http_server import StaticFile
 from simple_http_server import HttpError
 
 from simple_http_server import Parameter
@@ -56,8 +58,6 @@ class ResponseWrapper(Response):
                  headers=None):
         self.status_code = status_code
         self.__headers = headers if headers is not None else {}
-        self.__headers["Content-Type"] = "text/plain"
-        # self.__headers["Content-Security-Policy"] = "default-src 'self'"
         self.__body = ""
         self.__req_handler = handler
         self.__is_sent = False
@@ -92,7 +92,6 @@ class ResponseWrapper(Response):
     def send_response(self):
         assert not self.__is_sent, "This response has benn sent"
         self.__is_sent = True
-        _logger.debug("send response...")
         self.__req_handler._send_response({
             "status_code": self.status_code,
             "headers": self.__headers,
@@ -121,29 +120,16 @@ class FilterContex:
             else:
                 ctr_res = self.__controller(*args, **kwargs)
 
-            if isinstance(ctr_res, dict):
-                self.response.set_header("Content-Type", "application/json; charset=utf8")
-                self.response.body = json.dumps(ctr_res, ensure_ascii=False)
-            elif isinstance(ctr_res, Response):
+            if isinstance(ctr_res, Response):
                 self.response.status_code = ctr_res.status_code
                 self.response.body = ctr_res.body
                 for k, v in ctr_res.headers.items():
                     self.response.set_header(k, v)
-                if ctr_res.content_type is not None and ctr_res.content_type != "":
-                    self.response.set_header("Content-Type", ctr_res.content_type)
-            elif isinstance(ctr_res, str) or type(ctr_res).__name__ == "unicode":
-                ctr_res = ctr_res.strip()
-                self.response.body = ctr_res
-                if ctr_res.startswith("<?xml") and ctr_res.endswith(">"):
-                    self.response.set_header("Content-Type", "text/xml; charset=utf8")
-                elif ctr_res.lower().startswith("<!doctype html") and ctr_res.endswith(">"):
-                    self.response.set_header("Content-Type", "text/html; charset=utf8")
-                else:
-                    self.response.set_header("Content-Type", "text/plain; charset=utf8")
             else:
-                assert False, "Cannot reconize response type %s " % str(type(ctr_res))
+                self.response.body = ctr_res
+
             if self.request.method.upper() == "HEAD":
-                self.response.body = ""
+                self.response.body = None
             if not self.response.is_sent:
                 self.response.send_response()
         else:
@@ -515,8 +501,8 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             key, val = self.__break(item, "=")
             if val is None:
                 val = ""
-            """ 
-            " for python 2.7: val here is a unicode, after unquote, 
+            """
+            " for python 2.7: val here is a unicode, after unquote,
             " it still is a unicode, and may cause a encoding problem,
             " so here we fource to change it into a str
             """
@@ -532,22 +518,73 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             params[key].append(val)
 
     def _send_response(self, response):
-        self.send_response(response["status_code"])
-        self.send_header("Last-Modified", str(self.date_time_string()))
-        for k, v in response["headers"].items():
-            self.send_header(k, v)
-        body = response["body"]
-        self.send_header("Content-Length", len(body))
+        status_code = response["status_code"]
+        headers = response["headers"]
+        raw_body = response["body"]
 
-        self.end_headers()
+        content_type, body = self.__prepare_res_body(raw_body)
+
+        if "Content-Type" not in headers.keys() and "content-type" not in headers.keys():
+            headers["Content-Type"] = content_type
+
+        self.send_response(status_code)
+        self.send_header("Last-Modified", str(self.date_time_string()))
+        for k, v in headers.items():
+            self.send_header(k, v)
+
         # _logger.debug("body::" + body)
 
-        if body is not None and body != "":
+        if body is None:
+            self.send_header("Content-Length", 0)
+            self.end_headers()
+        elif isinstance(body, str) or type(body).__name__ == "unicode":
             try:
-                self.wfile.write(body.encode("utf8"))
+                data = body.encode("utf-8")
+                self.send_header("Content-Length", len(data))
+                self.end_headers()
+                self.wfile.write(data)
             except:
                 # for python 2.7
+                self.send_header("Content-Length", len(body))
+                self.end_headers()
                 self.wfile.write(body)
+        elif isinstance(body, bytes):
+            self.send_header("Content-Length", len(body))
+            self.end_headers()
+            self.wfile.write(body)
+        elif isinstance(body, StaticFile):
+            file_size = os.path.getsize(body.file_path)
+            self.send_header("Content-Length", file_size)
+            self.end_headers()
+            buffer_size = 1024 * 1024  # 1M
+            with open(body.file_path, "rb") as in_file:
+                data = in_file.read(buffer_size)
+                while data:
+                    self.wfile.write(data)
+                    data = in_file.read(buffer_size)
+
+    def __prepare_res_body(self, raw_body):
+        content_type = "text/plain; chartset=utf8"
+        if raw_body is None:
+            body = ""
+        elif isinstance(raw_body, dict):
+            content_type = "application/json; charset=utf8"
+            body = json.dumps(raw_body, ensure_ascii=False)
+        elif isinstance(raw_body, str) or type(raw_body).__name__ == "unicode":
+            body = raw_body
+            if body.startswith("<?xml") and body.endswith(">"):
+                content_type = "text/xml; charset=utf8"
+            elif body.lower().startswith("<!doctype html") and body.endswith(">"):
+                content_type = "text/html; charset=utf8"
+            else:
+                content_type = "text/plain; charset=utf8"
+        elif isinstance(raw_body, StaticFile):
+            body = raw_body
+            content_type = body.content_type
+        elif isinstance(raw_body, bytes):
+            body = raw_body
+            content_type = "application/octet-stream"
+        return content_type, body
 
     def do_method(self, method):
         self.__process(method)
@@ -569,10 +606,7 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
     # @override
     def log_message(self, format, *args):
-        _logger.info("%s - - [%s] %s\n" %
-                     (self.client_address[0],
-                      self.log_date_time_string(),
-                      format % args))
+        _logger.info("%s -  %s\n" % (self.client_address[0], format % args))
 
 
 class SimpleDispatcherHttpServer:

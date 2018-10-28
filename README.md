@@ -16,10 +16,16 @@ Python 2.7 / 3.6+ (It should also work at 3.5, not test)
 
 ## Change log
 
+### Version 0.1.2 2018-10-28
+
+1, You can return a `StaticFile` in the controller function, the response will read the file content and write it to output stream.
+2, Add a default `/favicon.ico`.
+3, Fix some `utf-8` encoding bug for python 2.7.  
+
 ### Version 0.1.1 2018-10-26
 
 1, You can post JSON in a request body now.
-2, request.body will be the raw data which is byte array in python 3.6 and origianl string in python 2.7 now.
+2, `request.body` will be the raw data which is byte array in python 3.6 and origianl string in python 2.7 now.
 
 ### Version 0.1.0 2018-10-23
 
@@ -42,6 +48,7 @@ pip install simple_http_server
 ### Write Controllers
 
 ```python
+
 from simple_http_server import request_map
 from simple_http_server import Response
 from simple_http_server import MultipartFile
@@ -50,6 +57,7 @@ from simple_http_server import Parameters
 from simple_http_server import Header
 from simple_http_server import JSONBody
 from simple_http_server import HttpError
+from simple_http_server import StaticFile
 
 
 @request_map("/index")
@@ -76,17 +84,19 @@ def exception_ctrl():
 @request_map("/upload", method="POST")
 def my_upload(img=MultipartFile("img")):
     root = os.path.dirname(os.path.abspath(__file__))
-
     img.save_to_file(root + "/my_dev/imgs/" + img.filename)
-
     return "<!DOCTYPE html><html><body>upload ok!</body></html>"
+
+
+@request_map("/post_txt", method="POST")
+def normal_form_post(txt):
+    return "<!DOCTYPE html><html><body>hi, %s</body></html>" % txt
 
 
 @request_map("/upload", method="GET")
 def show_upload():
     root = os.path.dirname(os.path.abspath(__file__))
-    with open(root + "/my_dev/my_test_index.html", "r") as html:
-        return html.read()
+    return StaticFile("%s/my_dev/my_test_index.html" % root, "text/html; charset=utf-8")
 ```
 
 ### Start your server

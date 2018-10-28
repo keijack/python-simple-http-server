@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-
+import os
 from simple_http_server.__logger__ import getLogger
 
 
@@ -128,11 +128,9 @@ class Response(object):
 
     def __init__(self,
                  status_code=200,
-                 content_type="application/json; charset=utf8",
                  headers=None,
                  body=""):
         self.status_code = status_code
-        self.content_type = content_type
         self.__headers = headers if headers is not None else {}
         self.body = ""
 
@@ -150,6 +148,13 @@ class Response(object):
     def send_response(self):
         """abstruct method"""
         pass
+
+
+class StaticFile(object):
+
+    def __init__(self, file_path, content_type="application/octet-stream"):
+        self.file_path = file_path
+        self.content_type = content_type
 
 
 class HttpError(Exception):
@@ -206,3 +211,9 @@ class Header(Parameter):
 
 class JSONBody(dict):
     pass
+
+
+@request_map("/favicon.ico")
+def _favicon():
+    root = os.path.dirname(os.path.abspath(__file__))
+    return StaticFile("%s/favicon.ico" % root, "image/x-icon")
