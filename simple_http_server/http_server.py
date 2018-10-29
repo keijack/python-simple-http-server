@@ -503,16 +503,16 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         pairs = query_string.split("&")
         # _logger.debug("pairs: " + str(pairs))
         for item in pairs:
-            key, val = self.__break(item, "=")
-            if val is None:
-                val = ""
             """
             " for python 2.7: val here is a unicode, after unquote,
             " it still is a unicode, and may cause a encoding problem,
             " so here we fource to change it into a str
             """
-            val = str(val)
-            self.__put_to(params, key, unquote(val))
+            str_item = str(item)
+            key, val = self.__break(str_item, "=")
+            if val is None:
+                val = ""
+            self.__put_to(params, unquote(key), unquote(val))
 
         return params
 
