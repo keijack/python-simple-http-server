@@ -1,6 +1,4 @@
 # -*- coding: utf-8 -*-
-import os
-
 from simple_http_server.__logger__ import getLogger
 try:
     unicode("")
@@ -239,4 +237,3 @@ class Header(Parameter):
 
 class JSONBody(dict):
     pass
-
