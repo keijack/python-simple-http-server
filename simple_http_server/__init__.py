@@ -203,6 +203,11 @@ class Parameter(unicode):
 
     def __new__(cls, name="", default="", **kwargs):
         assert isinstance(default, str) or isinstance(default, unicode)
+        if str != unicode:
+            """
+            " Python 2.7, chuange str to unicode
+            """
+            default = default.decode("utf-8")
         obj = super(Parameter, cls).__new__(cls, default)
         return obj
 

@@ -148,7 +148,8 @@ class FilterContex:
         for arg in args:
             if arg not in self.request.parameter.keys():
                 raise HttpError(400, "Parameter[%s] is required]" % arg)
-            arg_vals.append(self.request.parameter[arg])
+            param = Parameter(name=arg, default=self.request.parameter[arg], required=True)
+            arg_vals.append(param)
         return arg_vals
 
     def __prepare_kwargs(self):
@@ -245,9 +246,9 @@ class FilterContex:
 
     def __build_str(self, key, val=""):
         if key in self.request.parameter.keys():
-            return self.request.parameter[key]
+            return Parameter(name=key, default=self.request.parameter[key], required=False)
         else:
-            return val
+            return Parameter(name=key, default=val, required=False)
 
     def __build_json_body(self):
         if "content-type" not in self.request._headers_keys_in_lowcase.keys() or \
@@ -284,7 +285,7 @@ class FilterContex:
             name = name.decode("utf-8")
         if val._required and name not in self.request.parameter:
             raise HttpError(400, "Parameter[%s] is required." % name)
-        if name in self.request.parameter.keys():
+        if name in self.request.parameter:
             v = self.request.parameter[name]
             return Parameter(name=name, default=v, required=val._required)
         else:
