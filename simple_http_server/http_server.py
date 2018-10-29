@@ -465,6 +465,7 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         line, rest = self.__read_line(field)
         # _logger.debug("line::" + line)
         kvs = self.__decode_content_disposition(line)
+        kname = kvs["name"].encode("ISO-8859-1").decode("UTF-8")
         if len(kvs) == 1:
             # this is a string field, the second line is an empty line, the rest is the value
             val = self.__read_line(rest)[1].encode("ISO-8859-1").decode("UTF-8")
@@ -477,11 +478,11 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             # the third line is an empty line, the rest is the value
             content = self.__read_line(rest)[1].encode("ISO-8859-1")
 
-            val = MultipartFile(kvs["name"], filename=filename, content_type=content_type, content=content)
+            val = MultipartFile(kname, filename=filename, content_type=content_type, content=content)
         else:
             val = "UNKNOWN"
 
-        return kvs["name"].encode("ISO-8859-1").decode("UTF-8"), val
+        return kname, val
 
     def __decode_content_disposition(self, line):
         cont_dis = {}
