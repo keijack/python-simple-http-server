@@ -187,7 +187,7 @@ class HttpError(Exception):
         self.message = message
 
 
-class Parameter(str):
+class Parameter(unicode):
 
     def __init__(self, name="", default="", required=False):
         self.__name = name
@@ -202,7 +202,7 @@ class Parameter(str):
         return self.__required
 
     def __new__(cls, name="", default="", **kwargs):
-        assert isinstance(default, str) or type(default).__name__ == "unicode"
+        assert isinstance(default, str) or isinstance(default, unicode)
         obj = super(Parameter, cls).__new__(cls, default)
         return obj
 

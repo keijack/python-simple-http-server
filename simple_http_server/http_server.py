@@ -277,9 +277,14 @@ class FilterContex:
 
     def __build_param(self, key, val=Parameter()):
         name = val.name if val.name is not None and val.name != "" else key
+        if str != unicode:
+            """
+            " Python 2.7, change str => unicode, or it will fail to reconize the key that is unicode;
+            """
+            name = name.decode("utf-8")
         if val._required and name not in self.request.parameter:
             raise HttpError(400, "Parameter[%s] is required." % name)
-        if name in self.request.parameter:
+        if name in self.request.parameter.keys():
             v = self.request.parameter[name]
             return Parameter(name=name, default=v, required=val._required)
         else:
