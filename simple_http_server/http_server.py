@@ -576,7 +576,7 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             content_type = "application/json; charset=utf8"
             body = json.dumps(raw_body, ensure_ascii=False)
         elif isinstance(raw_body, str) or isinstance(raw_body, unicode):
-            body = raw_body
+            body = raw_body.strip()
             if body.startswith("<?xml") and body.endswith(">"):
                 content_type = "text/xml; charset=utf8"
             elif body.lower().startswith("<!doctype html") and body.endswith(">"):

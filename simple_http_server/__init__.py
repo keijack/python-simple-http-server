@@ -160,11 +160,11 @@ class Response(object):
 
     def send_redirect(self, url):
         """abstruct method"""
-        pass
+        raise Exception("Abstruct method, you cannot call this method directly.")
 
     def send_response(self):
         """abstruct method"""
-        pass
+        raise Exception("Abstruct method, you cannot call this method directly.")
 
 
 class StaticFile(object):
