@@ -475,7 +475,7 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         else:
             val = "UNKNOWN"
 
-        return kvs["name"], val
+        return kvs["name"].encode("ISO-8859-1").decode("UTF-8"), val
 
     def __decode_content_disposition(self, line):
         cont_dis = {}

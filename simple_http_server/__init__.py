@@ -122,9 +122,14 @@ class MultipartFile(object):
     def content(self):
         return self.__content
 
+    @property
+    def is_empty(self):
+        return self.__content is None or len(self.__content) == 0
+
     def save_to_file(self, file_path):
-        with open(file_path, "wb") as f:
-            f.write(self.__content)
+        if self.__content is not None and len(self.__content) > 0:
+            with open(file_path, "wb") as f:
+                f.write(self.__content)
 
 
 class Response(object):
