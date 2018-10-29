@@ -25,6 +25,11 @@ try:
 except NameError:
     # python 3 does no longer support long method, use int instead
     long = int
+try:
+    unicode("")
+except NameError:
+    # python 3 does no longer support unicode method, use str instead
+    unicode = str
 
 from simple_http_server.__logger__ import getLogger
 
@@ -162,7 +167,7 @@ class FilterContex:
                 kwarg_vals[k] = self.__build_header(k, v)
             elif isinstance(v, JSONBody):
                 kwarg_vals[k] = self.__build_json_body()
-            elif isinstance(v, str) or type(v).__name__ == "unicode":
+            elif isinstance(v, str) or isinstance(v, unicode):
                 kwarg_vals[k] = self.__build_str(k, v)
             elif isinstance(v, bool):
                 kwarg_vals[k] = self.__build_bool(k, v)
@@ -537,7 +542,7 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         if body is None:
             self.send_header("Content-Length", 0)
             self.end_headers()
-        elif isinstance(body, str) or type(body).__name__ == "unicode":
+        elif isinstance(body, str) or isinstance(body, unicode):
             try:
                 data = body.encode("utf-8")
                 self.send_header("Content-Length", len(data))
@@ -570,7 +575,7 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         elif isinstance(raw_body, dict):
             content_type = "application/json; charset=utf8"
             body = json.dumps(raw_body, ensure_ascii=False)
-        elif isinstance(raw_body, str) or type(raw_body).__name__ == "unicode":
+        elif isinstance(raw_body, str) or isinstance(raw_body, unicode):
             body = raw_body
             if body.startswith("<?xml") and body.endswith(">"):
                 content_type = "text/xml; charset=utf8"

@@ -2,7 +2,11 @@
 import os
 from simple_http_server.__logger__ import getLogger
 
-
+try:
+    unicode("")
+except NameError:
+    # python 3 has no unicode type
+    unicode = str
 name = "simple_http_server"
 
 
@@ -132,7 +136,20 @@ class Response(object):
                  body=""):
         self.status_code = status_code
         self.__headers = headers if headers is not None else {}
-        self.body = ""
+        self.__body = ""
+        self.__set_body(body)
+
+    @property
+    def body(self):
+        return self.__body
+
+    @body.setter
+    def body(self, val):
+        self.__set_body(val)
+
+    def __set_body(self, val):
+        assert val is None or type(val) in (str, unicode, dict, StaticFile, bytes), "Body type is not supported."
+        self.__body = val
 
     @property
     def headers(self):
