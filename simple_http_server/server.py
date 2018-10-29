@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 
+import os
 import simple_http_server.http_server as http_server
+from simple_http_server import request_map
+from simple_http_server import StaticFile
 from simple_http_server.__logger__ import getLogger
 
 __logger = getLogger("simple_http_server.server")
@@ -32,3 +35,9 @@ def stop():
     if __server is not None:
         __server.shutdown()
         __server = None
+
+
+@request_map("/favicon.ico")
+def _favicon():
+    root = os.path.dirname(os.path.abspath(__file__))
+    return StaticFile("%s/favicon.ico" % root, "image/x-icon")

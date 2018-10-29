@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 import os
-from simple_http_server.__logger__ import getLogger
 
+from simple_http_server.__logger__ import getLogger
 try:
     unicode("")
 except NameError:
     # python 3 has no unicode type
     unicode = str
+
 name = "simple_http_server"
 
 
@@ -31,7 +32,7 @@ def request_map(url, method=""):
         else:
             mths = [method]
         for mth in mths:
-            __log().debug("map url %s with method[%s] to function %s. " % (url, mth, str(ctrl_fun)))
+            __log().info("map url %s with method[%s] to function %s. " % (url, mth, str(ctrl_fun)))
             __request_mappings.append({
                 "url": url,
                 "method": mth,
@@ -239,8 +240,3 @@ class Header(Parameter):
 class JSONBody(dict):
     pass
 
-
-@request_map("/favicon.ico")
-def _favicon():
-    root = os.path.dirname(os.path.abspath(__file__))
-    return StaticFile("%s/favicon.ico" % root, "image/x-icon")
