@@ -618,7 +618,7 @@ class SimpleDispatcherHttpServer:
     def map_request(self, url, fun, method=""):
         RequestMapping.map(url, fun, method)
 
-    def __init__(self, host=('', 8888), multithread=True):
+    def __init__(self, host=('', 9090), multithread=True):
         self.host = host
         self.multithread = multithread
         if self.multithread:
