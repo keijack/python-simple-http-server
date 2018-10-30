@@ -16,7 +16,7 @@ __filters = []
 __logger = None
 
 
-def __log():
+def _log():
     global __logger
     if __logger is None:
         __logger = getLogger("simple_http_server")
@@ -30,7 +30,7 @@ def request_map(url, method=""):
         else:
             mths = [method]
         for mth in mths:
-            __log().info("map url %s with method[%s] to function %s. " % (url, mth, str(ctrl_fun)))
+            _log().info("map url %s with method[%s] to function %s. " % (url, mth, str(ctrl_fun)))
             __request_mappings.append({
                 "url": url,
                 "method": mth,
@@ -161,6 +161,18 @@ class Response(object):
 
     def set_header(self, key, value):
         self.__headers[key] = value
+
+    def add_header(self, key, value):
+        if key not in self.__headers.keys():
+            self.__headers[key] = value
+            return
+        a = []
+        if not isinstance(self.__headers[key], list):
+            self.__headers[key] = [self.__headers[key]]
+        if isinstance(value, list):
+            self.__headers[key].extend(value)
+        else:
+            self.__headers[key].append(value)
 
     def send_redirect(self, url):
         """abstruct method"""

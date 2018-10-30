@@ -61,37 +61,18 @@ class ResponseWrapper(Response):
     def __init__(self, handler,
                  status_code=200,
                  headers=None):
-        self.status_code = status_code
-        self.__headers = headers if headers is not None else {}
-        self.__body = ""
+        super(ResponseWrapper, self).__init__(status_code=status_code, headers=headers, body="")
         self.__req_handler = handler
         self.__is_sent = False
-
-    @property
-    def headers(self):
-        return self.__headers
-
-    @property
-    def body(self):
-        return self.__body
-
-    @body.setter
-    def body(self, body):
-        assert not self.__is_sent, "This response has benn sent"
-        # _logger.debug("body set:: %s" % body)
-        self.__body = body
 
     @property
     def is_sent(self):
         return self.__is_sent
 
-    def set_header(self, key, value):
-        self.__headers[key] = value
-
     def send_redirect(self, url):
         self.status_code = 302
         self.set_header("Location", url)
-        self.__body = ""
+        self.body = None
         self.send_response()
 
     def send_response(self):
@@ -99,8 +80,8 @@ class ResponseWrapper(Response):
         self.__is_sent = True
         self.__req_handler._send_response({
             "status_code": self.status_code,
-            "headers": self.__headers,
-            "body": self.__body
+            "headers": self.headers,
+            "body": self.body
         })
 
 
@@ -125,13 +106,14 @@ class FilterContex:
             else:
                 ctr_res = self.__controller(*args, **kwargs)
 
-            if isinstance(ctr_res, Response):
-                self.response.status_code = ctr_res.status_code
-                self.response.body = ctr_res.body
-                for k, v in ctr_res.headers.items():
-                    self.response.set_header(k, v)
-            else:
-                self.response.body = ctr_res
+            if ctr_res is not None:
+                if isinstance(ctr_res, Response):
+                    self.response.status_code = ctr_res.status_code
+                    self.response.body = ctr_res.body
+                    for k, v in ctr_res.headers.items():
+                        self.response.set_header(k, v)
+                else:
+                    self.response.body = ctr_res
 
             if self.request.method.upper() == "HEAD":
                 self.response.body = None
@@ -542,9 +524,12 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         self.send_response(status_code)
         self.send_header("Last-Modified", str(self.date_time_string()))
         for k, v in headers.items():
-            self.send_header(k, v)
-
-        # _logger.debug("body::" + body)
+            if isinstance(v, str) or isinstance(v, unicode):
+                self.send_header(k, v)
+            elif isinstance(v, list):
+                for iov in v:
+                    if isinstance(iov, str) or isinstance(iov, unicode):
+                        self.send_header(k, iov)
 
         if body is None:
             self.send_header("Content-Length", 0)
