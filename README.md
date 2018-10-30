@@ -16,6 +16,12 @@ Python 2.7 / 3.6+ (It should also work at 3.5, not test)
 
 ## Change log
 
+### Version 0.1.3 2018-10-30
+
+1. Support add header in Response object, you can send several different header value with the same name now.
+2. Fix some `utf-8` encoding bug for python 2.7 when using `multipart/form-data`
+3. Fix a bug when using a Response object to send back data rather than returning it in controller function.
+
 ### Version 0.1.2 2018-10-28
 
 1. You can return a `StaticFile` in the controller function, the response will read the file content and write it to output stream.
