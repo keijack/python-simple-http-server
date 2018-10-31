@@ -165,12 +165,14 @@ class FilterContex:
         for k, v in kwargs.items():
             if v is None:
                 kwarg_vals[k] = self.__build_str(k, v)
+            elif isinstance(v, Header):
+                kwarg_vals[k] = self.__build_header(k, v)
+            elif isinstance(v, Headers):
+                kwarg_vals[k] = Headers(self.request.headers)
             elif isinstance(v, Parameter):
                 kwarg_vals[k] = self.__build_param(k, v)
             elif isinstance(v, Parameters):
                 kwarg_vals[k] = self.__build_params(k, v)
-            elif isinstance(v, Header):
-                kwarg_vals[k] = self.__build_header(k, v)
             elif isinstance(v, JSONBody):
                 kwarg_vals[k] = self.__build_json_body()
             elif isinstance(v, str) or isinstance(v, unicode):
