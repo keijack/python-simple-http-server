@@ -43,7 +43,6 @@ Python 2.7 / 3.6+ (It should also work at 3.5, not test)
 
 * Support path values.
 * Support Cookies.
-* Support controller functions returning tuples.
 
 ## How to use
 
@@ -66,6 +65,7 @@ from simple_http_server import Header
 from simple_http_server import JSONBody
 from simple_http_server import HttpError
 from simple_http_server import StaticFile
+from simple_http_server import Headers
 
 
 @request_map("/index")
