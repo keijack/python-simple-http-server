@@ -54,6 +54,7 @@ class RequestWrapper(Request):
     def __init__(self):
         super(RequestWrapper, self).__init__()
         self._headers_keys_in_lowcase = {}
+        self._path = ""
 
 
 class ResponseWrapper(Response):
@@ -346,13 +347,21 @@ class RequestMapping:
 
     @staticmethod
     def map(url, fun, method=""):
+        _url = _remove_url_first_slash(url)
         if method is None or method == "":
-            RequestMapping.COMMON[url] = fun
+            RequestMapping.COMMON[_url] = fun
         else:
             mth = method.upper()
             if mth not in RequestMapping.SPECIFIC.keys():
                 RequestMapping.SPECIFIC[mth] = {}
-            RequestMapping.SPECIFIC[mth][url] = fun
+            RequestMapping.SPECIFIC[mth][_url] = fun
+
+
+def _remove_url_first_slash(url):
+    _url = url
+    while _url.startswith("/"):
+        _url = url[1:]
+    return _url
 
 
 class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
@@ -362,7 +371,7 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         mth = method.upper()
 
         req = self.__prepare_request(mth)
-        path = req.path
+        path = req._path
 
         if mth in RequestMapping.SPECIFIC.keys() and path in RequestMapping.SPECIFIC[mth].keys():
             ctrl = RequestMapping.SPECIFIC[mth][path]
@@ -395,7 +404,8 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         path = self.__get_path(self.path)
         _logger.debug(path + " [" + method + "] is bing visited")
         req = RequestWrapper()
-        req.path = path
+        req.path = "/" + path
+        req._path = path
         headers = {}
         _headers_keys_in_lowers = {}
         for k in self.headers.keys():
@@ -447,6 +457,7 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def __get_path(self, oriPath):
         path = oriPath.split('?', 1)[0]
         path = path.split('#', 1)[0]
+        path = _remove_url_first_slash(path)
         return path
 
     def __decode_multipart(self, content_type, data):

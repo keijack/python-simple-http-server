@@ -15,6 +15,7 @@ __filters = []
 
 __logger = None
 
+
 def _log():
     global __logger
     if __logger is None:
