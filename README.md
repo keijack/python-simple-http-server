@@ -109,9 +109,9 @@ def show_upload():
 @request_map("/tuple")
 def tuple_results():
     # The order here is not important, we consider the first `int` value as status code,
-    # The first `Headers` object will be consider as headers
+    # The first `Headers` object will be considered as headers
     # And the first valid object whose type in (str, unicode, dict, StaticFile, bytes) will
-    # be consider as the body
+    # be considered as the body
     return 200, Headers({"my-header": "headers"}), {"success": True}
 ```
 
