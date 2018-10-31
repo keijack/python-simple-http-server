@@ -105,6 +105,14 @@ def normal_form_post(txt):
 def show_upload():
     root = os.path.dirname(os.path.abspath(__file__))
     return StaticFile("%s/my_dev/my_test_index.html" % root, "text/html; charset=utf-8")
+
+@request_map("/tuple")
+def tuple_results():
+    # The order here is not important, we consider the first `int` value as status code,
+    # The first `Headers` object will be consider as headers
+    # And the first valid object whose type in (str, unicode, dict, StaticFile, bytes) will
+    # be consider as the body
+    return 200, Headers({"my-header": "headers"}), {"success": True}
 ```
 
 ### Start your server

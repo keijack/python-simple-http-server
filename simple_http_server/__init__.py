@@ -131,73 +131,6 @@ class MultipartFile(object):
                 f.write(self.__content)
 
 
-class Response(object):
-    """Response"""
-
-    def __init__(self,
-                 status_code=200,
-                 headers=None,
-                 body=""):
-        self.status_code = status_code
-        self.__headers = headers if headers is not None else {}
-        self.__body = ""
-        self.__set_body(body)
-
-    @property
-    def body(self):
-        return self.__body
-
-    @body.setter
-    def body(self, val):
-        self.__set_body(val)
-
-    def __set_body(self, val):
-        assert val is None or type(val) in (str, unicode, dict, StaticFile, bytes), "Body type is not supported."
-        self.__body = val
-
-    @property
-    def headers(self):
-        return self.__headers
-
-    def set_header(self, key, value):
-        self.__headers[key] = value
-
-    def add_header(self, key, value):
-        if key not in self.__headers.keys():
-            self.__headers[key] = value
-            return
-        a = []
-        if not isinstance(self.__headers[key], list):
-            self.__headers[key] = [self.__headers[key]]
-        if isinstance(value, list):
-            self.__headers[key].extend(value)
-        else:
-            self.__headers[key].append(value)
-
-    def send_redirect(self, url):
-        """abstruct method"""
-        raise Exception("Abstruct method, you cannot call this method directly.")
-
-    def send_response(self):
-        """abstruct method"""
-        raise Exception("Abstruct method, you cannot call this method directly.")
-
-
-class StaticFile(object):
-
-    def __init__(self, file_path, content_type="application/octet-stream"):
-        self.file_path = file_path
-        self.content_type = content_type
-
-
-class HttpError(Exception):
-
-    def __init__(self, code=400, message=""):
-        super(HttpError, self).__init__("HTTP_ERROR[%d] %s" % (code, message))
-        self.code = code
-        self.message = message
-
-
 class Parameter(unicode):
 
     def __init__(self, name="", default="", required=False):
@@ -249,3 +182,85 @@ class Header(Parameter):
 
 class JSONBody(dict):
     pass
+
+
+"""
+" The folowing beans are used in Response
+"""
+
+
+class Response(object):
+    """Response"""
+
+    def __init__(self,
+                 status_code=200,
+                 headers=None,
+                 body=""):
+        self.status_code = status_code
+        self.__headers = headers if headers is not None else {}
+        self.__body = ""
+        self.__set_body(body)
+
+    @property
+    def body(self):
+        return self.__body
+
+    @body.setter
+    def body(self, val):
+        self.__set_body(val)
+
+    def __set_body(self, val):
+        assert val is None or type(val) in (str, unicode, dict, StaticFile, bytes), "Body type is not supported."
+        self.__body = val
+
+    @property
+    def headers(self):
+        return self.__headers
+
+    def set_header(self, key, value):
+        self.__headers[key] = value
+
+    def add_header(self, key, value):
+        if key not in self.__headers.keys():
+            self.__headers[key] = value
+            return
+        if not isinstance(self.__headers[key], list):
+            self.__headers[key] = [self.__headers[key]]
+        if isinstance(value, list):
+            self.__headers[key].extend(value)
+        else:
+            self.__headers[key].append(value)
+
+    def add_headers(self, headers={}):
+        if headers is not None:    
+            for k, v in headers.items():
+                self.add_header(k, v)
+
+    def send_redirect(self, url):
+        """abstruct method"""
+        raise Exception("Abstruct method, you cannot call this method directly.")
+
+    def send_response(self):
+        """abstruct method"""
+        raise Exception("Abstruct method, you cannot call this method directly.")
+
+
+class HttpError(Exception):
+
+    def __init__(self, code=400, message=""):
+        super(HttpError, self).__init__("HTTP_ERROR[%d] %s" % (code, message))
+        self.code = code
+        self.message = message
+
+
+class StaticFile(object):
+
+    def __init__(self, file_path, content_type="application/octet-stream"):
+        self.file_path = file_path
+        self.content_type = content_type
+
+
+class Headers(dict):
+
+    def __init__(self, headers={}):
+        self.update(headers)

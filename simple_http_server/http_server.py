@@ -38,14 +38,15 @@ _logger = getLogger("simple_http_server.http_server")
 
 from simple_http_server import Request
 from simple_http_server import MultipartFile
-from simple_http_server import Response
-from simple_http_server import StaticFile
-from simple_http_server import HttpError
-
 from simple_http_server import Parameter
 from simple_http_server import Parameters
 from simple_http_server import Header
 from simple_http_server import JSONBody
+
+from simple_http_server import Response
+from simple_http_server import Headers
+from simple_http_server import StaticFile
+from simple_http_server import HttpError
 
 
 class RequestWrapper(Request):
@@ -110,8 +111,14 @@ class FilterContex:
                 if isinstance(ctr_res, Response):
                     self.response.status_code = ctr_res.status_code
                     self.response.body = ctr_res.body
-                    for k, v in ctr_res.headers.items():
-                        self.response.set_header(k, v)
+                    self.response.add_headers(ctr_res.headers)
+                elif isinstance(ctr_res, Headers):
+                    self.response.add_headers(ctr_res)
+                elif isinstance(ctr_res, tuple):
+                    status, headers, body = self.__decode_tuple_response(ctr_res)
+                    self.response.status_code = status if status is not None else self.response.status_code
+                    self.response.body = body if body is not None else self.response.body
+                    self.response.add_headers(headers)
                 else:
                     self.response.body = ctr_res
 
@@ -123,6 +130,21 @@ class FilterContex:
             fun = self.__filters[0]
             self.__filters = self.__filters[1:]
             fun(self)
+
+    def __decode_tuple_response(self, ctr_res):
+        status_code = None
+        headers = None
+        body = None
+        for item in ctr_res:
+            if isinstance(item, int):
+                if status_code is None:
+                    status_code = item
+            elif isinstance(item, Headers):
+                if headers is None:
+                    headers = item
+            elif type(item) in (str, unicode, dict, StaticFile, bytes):
+                body = item
+        return status_code, headers, body
 
     def __prepare_args(self):
         args = _get_args_(self.__controller)
