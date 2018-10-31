@@ -5,14 +5,18 @@ import simple_http_server.http_server as http_server
 from simple_http_server import request_map
 from simple_http_server import StaticFile
 from simple_http_server.__logger__ import getLogger
+import threading
+
 
 __logger = getLogger("simple_http_server.server")
+__lock = threading.Lock()
 __server = None
 
 
 def start(host="", port=9090):
-    global __server
-    __server = http_server.SimpleDispatcherHttpServer((host, port))
+    with __lock:
+        global __server
+        __server = http_server.SimpleDispatcherHttpServer((host, port))
 
     from simple_http_server import _get_filters
     __filters = _get_filters()
@@ -31,10 +35,12 @@ def start(host="", port=9090):
 
 
 def stop():
-    global __server
-    if __server is not None:
-        __server.shutdown()
-        __server = None
+    with __lock:
+        global __server
+        if __server is not None:
+            __logger.info("shutting down server...")
+            __server.shutdown()
+            __server = None
 
 
 @request_map("/favicon.ico")

@@ -15,7 +15,6 @@ __filters = []
 
 __logger = None
 
-
 def _log():
     global __logger
     if __logger is None:
@@ -232,7 +231,7 @@ class Response(object):
             self.__headers[key].append(value)
 
     def add_headers(self, headers={}):
-        if headers is not None:    
+        if headers is not None:
             for k, v in headers.items():
                 self.add_header(k, v)
 
