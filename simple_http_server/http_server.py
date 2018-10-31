@@ -595,6 +595,8 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 content_type = "text/xml; charset=utf8"
             elif body.lower().startswith("<!doctype html") and body.endswith(">"):
                 content_type = "text/html; charset=utf8"
+            elif body.lower().startswith("<html") and body.endswith(">"):
+                content_type = "text/html; charset=utf8"
             else:
                 content_type = "text/plain; charset=utf8"
         elif isinstance(raw_body, StaticFile):
