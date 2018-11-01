@@ -45,7 +45,7 @@ def request_map(url, method=""):
     return map
 
 
-def filter(pattern):
+def filter_map(pattern):
     def map(filter_fun):
         __filters.append({"url_pattern": pattern, "func": filter_fun})
         return filter_fun
@@ -255,6 +255,10 @@ class Response(object):
             for k, v in headers.items():
                 self.add_header(k, v)
 
+    def send_error(self, status_code, message=""):
+        """abstruct method"""
+        raise Exception("Abstruct method, you cannot call this method directly.")
+
     def send_redirect(self, url):
         """abstruct method"""
         raise Exception("Abstruct method, you cannot call this method directly.")
@@ -292,6 +296,7 @@ class Headers(dict):
 
 class Cookies(cookies.SimpleCookie):
     EXPIRE_DATE_FORMAT = "%a, %d %b %Y %H:%M:%S GMT"
+
 
 class Cookie(cookies.Morsel):
 

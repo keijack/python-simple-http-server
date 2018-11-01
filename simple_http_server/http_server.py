@@ -76,6 +76,12 @@ class ResponseWrapper(Response):
     def is_sent(self):
         return self.__is_sent
 
+    def send_error(self, status_code, message=""):
+        self.status_code = status_code
+        msg = message if message is not None else ""
+        self.body = {"error": msg}
+        self.send_response()
+
     def send_redirect(self, url):
         self.status_code = 302
         self.set_header("Location", url)
@@ -417,25 +423,25 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             res.body = '{"error":"Cannot find controller for your path"}'
             res.send_response()
         else:
-            filters = FilterMapping._get_matched_filters(path)
+            filters = FilterMapping._get_matched_filters(req.path)
             ctx = FilterContex(req, res, ctrl, filters)
             try:
                 ctx.do_chain()
             except HttpError as e:
                 res.status_code = e.code
-                res.body = '{"error": "%s"}' % e.message
+                res.body = {"error": e.message}
                 res.send_response()
             except Exception as e:
                 _logger.exception("error occurs! returning 500")
                 res.status_code = 500
-                res.body = '{"error": "%s"}' % str(e)
+                res.body = {"error":  str(e)}
                 res.send_response()
 
     def __prepare_request(self, method):
         path = self.__get_path(self.path)
-        _logger.debug(path + " [" + method + "] is bing visited")
         req = RequestWrapper()
         req.path = "/" + path
+        _logger.debug("%s [%s] is bing visited" % (req.path, method))
         req._path = path
         headers = {}
         _headers_keys_in_lowers = {}
@@ -599,7 +605,7 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 for iov in v:
                     if isinstance(iov, str) or isinstance(iov, unicode):
                         self.send_header(k, iov)
-        
+
         for k in cks:
             ck = cks[k]
             self.send_header("Set-Cookie", ck.OutputString())

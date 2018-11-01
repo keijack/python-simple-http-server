@@ -144,6 +144,28 @@ def tuple_with_cookies(all_cookies=Cookies(), cookie_sc=Cookie("sc")):
     return Header({"xx": "yyy"}), cks, "<html><body>OK</body></html>"
 ```
 
+### Write filters
+
+```python
+from simple_http_server import request_map
+
+# Please note filter will map a regular expression, not a concrect url.
+@filter_map("^/tuple")
+def filter_tuple(ctx):
+    print("---------- through filter ---------------")
+    # add a header to request header
+    ctx.request.headers["filter-set"] = "through filter"
+    if "user_name" not in ctx.request.parameter:
+        ctx.response.send_redirect("/index")
+    elif "pass" not in ctx.request.parameter:
+        ctx.response.send_error(400, "pass should be passed")
+        # you can also raise a HttpError
+        # raise HttpError(400, "pass should be passed")
+    else:
+        # you should always use do_chain method to go to the next
+        ctx.do_chain()
+```
+
 ### Start your server
 
 ```python
