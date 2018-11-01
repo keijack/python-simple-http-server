@@ -9,6 +9,10 @@ import inspect
 from collections import OrderedDict
 from threading import Thread
 try:
+    import http.cookies as cookies
+except ImportError:
+    import Cookie as cookies
+try:
     import http.server as BaseHTTPServer
 except ImportError:
     import BaseHTTPServer
@@ -42,6 +46,7 @@ from simple_http_server import Parameter
 from simple_http_server import Parameters
 from simple_http_server import Header
 from simple_http_server import JSONBody
+from simple_http_server import Cookie
 
 from simple_http_server import Response
 from simple_http_server import Headers
@@ -83,6 +88,7 @@ class ResponseWrapper(Response):
         self.__req_handler._send_response({
             "status_code": self.status_code,
             "headers": self.headers,
+            "cookies": self.cookies,
             "body": self.body
         })
 
@@ -115,11 +121,14 @@ class FilterContex:
                     self.response.add_headers(ctr_res.headers)
                 elif isinstance(ctr_res, Headers):
                     self.response.add_headers(ctr_res)
+                elif isinstance(ctr_res, cookies.BaseCookie):
+                    self.response.cookies.update(ctr_res)
                 elif isinstance(ctr_res, tuple):
-                    status, headers, body = self.__decode_tuple_response(ctr_res)
+                    status, headers, cks, body = self.__decode_tuple_response(ctr_res)
                     self.response.status_code = status if status is not None else self.response.status_code
                     self.response.body = body if body is not None else self.response.body
                     self.response.add_headers(headers)
+                    self.response.cookies.update(cks)
                 else:
                     self.response.body = ctr_res
 
@@ -134,18 +143,21 @@ class FilterContex:
 
     def __decode_tuple_response(self, ctr_res):
         status_code = None
-        headers = None
+        headers = Headers()
+        cks = cookies.SimpleCookie()
         body = None
         for item in ctr_res:
             if isinstance(item, int):
                 if status_code is None:
                     status_code = item
             elif isinstance(item, Headers):
-                if headers is None:
-                    headers = item
+                headers.update(item)
+            elif isinstance(item, cookies.BaseCookie):
+                cks.update(item)
             elif type(item) in (str, unicode, dict, StaticFile, bytes):
-                body = item
-        return status_code, headers, body
+                if body is None:
+                    body = item
+        return status_code, headers, cks, body
 
     def __prepare_args(self):
         args = _get_args_(self.__controller)
@@ -165,10 +177,20 @@ class FilterContex:
         for k, v in kwargs.items():
             if v is None:
                 kwarg_vals[k] = self.__build_str(k, v)
-            elif isinstance(v, Header):
-                kwarg_vals[k] = self.__build_header(k, v)
+            elif isinstance(v, Request):
+                kwarg_vals[k] = self.request
+            elif isinstance(v, Response):
+                kwarg_vals[k] = self.response
             elif isinstance(v, Headers):
                 kwarg_vals[k] = Headers(self.request.headers)
+            elif isinstance(v, Header):
+                kwarg_vals[k] = self.__build_header(k, v)
+            elif isinstance(v, cookies.BaseCookie):
+                kwarg_vals[k] = self.request.cookies
+            elif isinstance(v, Cookie):
+                kwarg_vals[k] = self.__build_cookie(k, v)
+            elif isinstance(v, MultipartFile):
+                kwarg_vals[k] = self.__build_multipart(k, v)
             elif isinstance(v, Parameter):
                 kwarg_vals[k] = self.__build_param(k, v)
             elif isinstance(v, Parameters):
@@ -187,16 +209,23 @@ class FilterContex:
                 kwarg_vals[k] = self.__build_list(k, v)
             elif isinstance(v, dict):
                 kwarg_vals[k] = self.__build_dict(k, v)
-            elif isinstance(v, Request):
-                kwarg_vals[k] = self.request
-            elif isinstance(v, Response):
-                kwarg_vals[k] = self.response
-            elif isinstance(v, MultipartFile):
-                kwarg_vals[k] = self.__build_multipart(k, v)
             else:
                 kwarg_vals[k] = v
 
         return kwarg_vals
+
+    def __build_cookie(self, key, val=Cookie()):
+        name = val.name if val.name is not None and val.name != "" else key
+        if val._required and name not in self.request.cookies:
+            raise HttpError(400, "Parameter[%s] is required." % name)
+        if name in self.request.cookies:
+            morsel = self.request.cookies[name]
+            cookie = Cookie()
+            cookie.set(morsel.key, morsel.value, morsel.coded_value)
+            cookie.update(morsel)
+            return cookie
+        else:
+            return val
 
     def __build_multipart(self, key, val=MultipartFile()):
         name = val.name if val.name is not None and val.name != "" else key
@@ -416,6 +445,10 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         req.headers = headers
         req._headers_keys_in_lowcase = _headers_keys_in_lowers
 
+        # cookies
+        if "cookie" in _headers_keys_in_lowers.keys():
+            req.cookies.load(_headers_keys_in_lowers["cookie"])
+
         _logger.debug("Headers: " + str(req.headers))
         req.method = method
         query_string = self.__get_query_string(self.path)
@@ -549,6 +582,7 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def _send_response(self, response):
         status_code = response["status_code"]
         headers = response["headers"]
+        cks = response["cookies"]
         raw_body = response["body"]
 
         content_type, body = self.__prepare_res_body(raw_body)
@@ -565,6 +599,10 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 for iov in v:
                     if isinstance(iov, str) or isinstance(iov, unicode):
                         self.send_header(k, iov)
+        
+        for k in cks:
+            ck = cks[k]
+            self.send_header("Set-Cookie", ck.OutputString())
 
         if body is None:
             self.send_header("Content-Length", 0)

@@ -5,6 +5,10 @@ try:
 except NameError:
     # python 3 has no unicode type
     unicode = str
+try:
+    import http.cookies as cookies
+except ImportError:
+    import Cookie as cookies
 
 name = "simple_http_server"
 
@@ -62,12 +66,17 @@ class Request(object):
     def __init__(self):
         self.method = ""  # GET, POST, PUT, DELETE, HEAD, etc.
         self.headers = {}  # Request headers
+        self.__cookies = Cookies()
         self.query_string = ""  # Query String
         self.path = ""  # Path
         self.__parameters = {}  # Parameters, key-value array, merged by query string and request body if the `Content-Type` in request header is `application/x-www-form-urlencoded` or `multipart/form-data`
         self.__parameter = {}  # Parameters, key-value, if more than one parameters with the same key, only the first one will be stored.
         self.body = ""  # Request body
         self.json = None  # A dictionary if the `Content-Type` in request header is `application/json`
+
+    @property
+    def cookies(self):
+        return self.__cookies
 
     @property
     def parameters(self):
@@ -199,7 +208,17 @@ class Response(object):
         self.status_code = status_code
         self.__headers = headers if headers is not None else {}
         self.__body = ""
+        self.__cookies = Cookies()
         self.__set_body(body)
+
+    @property
+    def cookies(self):
+        return self.__cookies
+
+    @cookies.setter
+    def cookies(self, val):
+        assert isinstance(val, cookies.SimpleCookie)
+        self.__cookies = val
 
     @property
     def body(self):
@@ -260,7 +279,37 @@ class StaticFile(object):
         self.content_type = content_type
 
 
+"""
+" Use both in request and response
+"""
+
+
 class Headers(dict):
 
     def __init__(self, headers={}):
         self.update(headers)
+
+
+class Cookies(cookies.SimpleCookie):
+    EXPIRE_DATE_FORMAT = "%a, %d %b %Y %H:%M:%S GMT"
+
+class Cookie(cookies.Morsel):
+
+    def __init__(self, name="",
+                 default="",
+                 default_options={},
+                 required=False):
+        super(Cookie, self).__init__()
+        self.__name = name
+        self.__required = required
+        if name is not None and name != "":
+            self.set(name, default, default)
+        self.update(default_options)
+
+    @property
+    def name(self):
+        return self.__name
+
+    @property
+    def _required(self):
+        return self.__required

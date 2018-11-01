@@ -6,7 +6,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="simple_http_server",
-    version="0.1.3",
+    version="0.1.4",
     author="Keijack",
     author_email="keijack.wu@gmail.com",
     description="This is a simple http server, use MVC like design.",

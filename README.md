@@ -16,6 +16,12 @@ Python 2.7 / 3.6+ (It should also work at 3.5, not test)
 
 ## Change log
 
+### Version 0.1.4 2018-11-1
+
+1. Support `cookies`, you can read and write `cookies` very easily in your controller function.
+2. You can use `Headers()` as a default argument in your controller function, if you do so, All headers will be given to this argument.
+3. Some bugs are fixed.
+
 ### Version 0.1.3 2018-10-30
 
 1. Support add header in Response object, you can send several different header value with the same name now.
@@ -42,7 +48,6 @@ Python 2.7 / 3.6+ (It should also work at 3.5, not test)
 ## TODOs
 
 * Support path values.
-* Support Cookies.
 
 ## How to use
 
@@ -66,6 +71,8 @@ from simple_http_server import JSONBody
 from simple_http_server import HttpError
 from simple_http_server import StaticFile
 from simple_http_server import Headers
+from simple_http_server import Cookies
+from simple_http_server import Cookie
 
 
 @request_map("/index")
@@ -109,10 +116,32 @@ def show_upload():
 @request_map("/tuple")
 def tuple_results():
     # The order here is not important, we consider the first `int` value as status code,
-    # The first `Headers` object will be considered as headers
+    # All `Headers` object will be sent to the response
     # And the first valid object whose type in (str, unicode, dict, StaticFile, bytes) will
     # be considered as the body
     return 200, Headers({"my-header": "headers"}), {"success": True}
+
+"""
+" Please note that, cookie_sc will not be written to response. It's just some kind of default 
+" value
+"""
+@request_map("tuple_cookie")
+def tuple_with_cookies(all_cookies=Cookies(), cookie_sc=Cookie("sc")):
+    print("=====> cookies ")
+    print(all_cookies)
+    print("=====> cookie sc ")
+    print(cookie_sc)
+    print("======<")
+    import datetime
+    expires = datetime.datetime(2018, 12, 31)
+
+    cks = Cookies()
+    # cks = cookies.SimpleCookie() # you could also use the build-in cookie objects
+    cks["ck1"] = "keijack"
+    cks["ck1"]["path"] = "/"
+    cks["ck1"]["expires"] = expires.strftime(Cookies.EXPIRE_DATE_FORMAT)
+    # You can ignore status code, headers, cookies even body in this tuple.
+    return Header({"xx": "yyy"}), cks, "<html><body>OK</body></html>"
 ```
 
 ### Start your server
