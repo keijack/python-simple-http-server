@@ -7,7 +7,7 @@ import json
 import copy
 import inspect
 from collections import OrderedDict
-from threading import Thread
+import threading
 try:
     import http.cookies as cookies
 except ImportError:
@@ -71,6 +71,7 @@ class ResponseWrapper(Response):
         super(ResponseWrapper, self).__init__(status_code=status_code, headers=headers, body="")
         self.__req_handler = handler
         self.__is_sent = False
+        self.__send_lock__ = threading.Lock()
 
     @property
     def is_sent(self):
@@ -89,6 +90,10 @@ class ResponseWrapper(Response):
         self.send_response()
 
     def send_response(self):
+        with self.__send_lock__:
+            self._send_response()
+    
+    def _send_response(self):
         assert not self.__is_sent, "This response has benn sent"
         self.__is_sent = True
         self.__req_handler._send_response({
@@ -715,6 +720,6 @@ class SimpleDispatcherHttpServer:
 
     def shutdown(self):
         # server must shutdown in a separate thread, or it will be deadlocking...WTF!
-        t = Thread(target=self.server.shutdown)
+        t = threading.Thread(target=self.server.shutdown)
         t.daemon = True
         t.start()
