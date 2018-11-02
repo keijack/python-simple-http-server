@@ -92,7 +92,7 @@ class ResponseWrapper(Response):
     def send_response(self):
         with self.__send_lock__:
             self._send_response()
-    
+
     def _send_response(self):
         assert not self.__is_sent, "This response has benn sent"
         self.__is_sent = True
@@ -425,7 +425,7 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         res = ResponseWrapper(self)
         if ctrl is None:
             res.status_code = 404
-            res.body = '{"error":"Cannot find controller for your path"}'
+            res.body = {"error": "Cannot find a controller for your path"}
             res.send_response()
         else:
             filters = FilterMapping._get_matched_filters(req.path)
@@ -446,7 +446,7 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         path = self.__get_path(self.path)
         req = RequestWrapper()
         req.path = "/" + path
-        _logger.debug("%s [%s] is bing visited" % (req.path, method))
+
         req._path = path
         headers = {}
         _headers_keys_in_lowers = {}
@@ -460,10 +460,9 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         if "cookie" in _headers_keys_in_lowers.keys():
             req.cookies.load(_headers_keys_in_lowers["cookie"])
 
-        _logger.debug("Headers: " + str(req.headers))
         req.method = method
         query_string = self.__get_query_string(self.path)
-        _logger.debug("query string: " + query_string)
+
         req.parameters = self.__decode_query_string(query_string)
 
         if "content-length" in _headers_keys_in_lowers.keys():
@@ -507,9 +506,7 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         return path
 
     def __decode_multipart(self, content_type, data):
-        _logger.debug("decode multipart...")
         boundary = "--" + content_type.split("; ")[1].split("=")[1]
-        _logger.debug("data's type is %s " % type(data))
         fields = data.split(boundary)
         # ignore the first empty row and the last end symbol
         fields = fields[1: len(fields) - 1]
@@ -524,13 +521,12 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def __decode_multipart_field(self, field):
         # first line: Content-Disposition
         line, rest = self.__read_line(field)
-        # _logger.debug("line::" + line)
+        
         kvs = self.__decode_content_disposition(line)
         kname = kvs["name"].encode("ISO-8859-1").decode("UTF-8")
         if len(kvs) == 1:
             # this is a string field, the second line is an empty line, the rest is the value
             val = self.__read_line(rest)[1].encode("ISO-8859-1").decode("UTF-8")
-            _logger.debug("value is ::" + val)
         elif len(kvs) == 2:
             filename = kvs["filename"].encode("ISO-8859-1").decode("UTF-8")
             # the second line is Content-Type line
@@ -554,7 +550,6 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         return cont_dis
 
     def __read_line(self, txt):
-        # _logger.debug("txt is -> " + str(txt))
         return self.__break(txt, "\r\n")
 
     def __break(self, txt, separator):
@@ -569,7 +564,6 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         if not query_string:
             return params
         pairs = query_string.split("&")
-        # _logger.debug("pairs: " + str(pairs))
         for item in pairs:
             """
             " for python 2.7: val here is a unicode, after unquote,
