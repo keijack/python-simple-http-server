@@ -2,6 +2,12 @@
 
 ## Change log
 
+### Version 0.1.5 2018-11-2
+
+1. Fix a bug that filter mapping may not work.
+2. Rename `filter` decoration to `filter_map` to avoid some problems.
+3. Add a lock to ensure response sending is synchronied.
+
 ### Version 0.1.4 2018-11-1
 
 1. Support `cookies`, you can read and write `cookies` very easily in your controller function.
