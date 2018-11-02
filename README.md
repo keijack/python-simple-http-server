@@ -112,7 +112,7 @@ def tuple_with_cookies(all_cookies=Cookies(), cookie_sc=Cookie("sc")):
 ### Write filters
 
 ```python
-from simple_http_server import request_map
+from simple_http_server import filter_map
 
 # Please note filter will map a regular expression, not a concrect url.
 @filter_map("^/tuple")
