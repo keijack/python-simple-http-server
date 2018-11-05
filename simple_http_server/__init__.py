@@ -166,6 +166,26 @@ class Parameter(unicode):
         return obj
 
 
+class PathValue(unicode):
+
+    def __init__(self, name="", _value=""):
+        self.__name = name
+
+    @property
+    def name(self):
+        return self.__name
+
+    def __new__(cls, name="", _value="", **kwargs):
+        assert isinstance(_value, str) or isinstance(_value, unicode)
+        if str != unicode:
+            """
+            " Python 2.7, chuange str to unicode
+            """
+            _value = _value.decode("utf-8")
+        obj = super(PathValue, cls).__new__(cls, _value)
+        return obj
+
+
 class Parameters(list):
 
     def __init__(self, name="", default=[], required=False):

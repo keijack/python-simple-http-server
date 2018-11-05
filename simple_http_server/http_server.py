@@ -47,6 +47,7 @@ _logger = getLogger("simple_http_server.http_server")
 from simple_http_server import Request
 from simple_http_server import MultipartFile
 from simple_http_server import Parameter
+from simple_http_server import PathValue
 from simple_http_server import Parameters
 from simple_http_server import Header
 from simple_http_server import JSONBody
@@ -208,6 +209,8 @@ class FilterContex:
                 kwarg_vals[k] = self.__build_multipart(k, v)
             elif isinstance(v, Parameter):
                 kwarg_vals[k] = self.__build_param(k, v)
+            elif isinstance(v, PathValue):
+                kwarg_vals[k] = self.__build_path_value(k, v)
             elif isinstance(v, Parameters):
                 kwarg_vals[k] = self.__build_params(k, v)
             elif isinstance(v, JSONBody):
@@ -228,6 +231,13 @@ class FilterContex:
                 kwarg_vals[k] = v
 
         return kwarg_vals
+
+    def __build_path_value(self, key, val=PathValue()):
+        name = val.name if val.name is not None and val.name != "" else key
+        if name in self.request.path_values:
+            return PathValue(name=name, _value=self.request.path_values[name])
+        else:
+            raise HttpError(500, "path name[%s] not in your url mapping!" % name)
 
     def __build_cookie(self, key, val=Cookie()):
         name = val.name if val.name is not None and val.name != "" else key
