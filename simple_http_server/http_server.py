@@ -228,7 +228,7 @@ class FilterContex:
     def __build_cookie(self, key, val=Cookie()):
         name = val.name if val.name is not None and val.name != "" else key
         if val._required and name not in self.request.cookies:
-            raise HttpError(400, "Parameter[%s] is required." % name)
+            raise HttpError(400, "Cookie[%s] is required." % name)
         if name in self.request.cookies:
             morsel = self.request.cookies[name]
             cookie = Cookie()
@@ -355,50 +355,6 @@ def _get_kwargs_(func):
         return OrderedDict(zip(args.args[-len(args.defaults):], args.defaults))
 
 
-class FilterMapping:
-    """Filter Mapping"""
-
-    __SORTED_KEYS = []
-    __FILTER = {}
-
-    def __init__(self):
-        pass
-
-    @staticmethod
-    def map(key, ft):
-        FilterMapping.__SORTED_KEYS.append(key)
-        FilterMapping.__FILTER[key] = ft
-
-    @staticmethod
-    def _get_matched_filters(path):
-        available_filters = []
-        for key in FilterMapping.__SORTED_KEYS:
-            if re.match(key, path):
-                available_filters.append(FilterMapping.__FILTER[key])
-        return available_filters
-
-
-class RequestMapping:
-    """Request Mapping"""
-
-    COMMON = {}
-    SPECIFIC = {}
-
-    def __init__(self):
-        pass
-
-    @staticmethod
-    def map(url, fun, method=""):
-        _url = _remove_url_first_slash(url)
-        if method is None or method == "":
-            RequestMapping.COMMON[_url] = fun
-        else:
-            mth = method.upper()
-            if mth not in RequestMapping.SPECIFIC.keys():
-                RequestMapping.SPECIFIC[mth] = {}
-            RequestMapping.SPECIFIC[mth][_url] = fun
-
-
 def _remove_url_first_slash(url):
     _url = url
     while _url.startswith("/"):
@@ -406,7 +362,7 @@ def _remove_url_first_slash(url):
     return _url
 
 
-class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
+class _SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     """The Class will dispatch the request to the controller configured in RequestMapping"""
 
     def __process(self, method):
@@ -415,10 +371,10 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         req = self.__prepare_request(mth)
         path = req._path
 
-        if mth in RequestMapping.SPECIFIC.keys() and path in RequestMapping.SPECIFIC[mth].keys():
-            ctrl = RequestMapping.SPECIFIC[mth][path]
-        elif path in RequestMapping.COMMON.keys():
-            ctrl = RequestMapping.COMMON[path]
+        if mth in self.server.method_url_mapping.keys() and path in self.server.method_url_mapping[mth].keys():
+            ctrl = self.server.method_url_mapping[mth][path]
+        elif path in self.server.common_url_mapping.keys():
+            ctrl = self.server.common_url_mapping[path]
         else:
             ctrl = None
 
@@ -428,7 +384,7 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             res.body = {"error": "Cannot find a controller for your path"}
             res.send_response()
         else:
-            filters = FilterMapping._get_matched_filters(req.path)
+            filters = self.server.get_matched_filters(req.path)
             ctx = FilterContex(req, res, ctrl, filters)
             try:
                 ctx.do_chain()
@@ -521,7 +477,7 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def __decode_multipart_field(self, field):
         # first line: Content-Disposition
         line, rest = self.__read_line(field)
-        
+
         kvs = self.__decode_content_disposition(line)
         kname = kvs["name"].encode("ISO-8859-1").decode("UTF-8")
         if len(kvs) == 1:
@@ -686,27 +642,55 @@ class SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         _logger.info("%s -  %s\n" % (self.client_address[0], format % args))
 
 
+class _HttpServer(BaseHTTPServer.HTTPServer):
+
+    def __init__(self, addr):
+        super(_HttpServer, self).__init__(addr, _SimpleDispatcherHttpRequestHandler)
+        self.common_url_mapping = {}
+        self.method_url_mapping = {}
+        self.filter_mapping = OrderedDict()
+
+    def map_url(self, url, fun, method=""):
+        _url = _remove_url_first_slash(url)
+        if method is None or method == "":
+            self.common_url_mapping[_url] = fun
+        else:
+            mth = method.upper()
+            if mth not in self.method_url_mapping.keys():
+                self.method_url_mapping[mth] = {}
+            self.method_url_mapping[mth][_url] = fun
+
+    def map_filter(self, path_pattern, filter_fun):
+        self.filter_mapping[path_pattern] = filter_fun
+
+    def get_matched_filters(self, path):
+        available_filters = []
+        for key in self.filter_mapping.keys():
+            if re.match(key, path):
+                available_filters.append(self.filter_mapping[key])
+        return available_filters
+
+
+class _ThreadingHttpServer(ThreadingMixIn, _HttpServer):
+    pass
+
+
 class SimpleDispatcherHttpServer:
     """Dispatcher Http server"""
 
-    class __ThreadingServer(ThreadingMixIn, BaseHTTPServer.HTTPServer):
-        pass
-
-    def map_filter(self, pattern, filter_fun):
-        FilterMapping.map(pattern, filter_fun)
+    def map_filter(self, path_pattern, filter_fun):
+        self.server.map_filter(path_pattern, filter_fun)
 
     def map_request(self, url, fun, method=""):
-        RequestMapping.map(url, fun, method)
+        self.server.map_url(url, fun, method)
 
     def __init__(self, host=('', 9090), multithread=True):
         self.host = host
         self.multithread = multithread
         if self.multithread:
-            self.server = self.__ThreadingServer(
-                self.host, SimpleDispatcherHttpRequestHandler)
+            self.server = _ThreadingHttpServer(self.host)
         else:
-            self.server = BaseHTTPServer.HTTPServer(
-                self.host, SimpleDispatcherHttpRequestHandler)
+            self.server = _HttpServer(self.host)
 
     def start(self):
         _logger.info("Dispatcher Http Server starts. Listen to port [" + str(self.host[1]) + "]")
