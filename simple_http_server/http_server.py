@@ -25,6 +25,10 @@ try:
 except ImportError:
     from urllib import unquote
 try:
+    from urllib.parse import quote
+except ImportError:
+    from urllib import quote
+try:
     long(0)
 except NameError:
     # python 3 does no longer support long method, use int instead
@@ -325,7 +329,7 @@ class FilterContex:
 
     def __build_param(self, key, val=Parameter()):
         name = val.name if val.name is not None and val.name != "" else key
-        if str != unicode:
+        if not isinstance(name, unicode):
             """
             " Python 2.7, change str => unicode, or it will fail to reconize the key that is unicode;
             """
@@ -371,12 +375,7 @@ class _SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler)
         req = self.__prepare_request(mth)
         path = req._path
 
-        if mth in self.server.method_url_mapping.keys() and path in self.server.method_url_mapping[mth].keys():
-            ctrl = self.server.method_url_mapping[mth][path]
-        elif path in self.server.common_url_mapping.keys():
-            ctrl = self.server.common_url_mapping[path]
-        else:
-            ctrl = None
+        ctrl, req.path_values = self.server.get_url_controller(path, mth)
 
         res = ResponseWrapper(self)
         if ctrl is None:
@@ -622,6 +621,9 @@ class _SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler)
     def do_method(self, method):
         self.__process(method)
 
+    def do_OPTIONS(self):
+        self.do_method("OPTIONS")
+
     def do_GET(self):
         self.do_method("GET")
 
@@ -637,28 +639,103 @@ class _SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler)
     def do_DELETE(self):
         self.do_method("DELETE")
 
+    def do_TRACE(self):
+        self.do_method("TRACE")
+
+    def do_CONNECT(self):
+        self.do_method("CONNECT")
+
     # @override
     def log_message(self, format, *args):
         _logger.info("%s -  %s\n" % (self.client_address[0], format % args))
 
 
-class _HttpServer(BaseHTTPServer.HTTPServer):
+class _HttpServerWrapper(BaseHTTPServer.HTTPServer, object):
 
     def __init__(self, addr):
-        super(_HttpServer, self).__init__(addr, _SimpleDispatcherHttpRequestHandler)
-        self.common_url_mapping = {}
-        self.method_url_mapping = {}
+        super(_HttpServerWrapper, self).__init__(addr, _SimpleDispatcherHttpRequestHandler)
+        self.method_url_mapping = {"_": {},
+                                   "OPTIONS": {},
+                                   "GET": {},
+                                   "HEAD": {},
+                                   "POST": {},
+                                   "PUT": {},
+                                   "DELETE": {},
+                                   "TRACE": {},
+                                   "CONNECT": {}}
+        self.path_val_url_mapping = {"_": {},
+                                     "OPTIONS": {},
+                                     "GET": {},
+                                     "HEAD": {},
+                                     "POST": {},
+                                     "PUT": {},
+                                     "DELETE": {},
+                                     "TRACE": {},
+                                     "CONNECT": {}}
         self.filter_mapping = OrderedDict()
 
+    def __get_path_reg_pattern(self, url):
+        _url = url
+        if not isinstance(_url, unicode):
+            _url = _url.decode("utf-8")
+        path_names = re.findall("(?u)\\{\\w+\\}", _url)
+        if len(path_names) == 0:
+            # normal url
+            return None, path_names
+        for name in path_names:
+            _url = _url.replace(name, "([\\w%]+)")
+        _url = "^%s$" % _url
+
+        quoted_names = []
+        for name in path_names:
+            name = name[1: -1]
+            if str != unicode:
+                name = name.encode("utf-8")
+            quoted_names.append(quote(name))
+        return _url, quoted_names
+
     def map_url(self, url, fun, method=""):
+        assert url is not None
+        assert fun is not None and inspect.isfunction(fun)
+        assert method is None or method.upper() in ("", "OPTIONS", "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT")
+        _method = method.upper() if method is not None and method != "" else "_"
         _url = _remove_url_first_slash(url)
-        if method is None or method == "":
-            self.common_url_mapping[_url] = fun
+
+        path_pattern, path_names = self.__get_path_reg_pattern(_url)
+        if path_pattern is None:
+            self.method_url_mapping[_method][_url] = fun
         else:
-            mth = method.upper()
-            if mth not in self.method_url_mapping.keys():
-                self.method_url_mapping[mth] = {}
-            self.method_url_mapping[mth][_url] = fun
+            self.path_val_url_mapping[_method][path_pattern] = (fun, path_names)
+
+    def get_url_controller(self, path, method):
+        if path in self.method_url_mapping[method]:
+            return self.method_url_mapping[method][path], {}
+        elif path in self.method_url_mapping["_"]:
+            return self.method_url_mapping["_"][path], {}
+        else:
+            fun_and_val = self.__try_get_from_path_val(path, method)
+            if fun_and_val is None:
+                fun_and_val = self.__try_get_from_path_val(path, "_")
+            if fun_and_val is not None:
+                return fun_and_val
+            else:
+                return None, {}
+
+    def __try_get_from_path_val(self, path, method):
+        for patterns, val in self.path_val_url_mapping[method].items():
+            if not isinstance(patterns, unicode):
+                patterns = patterns.decode("utf-8")
+            _logger.debug("pattern::[%s] => path::[%s]" % (patterns, path))
+            m = re.match(patterns, path)
+            _logger.debug(m)
+            if m is not None:
+                fun, path_names = val
+                path_values = {}
+                for idx in range(len(path_names)):
+                    key = unquote(str(path_names[idx]))
+                    path_values[key] = unquote(str(m.groups()[idx]))
+                return fun, path_values
+        return None
 
     def map_filter(self, path_pattern, filter_fun):
         self.filter_mapping[path_pattern] = filter_fun
@@ -671,7 +748,7 @@ class _HttpServer(BaseHTTPServer.HTTPServer):
         return available_filters
 
 
-class _ThreadingHttpServer(ThreadingMixIn, _HttpServer):
+class _ThreadingHttpServer(ThreadingMixIn, _HttpServerWrapper):
     pass
 
 
@@ -690,7 +767,7 @@ class SimpleDispatcherHttpServer:
         if self.multithread:
             self.server = _ThreadingHttpServer(self.host)
         else:
-            self.server = _HttpServer(self.host)
+            self.server = _HttpServerWrapper(self.host)
 
     def start(self):
         _logger.info("Dispatcher Http Server starts. Listen to port [" + str(self.host[1]) + "]")

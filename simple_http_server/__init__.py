@@ -68,6 +68,7 @@ class Request(object):
         self.headers = {}  # Request headers
         self.__cookies = Cookies()
         self.query_string = ""  # Query String
+        self.path_values = {}
         self.path = ""  # Path
         self.__parameters = {}  # Parameters, key-value array, merged by query string and request body if the `Content-Type` in request header is `application/x-www-form-urlencoded` or `multipart/form-data`
         self.__parameter = {}  # Parameters, key-value, if more than one parameters with the same key, only the first one will be stored.
