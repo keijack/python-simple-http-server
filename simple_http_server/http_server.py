@@ -131,20 +131,22 @@ class FilterContex:
                 ctr_res = self.__controller(*args, **kwargs)
 
             if ctr_res is not None:
-                if isinstance(ctr_res, Response):
-                    self.response.status_code = ctr_res.status_code
-                    self.response.body = ctr_res.body
-                    self.response.add_headers(ctr_res.headers)
-                elif isinstance(ctr_res, Headers):
-                    self.response.add_headers(ctr_res)
-                elif isinstance(ctr_res, cookies.BaseCookie):
-                    self.response.cookies.update(ctr_res)
-                elif isinstance(ctr_res, tuple):
+                if isinstance(ctr_res, tuple):
                     status, headers, cks, body = self.__decode_tuple_response(ctr_res)
                     self.response.status_code = status if status is not None else self.response.status_code
                     self.response.body = body if body is not None else self.response.body
                     self.response.add_headers(headers)
                     self.response.cookies.update(cks)
+                elif isinstance(ctr_res, Response):
+                    self.response.status_code = ctr_res.status_code
+                    self.response.body = ctr_res.body
+                    self.response.add_headers(ctr_res.headers)
+                elif isinstance(ctr_res, int) and ctr_res >= 200 and ctr_res < 600:
+                    self.response.status_code = ctr_res
+                elif isinstance(ctr_res, Headers):
+                    self.response.add_headers(ctr_res)
+                elif isinstance(ctr_res, cookies.BaseCookie):
+                    self.response.cookies.update(ctr_res)
                 else:
                     self.response.body = ctr_res
 
