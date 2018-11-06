@@ -60,6 +60,10 @@ def my_ctrl3():
 def exception_ctrl():
     raise HttpError(400, "Exception")
 
+@request_map("/upload", method="GET")
+def show_upload():
+    root = os.path.dirname(os.path.abspath(__file__))
+    return StaticFile("%s/my_dev/my_test_index.html" % root, "text/html; charset=utf-8")
 
 @request_map("/upload", method="POST")
 def my_upload(img=MultipartFile("img")):
@@ -72,12 +76,6 @@ def my_upload(img=MultipartFile("img")):
 def normal_form_post(txt):
     return "<!DOCTYPE html><html><body>hi, %s</body></html>" % txt
 
-
-@request_map("/upload", method="GET")
-def show_upload():
-    root = os.path.dirname(os.path.abspath(__file__))
-    return StaticFile("%s/my_dev/my_test_index.html" % root, "text/html; charset=utf-8")
-
 @request_map("/tuple")
 def tuple_results():
     # The order here is not important, we consider the first `int` value as status code,
@@ -87,7 +85,7 @@ def tuple_results():
     return 200, Headers({"my-header": "headers"}), {"success": True}
 
 """
-" Please note that, cookie_sc will not be written to response. It's just some kind of default 
+" Cookie_sc will not be written to response. It's just some kind of default
 " value
 """
 @request_map("tuple_cookie")
@@ -107,6 +105,13 @@ def tuple_with_cookies(all_cookies=Cookies(), cookie_sc=Cookie("sc")):
     cks["ck1"]["expires"] = expires.strftime(Cookies.EXPIRE_DATE_FORMAT)
     # You can ignore status code, headers, cookies even body in this tuple.
     return Header({"xx": "yyy"}), cks, "<html><body>OK</body></html>"
+
+"""
+" If you visit /a/b/xyz/x，this controller function will be called, and `path_val` will be `xyz`
+"""
+@request_map("/a/b/{path_val}/x")
+def my_path_val_ctr(path_val=PathValue()):
+    return "<html><body>%s</body></html>" % path_val
 ```
 
 ### Write filters

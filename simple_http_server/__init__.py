@@ -141,7 +141,9 @@ class MultipartFile(object):
                 f.write(self.__content)
 
 
-class Parameter(unicode):
+
+
+class ParamStringValue(unicode):
 
     def __init__(self, name="", default="", required=False):
         self.__name = name
@@ -162,9 +164,11 @@ class Parameter(unicode):
             " Python 2.7, chuange str to unicode
             """
             default = default.decode("utf-8")
-        obj = super(Parameter, cls).__new__(cls, default)
+        obj = super(ParamStringValue, cls).__new__(cls, default)
         return obj
 
+class Parameter(ParamStringValue):
+    pass
 
 class PathValue(unicode):
 
@@ -206,7 +210,7 @@ class Parameters(list):
         return obj
 
 
-class Header(Parameter):
+class Header(ParamStringValue):
     pass
 
 

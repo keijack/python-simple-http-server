@@ -2,6 +2,10 @@
 
 ## Change log
 
+### Version 0.1.6 2018-11-6
+
+1. Add path value support.
+
 ### Version 0.1.5 2018-11-2
 
 1. Fix a bug that filter mapping may not work.

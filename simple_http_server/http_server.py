@@ -693,7 +693,7 @@ class _HttpServerWrapper(BaseHTTPServer.HTTPServer, object):
             # normal url
             return None, path_names
         for name in path_names:
-            _url = _url.replace(name, "([\\w%]+)")
+            _url = _url.replace(name, "([\\w%.-@!\\(\\)\\[\\]\\|\\$]+)")
         _url = "^%s$" % _url
 
         quoted_names = []
