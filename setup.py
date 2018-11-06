@@ -15,7 +15,9 @@ setuptools.setup(
     url="https://github.com/keijack/python-simple-http-server",
     packages=setuptools.find_packages(),
     classifiers=[
+        "Programming Language :: Python :: 2.7",
         "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.7",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],

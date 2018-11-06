@@ -664,26 +664,16 @@ class _SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler)
 
 class _HttpServerWrapper(BaseHTTPServer.HTTPServer, object):
 
+    HTTP_METHODS = ["OPTIONS", "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT"]
+
     def __init__(self, addr):
         super(_HttpServerWrapper, self).__init__(addr, _SimpleDispatcherHttpRequestHandler)
-        self.method_url_mapping = {"_": {},
-                                   "OPTIONS": {},
-                                   "GET": {},
-                                   "HEAD": {},
-                                   "POST": {},
-                                   "PUT": {},
-                                   "DELETE": {},
-                                   "TRACE": {},
-                                   "CONNECT": {}}
-        self.path_val_url_mapping = {"_": {},
-                                     "OPTIONS": {},
-                                     "GET": {},
-                                     "HEAD": {},
-                                     "POST": {},
-                                     "PUT": {},
-                                     "DELETE": {},
-                                     "TRACE": {},
-                                     "CONNECT": {}}
+        self.method_url_mapping = {"_": {}}
+        self.path_val_url_mapping = {"_": {}}
+        for mth in _HttpServerWrapper.HTTP_METHODS:
+            self.method_url_mapping[mth] = {}
+            self.path_val_url_mapping[mth] = {}
+
         self.filter_mapping = OrderedDict()
 
     def __get_path_reg_pattern(self, url):
@@ -709,7 +699,7 @@ class _HttpServerWrapper(BaseHTTPServer.HTTPServer, object):
     def map_url(self, url, fun, method=""):
         assert url is not None
         assert fun is not None and inspect.isfunction(fun)
-        assert method is None or method.upper() in ("", "OPTIONS", "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT")
+        assert method is None or method == "" or method.upper() in _HttpServerWrapper.HTTP_METHODS
         _method = method.upper() if method is not None and method != "" else "_"
         _url = _remove_url_first_slash(url)
 
