@@ -96,9 +96,9 @@ class ResponseWrapper(Response):
 
     def send_response(self):
         with self.__send_lock__:
-            self._send_response()
+            self.__send_response()
 
-    def _send_response(self):
+    def __send_response(self):
         assert not self.__is_sent, "This response has benn sent"
         self.__is_sent = True
         self.__req_handler._send_response({
@@ -109,14 +109,22 @@ class ResponseWrapper(Response):
         })
 
 
-class FilterContex:
+class FilterContex(object):
     """Context of a filter"""
 
     def __init__(self, req, res, controller, filters=None):
-        self.request = req
-        self.response = res
+        self.__request = req
+        self.__response = res
         self.__controller = controller
         self.__filters = filters if filters is not None else []
+
+    @property
+    def request(self):
+        return self.__request
+
+    @property
+    def response(self):
+        return self.__response
 
     def do_chain(self):
         if self.response.is_sent:
@@ -513,7 +521,7 @@ class _SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler)
         es = line.split(";")[1:]
         for e in es:
             k, v = self.__break(e.strip(), "=")
-            cont_dis[k] = v[1: len(v) - 1]  # ignore the '"' symbol
+            cont_dis[k] = v[1: -1]  # ignore the '"' symbol
         return cont_dis
 
     def __read_line(self, txt):
@@ -744,9 +752,9 @@ class _HttpServerWrapper(BaseHTTPServer.HTTPServer, object):
 
     def get_matched_filters(self, path):
         available_filters = []
-        for key in self.filter_mapping.keys():
+        for key, val in self.filter_mapping.items():
             if re.match(key, path):
-                available_filters.append(self.filter_mapping[key])
+                available_filters.append(val)
         return available_filters
 
 
@@ -754,7 +762,7 @@ class _ThreadingHttpServer(ThreadingMixIn, _HttpServerWrapper):
     pass
 
 
-class SimpleDispatcherHttpServer:
+class SimpleDispatcherHttpServer(object):
     """Dispatcher Http server"""
 
     def map_filter(self, path_pattern, filter_fun):
