@@ -34,7 +34,7 @@ def request_map(url, method=""):
         else:
             mths = [method]
         for mth in mths:
-            _log().info("map url %s with method[%s] to function %s. " % (url, mth, str(ctrl_fun)))
+            _log().debug("map url %s with method[%s] to function %s. " % (url, mth, str(ctrl_fun)))
             __request_mappings.append({
                 "url": url,
                 "method": mth,

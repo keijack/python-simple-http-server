@@ -727,10 +727,10 @@ class _HttpServerWrapper(BaseHTTPServer.HTTPServer, object):
         for patterns, val in self.path_val_url_mapping[method].items():
             if not isinstance(patterns, unicode):
                 patterns = patterns.decode("utf-8")
-            _logger.debug("pattern::[%s] => path::[%s]" % (patterns, path))
             m = re.match(patterns, path)
-            _logger.debug(m)
-            if m is not None:
+            is_match = m is not None
+            _logger.debug("pattern::[%s] => path::[%s] match? %s" % (patterns, path, str(is_match)))
+            if is_match:
                 fun, path_names = val
                 path_values = {}
                 for idx in range(len(path_names)):
