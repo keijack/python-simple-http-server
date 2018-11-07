@@ -23,7 +23,7 @@ __logger = None
 def _log():
     global __logger
     if __logger is None:
-        __logger = getLogger("simple_http_server")
+        __logger = getLogger("simple_http_server.__init__")
     return __logger
 
 

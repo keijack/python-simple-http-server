@@ -659,7 +659,7 @@ class _SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler)
 
     # @override
     def log_message(self, format, *args):
-        _logger.info("%s -  %s\n" % (self.client_address[0], format % args))
+        _logger.info("%s -  %s" % (self.client_address[0], format % args))
 
 
 class _HttpServerWrapper(BaseHTTPServer.HTTPServer, object):
