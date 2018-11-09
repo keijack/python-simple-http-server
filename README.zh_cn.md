@@ -86,7 +86,7 @@ def your_ctroller_function(req=Request()):
     """ 请注意关键字参数传入的默认参数是一个 Request 对象，而不是类本身。 """
     ##
     # 该请求的方法，可能是 "OPTIONS", "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT" 中的一个
-    print(req.path)
+    print(req.method)
     ##
     # 该请求的路径，就是 /say/hello/to/xxx
     print(req.path)
