@@ -54,6 +54,7 @@ from simple_http_server import JSONBody
 from simple_http_server import Cookie
 
 from simple_http_server import Response
+from simple_http_server import Redirect
 from simple_http_server import Headers
 from simple_http_server import StaticFile
 from simple_http_server import HttpError
@@ -149,6 +150,8 @@ class FilterContex(object):
                     self.response.status_code = ctr_res.status_code
                     self.response.body = ctr_res.body
                     self.response.add_headers(ctr_res.headers)
+                elif isinstance(ctr_res, Redirect):
+                    self.response.send_redirect(ctr_res.url)
                 elif isinstance(ctr_res, int) and ctr_res >= 200 and ctr_res < 600:
                     self.response.status_code = ctr_res
                 elif isinstance(ctr_res, Headers):

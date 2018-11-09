@@ -307,6 +307,15 @@ class StaticFile(object):
         self.file_path = file_path
         self.content_type = content_type
 
+class Redirect(object):
+
+    def __init__(self, url):
+        self.__url = url
+
+    @property
+    def url(self):
+        return self.__url
+
 
 """
 " Use both in request and response

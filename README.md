@@ -40,6 +40,7 @@ from simple_http_server import StaticFile
 from simple_http_server import Headers
 from simple_http_server import Cookies
 from simple_http_server import Cookie
+from simple_http_server import Redirect
 
 
 @request_map("/index")
@@ -114,6 +115,11 @@ def tuple_with_cookies(all_cookies=Cookies(), cookie_sc=Cookie("sc")):
 @request_map("/a/b/{path_val}/x")
 def my_path_val_ctr(path_val=PathValue()):
     return "<html><body>%s</body></html>" % path_val
+
+
+@request_map("/redirect")
+def redirect():
+    return Redirect("/index")
 ```
 
 ### Write filters

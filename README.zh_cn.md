@@ -174,7 +174,7 @@ from simple_http_server import JSONBody
 @request_map("/from_json_bldy", method=["post", "put", "delete"])
 def your_json_body_controller_function(data=JSONBody()):
     ##
-    #  JSONBody 是 dict 的子类，你可以直接其是一个 dict 来使用 
+    #  JSONBody 是 dict 的子类，你可以直接其是一个 dict 来使用
     print(data["some_key"])
     return "<html><body>Hello, World!</body></html>"
 ```
@@ -232,6 +232,11 @@ def upload(
     ##
     # 如果抛出其他的异常，默认会响应为 500 服务器错误
     raise Exception()
+
+    ##
+    # 返回 Redirect 对象
+    from simple_http_server import Redirect
+    return Redirect("/redirect/to/this/path")
 
     ##
     # 你可以返回一个 StaticFile 类，返回一个文件，这个可以编写下载用的控制器方法

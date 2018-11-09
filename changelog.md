@@ -2,6 +2,10 @@
 
 ## Change log
 
+### Version 0.1.7 2018-11-9
+
+1. Add Redirect, you can now return a simple_http_server.Redirect object to send a response redirect.
+
 ### Version 0.1.6 2018-11-6
 
 1. Add path value support.
