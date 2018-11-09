@@ -215,34 +215,48 @@ def upload(
     ##
     # 如果你返回一个 dict，那么框架将会将其响应为 application/json
     return {"success": True, "message": "Success!"}
+```
 
+```python
     ##
     # 你可以返回一个 XML 格式的字符串，框架会将其响应为 text/xml
     return "<?xml><root></root>"
+```
 
+```python
     ##
     # 返回其他的字符串，框架会将其响应为 text/plain
     return "some other string value"
+```
 
+```python
     ##
     # 响应为 HTTP 错误，可以在任何适合抛出一个 HttpError 异常
     from simple_http_server import HttpError
     raise HttpError(404, "page not found")
+```
 
+```python
     ##
     # 如果抛出其他的异常，默认会响应为 500 服务器错误
     raise Exception()
+```
 
+```python
     ##
     # 返回 Redirect 对象
     from simple_http_server import Redirect
     return Redirect("/redirect/to/this/path")
+```
 
+```python
     ##
     # 你可以返回一个 StaticFile 类，返回一个文件，这个可以编写下载用的控制器方法
     from simple_http_server import StaticFile
     return StaticFile("/path/to/file.xml", content_type="text/xml")
+```
 
+```python
     ##
     # 还可以返回一个 Response 对象，这个对象可以设置更多的信息
     from simple_http_server import Response
@@ -256,7 +270,9 @@ def upload(
     res.cookie["userInfo"]["path"] = "/"
     res.body = "<!DOCTYPE html><html><body>hello world</body></html>"
     return res
+```
 
+```python
     ##
     # 我们还有一个更为简便的方式，就是直接返回一个元祖(tuple)
     from simple_http_server import Headers
@@ -272,7 +288,9 @@ def upload(
     # 而元祖中第一个出现的类型在 (str, unicode, dict, StaticFile, bytes) 会被作为响应的数据。
     # 其他不符合条件的元素将被忽略
     return 200, Headers({"userToken": "user_id_token_xxx"}), res_cookie, {"success": True, "message": "success!"}, "这个字符串会被忽略"
+```
 
+```python
     ##
     # 元祖中所有的元素均不是必须的，即使是 body 也是一样，你可以省略一些没有的内容
     # 以下的元祖只写入了头部和响应体信息
