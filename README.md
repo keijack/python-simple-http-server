@@ -11,8 +11,10 @@ Python 2.7 / 3.6+ (It should also work at 3.5, not test)
 ## Why choose
 
 * Lightway.
-* Filter support.
-* Spring(Java) like request mapping.
+* Filter chain support.
+* Spring MVC like request mapping.
+* Easy to use.
+* Free style controller writing.
 
 ## How to use
 
