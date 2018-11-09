@@ -16,112 +16,287 @@ Python 2.7 / 3.6+ (3.5 也应该支持，没有在3.5环境测试过)
 * 简单易用
 * 编写风格自由
 
-## 如何使用？
-
-### 安装
+## 安装
 
 ```shell
 pip install simple_http_server
 ```
 
-### 编写控制器
+## 编写控制器
 
-```python
+### 配置路由信息
 
+我们接下来，将处理请求的函数命名为 **控制器函数（Controller Function）**。
+
+类似 Spring MVC，我们使用描述性的方式来将配置请求的路由（在 Java 中，我们会使用标注 Annotation，而在 Python，我们使用 decorator，两者在使用时非常类似）。
+
+基础的配置如下，该例子中，请求 /index 将会路由到当前的方法中。
+
+```Python
 from simple_http_server import request_map
-from simple_http_server import Response
-from simple_http_server import MultipartFile
-from simple_http_server import Parameter
-from simple_http_server import Parameters
-from simple_http_server import Header
-from simple_http_server import JSONBody
-from simple_http_server import HttpError
-from simple_http_server import StaticFile
-from simple_http_server import Headers
-from simple_http_server import Cookies
-from simple_http_server import Cookie
-
 
 @request_map("/index")
-def my_ctrl():
-    # 直接返回一个 dict 对象，框架会将其变为一个 JSON 返回到请求方。
-    return {"code": 0, "message": "success"}  
-
-
-@request_map("/say_hello", method=["GET", "POST"])
-def my_ctrl2(name, name2=Parameter("name", default="KEIJACK")):
-    # 如果你的 url 传入了 name， 那么 name == name2，如果不传，会抛出400错误，因为 name 为必填值，如果删除name，不传 name 参数， name2 会使用默认值而不会抛出400错误。
-    return "<!DOCTYPE html><html><body>hello, %s, %s</body></html>" % (name, name2)
-
-
-@request_map("/error")
-def my_ctrl3():
-    return Response(status_code=500)
-
-
-@request_map("/exception")
-def exception_ctrl():
-    raise HttpError(400, "Exception")
-
-@request_map("/upload", method="GET")
-def show_upload():
-    root = os.path.dirname(os.path.abspath(__file__))
-    return StaticFile("%s/my_dev/my_test_index.html" % root, "text/html; charset=utf-8")
-
-@request_map("/upload", method="POST")
-def my_upload(img=MultipartFile("img")):
-    root = os.path.dirname(os.path.abspath(__file__))
-    img.save_to_file(root + "/my_dev/imgs/" + img.filename)
-    return "<!DOCTYPE html><html><body>upload ok!</body></html>"
-
-
-@request_map("/post_txt", method="POST")
-def normal_form_post(txt):
-    return "<!DOCTYPE html><html><body>hi, %s</body></html>" % txt
-
-@request_map("/tuple")
-def tuple_results():
-    # 返回的元祖中，各个参数的顺序不必要是固定的，并且缺少任何的参数都可以。
-    # 框架会使用第一个出现的 int 值作为该响应的状态。
-    # 所有的 Header 对象都会被写入到响应头中。
-    # 所有的 Cookies 对象都会被写入到响应中。
-    # 第一个类型在 (str, unicode, dict, StaticFile, bytes) 会被作为响应的数据。
-    # 其他不符合条件的元素将被忽略
-    cks = Cookies()
-    cks["ck1"] = "keijack"
-    return 200, Headers({"my-header": "headers"}), cks, {"success": True}
-
-"""
-" Cookie_sc will not be written to response. It's just some kind of default
-" value
-"""
-@request_map("tuple_cookie")
-def tuple_with_cookies(all_cookies=Cookies(), cookie_sc=Cookie("sc")):
-    print("=====> cookies ")
-    print(all_cookies)
-    print("=====> cookie sc ")
-    print(cookie_sc)
-    print("======<")
-    import datetime
-    expires = datetime.datetime(2018, 12, 31)
-
-    cks = Cookies()
-    # cks = cookies.SimpleCookie() # 你可以使用 python 源生的 Cookie 对象。
-    cks["ck1"] = "keijack"
-    cks["ck1"]["path"] = "/"
-    cks["ck1"]["expires"] = expires.strftime(Cookies.EXPIRE_DATE_FORMAT)
-
-    return Header({"xx": "yyy"}), cks, "<html><body>OK</body></html>"
-
-"""
-" 如果你访问 /a/b/xyz/x，那么以下方法 `path_val` 就是 `xyz`
-"""
-@request_map("/a/b/{path_val}/x")
-def my_path_val_ctr(path_val=PathValue()):
-    return "<html><body>%s</body></html>" % path_val
+def your_ctroller_function():
+    return "<html><body>Hello, World!</body></html>"
 ```
 
-### 编写过滤器
+@request_map 会接收两个参数，第二个参数会指定当前的控制器函数会处理请求中哪些方法(Method)，以下的例子中的方法，仅会处理方法为 GET 的请求。
+
+```Python
+@request_map("/say_hello", method="GET")
+def your_ctroller_function():
+    return "<html><body>Hello, World!</body></html>"
+```
+
+method参数同时也可以是一个列表，以下的例子中，该控制器函数会处理方法为 GET、POST、PUT 的请求
+
+```Python
+@request_map("/say_hello", method=["GET", "POST", "PUT"])
+def your_ctroller_function():
+    return "<html><body>Hello, World!</body></html>"
+```
+
+匹配路由的适合，除了具体的路径之后，你还可以指定路径的某一段是可变的，这部方可变的部分将会作为路径参数放入请求中，如何取得这些路径参数我们将会在 **取得请求参数** 一节具体说明。@request_map 的配置如下。该配置下，`/say/hello/to/world`，`/say/hello/to/jhon` 等 url 都能访问该控制器方法。
+
+```Python
+@request_map("/say_hello/to/{name}", method=["GET", "POST", "PUT"])
+def your_ctroller_function():
+    return "<html><body>Hello, World!</body></html>"
+```
+
+你可以给一个控制器函数增加多个 @request_map
+
+```python
+@request_map("/")
+@request_map("/index")
+def index():
+    return "<html><body>Hello, World!</body></html>"
+```
+
+### 取的请求中的信息
+
+参考了 Spring MVC 的设计，获取请求方法的方式非常自由。其中最基本的方法是取得 Request 对象，该对象中包含了所有其他方式能够获取的内容。
+
+```Python
+from simple_http_server import request_map
+from simple_http_server import Request
+
+@request_map("/say_hello/to/{name}", method=["GET", "POST", "PUT"])
+def your_ctroller_function(req=Request()):
+    """ 请注意关键字参数传入的默认参数是一个 Request 对象，而不是类本身。 """
+    ##
+    # 该请求的方法，可能是 "OPTIONS", "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT" 中的一个
+    print(req.path)
+    ##
+    # 该请求的路径，就是 /say/hello/to/xxx
+    print(req.path)
+    ##
+    #  一个 dict 对象，包含了所有的头部参数。
+    print(req.headers)
+    ##
+    # 一个 dict 对象，包含了请求的参数，包括了来源于QueryString与 body 中的参数
+    # 该对象仅存储一个参数，如果同一个参数名传入了多个值，该对象只记录第一个值。
+    print(req.parameter)
+    ##
+    # 一个 dict 对象，类似，req.parameter，但该对象包含了所有的参数
+    # 该对象的值总是会返回一个列表，即使一个参数名只传入了一个参数。
+    print(req.parameters)
+    ##
+    # 返回 query string
+    print(req.query_string)
+    ##
+    # 返回一个 Cookies 对象，该对象是 http.cookies.SimpleCookie 的子类
+    print(req.cookies)
+    ##
+    # 一个 dict 对象，包含了所有的路径上的参数，本例中是 {"name": "xxx"}
+    print(req.path_values)
+    ##
+    # 请求体部分，在 3.6 中是一个 bytes 对象。2.7 中是一个 str 对象
+    print(req.body)
+    ##
+    # 当你的请求的 Content-Type 是 application/json 时，框架会自动将请求体中的 JSON 对象加载为一个dict对象。
+    print(req.json)
+    return "<html><body>Hello, World!</body></html>"
+```
+
+我们还可以通过更直接的参数和关键字参数来获取请求中的信息，使得编码更加简洁和方便。
+
+```python
+from simple_http_server import request_map
+
+@request_map("/say_hello/to/{name}", method=["GET", "POST", "PUT"])
+def your_ctroller_function(
+        user_name, # 传入 req.parameter["user_name"]，如果该参数为空，则会响应为 400 参数错误
+        password, # 传入 req.parameter["password"]，如果参数为空，则会响应为 400 参数错误
+        nickName="", # 传入 req.parameter["nickName"]，如果参数为空，则会传入 ""
+        age=16, # 传入 int(req.parameter["age"])，如果传入空则传入 16，如果传入的不是数字类型，会返回 400 参数错误
+        male=True, # 传入 0, false, 空字符串 为 False，其他均为 True，如果不传入，传入这里指定的默认值
+        skills=[], # 传入 req.parameters["skills"]，会返回一个数组，如果没有传入任何的内容，则返回这里指定的数组
+        extra={} # 传入 json.loads(req.parameter["extra"])，如果不传入则传入这里指定的 dict 对象，如果传入的字符串不是 JSON 格式，则响应为 400 参数错误
+    ):
+    return "<html><body>Hello, World!</body></html>"
+```
+
+以上的是基础类型的获取，实施上，我们还提供了几个类，通过这些类，你还能快速地获取一些在请求头中，Cookies 中，请求体，路径中的信息。以下是一些代码实例：
+
+```python
+from simple_http_server import request_map
+from simple_http_server import Parameter
+from simple_http_server import Parameters
+from simple_http_server import Headers
+from simple_http_server import Header
+from simple_http_server import Cookies
+from simple_http_server import Cookie
+from simple_http_server import PathValue
+
+
+@request_map("/say_hello/to/{name}", method=["GET", "POST", "PUT"])
+def your_ctroller_function(
+        user_name=Parameter("userName", required=True), # 传入 req.parameter["userName"]，如果该参数为空，则会响应为 400 参数错误
+        password=Parameter("password", required=True), # 传入 req.parameter["password"]，如果参数为空，则会响应为 400 参数错误
+        nickName=Parameter(default=""), # 传入 req.parameter["nickName"]，如果参数为空，则会传入 ""，参数名和
+        skills=Parameters(required=True), # 传入 req.parameters["skills"]，会返回一个数组，如果没有传入任何的内容，则响应为 400 参数错误
+        all_headers=Headers(), # 传入 req.headers
+        user_token=Header(name="userToken", required=True), # 传入 req.headers["userToken"]，如果请求头中没有 "userToken" 字段，则响应为 400 参数错误
+        all_cookies=Cookies(), # 传入 req.cookies，返回所有当前请求的 cookies
+        user_info=Cookie("userInfo", required=False), # 传入 req.cookies["userInfo"]，如果没有该 cookie，则响应为 400 参数错误
+        name=PathValue("name"), # 传入 req.path_values["name"]，返回路径中你路由配置中匹配 {name} 的字符串
+    ):
+    return "<html><body>Hello, World!</body></html>"
+```
+
+从上述的例子我们看出，这些类中的参数均有默认值，即使不传入，也能返回正确的数据。除了上述的这些例子之外，我们还有一些额外的情况。例如请求的 Content-Type 是 application/json，然后我们将 JSON 字符串直接写入请求体中，我们可以这样获取信息：
+
+```python
+from simple_http_server import request_map
+from simple_http_server import JSONBody
+
+@request_map("/from_json_bldy", method=["post", "put", "delete"])
+def your_json_body_controller_function(data=JSONBody()):
+    ##
+    #  JSONBody 是 dict 的子类，你可以直接其是一个 dict 来使用 
+    print(data["some_key"])
+    return "<html><body>Hello, World!</body></html>"
+```
+
+我们也支持使用 multipart/form-data 上传文件，你可以这样获取文件：
+
+```python
+from simple_http_server import request_map
+from simple_http_server import MultipartFile
+
+@request_map("/upload", method="POST")
+def upload(
+        img=MultipartFile("img", required=True) # 如果没有传入 img 参数，或者该参数不是一个文件，均响应为 400 参数错误
+        ):
+    root = os.path.dirname(os.path.abspath(__file__))
+    ##
+    # 获取上传文件的 content-type
+    print(img.content_type)
+    ##
+    # MultipartFile.content 在 3.6 中为 bytes 类型，在 2.7 中为字符串
+    print(img.content)
+    ##
+    # 还可以通过内置的 save_to_file 将内容直接写入到某个文件中
+    img.save_to_file(root + "/uploads/imgs/" + img.filename)
+    return "<!DOCTYPE html><html><body>upload ok!</body></html>"
+
+```
+
+### 响应请求
+
+从上述的例子中可以看出，取得请求中的参数我们有许多方式，这个给了开发者很高的自由度来编写这些信息。而响应的方法一样具有各种方法。
+
+上述的例子中是其中一种，我们直接返回了一个HTML格式的字符串，该框架会自动的将这个字符串响应为 text/html 格式。
+
+除了 HTML5 格式的字符串，我们还可以返回以下的内容：
+
+```python
+    ##
+    # 如果你返回一个 dict，那么框架将会将其响应为 application/json
+    return {"success": True, "message": "Success!"}
+
+    ##
+    # 你可以返回一个 XML 格式的字符串，框架会将其响应为 text/xml
+    return "<?xml><root></root>"
+
+    ##
+    # 返回其他的字符串，框架会将其响应为 text/plain
+    return "some other string value"
+
+    ##
+    # 响应为 HTTP 错误，可以在任何适合抛出一个 HttpError 异常
+    from simple_http_server import HttpError
+    raise HttpError(404, "page not found")
+
+    ##
+    # 如果抛出其他的异常，默认会响应为 500 服务器错误
+    raise Exception()
+
+    ##
+    # 你可以返回一个 StaticFile 类，返回一个文件，这个可以编写下载用的控制器方法
+    from simple_http_server import StaticFile
+    return StaticFile("/path/to/file.xml", content_type="text/xml")
+
+    ##
+    # 还可以返回一个 Response 对象，这个对象可以设置更多的信息
+    from simple_http_server import Response
+    from http.cookies import SimpleCookie
+    res = Response(status_code=200)
+    res.headers["Content-Type"] = "text/html"
+    res.set_header("userToken", "user_id_token_xxxx") # set_header() 会覆盖之前设置的信息
+    res.add_header("userToken", "xxxx") # add_header() 会增加多一个信息
+    res.cookies = SimpleCookie()
+    res.cookie["userInfo"] = "ABC"
+    res.cookie["userInfo"]["path"] = "/"
+    res.body = "<!DOCTYPE html><html><body>hello world</body></html>"
+    return res
+
+    ##
+    # 我们还有一个更为简便的方式，就是直接返回一个元祖(tuple)
+    from simple_http_server import Headers
+    from simple_http_server import Cookies
+    res_cookies = Cookies()
+    res_cookie["userInfo"] = "ABC"
+    res_cookie["userInfo"]["path"] = "/"
+    ##
+    # 该元祖中，这些参数的顺序其实并无关系，
+    # 第一个返回的 int 元素会将作为请求的状态码
+    # 但是元组中所有 Headers 对象均将会被写入到响应头中
+    # 同样，元祖中所有 http.cookies.BaseCookies 以及其子类，含 http.cookie.SimpleCookie 以及 simple_http_server.Cookies 均会被写入响应的 cookies 中
+    # 而元祖中第一个出现的类型在 (str, unicode, dict, StaticFile, bytes) 会被作为响应的数据。
+    # 其他不符合条件的元素将被忽略
+    return 200, Headers({"userToken": "user_id_token_xxx"}), res_cookie, {"success": True, "message": "success!"}, "这个字符串会被忽略"
+
+    ##
+    # 元祖中所有的元素均不是必须的，即使是 body 也是一样，你可以省略一些没有的内容
+    # 以下的元祖只写入了头部和响应体信息
+    return Headers({"userToken": "user_id_token_xxx"}), {"success": True, "message": "success!"},
+
+```
+
+上述的例子中描述的通过返回信息来进行响应，你也可以通过 Response 参数来响应
+
+```python
+from simple_http_server import request_map
+from simple_http_server import Response
+
+@request_map("/say_hello")
+def say_hello(res=Response()):
+    ##
+    # Response 对象就是上述我们写在返回的那个对象，所以，上面的对 headers、cookies 等的接口这个对象均有。
+    res.body = "<html><body>Hello, world! </body></html>"
+    res.send_response()
+    # 如果使用 res 来发送请求，就不再在控制器函数中返回任何内容了。
+
+@request_map("/")
+def redirect(res=Response()):
+    res.send_redirect("/index")
+```
+
+## 编写过滤器
+
+参考 Java 的设计，我们增加了过滤器链式的设计，这个给了你一定的面向切面编码的能力，虽然比较弱，但是做一些权限验证，日志记录等也是够用的。
 
 ```python
 from simple_http_server import filter_map
@@ -143,7 +318,7 @@ def filter_tuple(ctx):
         ctx.do_chain()
 ```
 
-### 启动服务器
+## 启动服务器
 
 ```python
 
