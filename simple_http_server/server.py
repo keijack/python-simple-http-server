@@ -4,11 +4,11 @@ import os
 import simple_http_server.http_server as http_server
 from simple_http_server import request_map
 from simple_http_server import StaticFile
-from simple_http_server.__logger__ import getLogger
+from simple_http_server.__logger__ import get_logger
 import threading
 
 
-__logger = getLogger("simple_http_server.server")
+__logger = get_logger("simple_http_server.server")
 __lock = threading.Lock()
 __server = None
 
@@ -16,6 +16,8 @@ __server = None
 def start(host="", port=9090):
     with __lock:
         global __server
+        if __server is not None:
+            __server.shutdown()
         __server = http_server.SimpleDispatcherHttpServer((host, port))
 
     from simple_http_server import _get_filters

@@ -17,12 +17,12 @@ def set_level(level):
     assert level is not None and level.upper() in ("DEBUG", "INFO", "WARN", "ERROR")
     lv = level.upper()
 
-    _logger_ = getLogger("simple_http_server.__logger__", "INFO")
+    _logger_ = get_logger("simple_http_server.__logger__", "INFO")
     _logger_.info("global logger level set to %s" % lv)
     __LOG_LEVEL_ = lv
 
 
-def getLogger(tag="simple_http_server.__not_set__", level=None):
+def get_logger(tag="simple_http_server.__not_set__", level=None):
     assert level is None or level.upper() in ("DEBUG", "INFO", "WARN", "ERROR")
     lv = level.upper() if level is not None else __LOG_LEVEL_
     if tag not in __loggers_:

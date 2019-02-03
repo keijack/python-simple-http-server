@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from simple_http_server.__logger__ import getLogger
+from simple_http_server.__logger__ import get_logger
 try:
     unicode("")
 except NameError:
@@ -23,7 +23,7 @@ __logger = None
 def _log():
     global __logger
     if __logger is None:
-        __logger = getLogger("simple_http_server.__init__")
+        __logger = get_logger("simple_http_server.__init__")
     return __logger
 
 

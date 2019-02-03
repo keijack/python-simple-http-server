@@ -39,10 +39,10 @@ except NameError:
     # python 3 does no longer support unicode method, use str instead
     unicode = str
 
-from simple_http_server.__logger__ import getLogger
+from simple_http_server.__logger__ import get_logger
 
 
-_logger = getLogger("simple_http_server.http_server")
+_logger = get_logger("simple_http_server.http_server")
 
 from simple_http_server import Request
 from simple_http_server import MultipartFile

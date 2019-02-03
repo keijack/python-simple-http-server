@@ -56,7 +56,7 @@ def your_ctroller_function():
     return "<html><body>Hello, World!</body></html>"
 ```
 
-匹配路由的适合，除了具体的路径之后，你还可以指定路径的某一段是可变的，这部方可变的部分将会作为路径参数放入请求中，如何取得这些路径参数我们将会在 **取得请求参数** 一节具体说明。@request_map 的配置如下。该配置下，`/say/hello/to/world`，`/say/hello/to/jhon` 等 url 都能访问该控制器方法。
+匹配路由时，除了指定具体的路径之外，你还可以指定路径的某一段是可变的，这部方可变的部分将会作为路径参数放入请求中，如何取得这些路径参数我们将会在 **取得请求参数** 一节具体说明。@request_map 的配置如下。该配置下，`/say/hello/to/world`，`/say/hello/to/jhon` 等 url 都能访问该控制器方法。
 
 ```Python
 @request_map("/say_hello/to/{name}", method=["GET", "POST", "PUT"])
