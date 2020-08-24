@@ -372,6 +372,23 @@ if __name__ == "__main__":
                             "/path_prefix/*", "/absolute/dir/root/path"})
 ```
 
+## 日志
+
+默认情况下，日志会输出到控制台，你创建自己的 Logging Handler 来将日志输出到别处，例如一个滚动文件中：
+
+```python
+import simple_http_server.logger as logger
+import logging
+
+_formatter = logging.Formatter(fmt='[%(asctime)s]-[%(name)s]-%(levelname)-4s: %(message)s')
+_handler = logging.TimedRotatingFileHandler("/var/log/simple_http_server.log", when="midnight", backupCount=7)
+_handler.setFormatter(_formatter)
+_handler.setLevel("INFO")
+
+logger.set_handler(_handler)
+
+```
+
 ## 问题
 
 ### Unicode 支持

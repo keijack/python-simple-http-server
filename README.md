@@ -175,6 +175,23 @@ If you want to specify the resources path:
                             "/path_prefix/*", "/absolute/dir/root/path"})
 ```
 
+## Logger
+
+The default logger is try to write logs to the screen, you can specify the logger handler to write it to a file. 
+
+```python
+import simple_http_server.logger as logger
+import logging
+
+_formatter = logging.Formatter(fmt='[%(asctime)s]-[%(name)s]-%(levelname)-4s: %(message)s')
+_handler = logging.TimedRotatingFileHandler("/var/log/simple_http_server.log", when="midnight", backupCount=7)
+_handler.setFormatter(_formatter)
+_handler.setLevel("INFO")
+
+logger.set_handler(_handler)
+
+```
+
 ## Problems
 
 ### Unicode supporting
