@@ -106,6 +106,7 @@ venv.bak/
 # for development only
 my_test_main.py
 my_dev/
+upload.sh
 
 # vscode
 .vscode/
