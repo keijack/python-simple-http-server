@@ -39,7 +39,7 @@ except NameError:
     # python 3 does no longer support unicode method, use str instead
     unicode = str
 
-from simple_http_server.__logger__ import get_logger
+from simple_http_server.logger import get_logger
 
 
 _logger = get_logger("simple_http_server.http_server")
@@ -673,11 +673,13 @@ class _SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler)
         _logger.info("%s -  %s" % (self.client_address[0], format % args))
 
 
+
+
 class _HttpServerWrapper(BaseHTTPServer.HTTPServer, object):
 
     HTTP_METHODS = ["OPTIONS", "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT"]
 
-    def __init__(self, addr):
+    def __init__(self, addr, res_conf={}):
         super(_HttpServerWrapper, self).__init__(addr, _SimpleDispatcherHttpRequestHandler)
         self.method_url_mapping = {"_": {}}
         self.path_val_url_mapping = {"_": {}}
@@ -686,6 +688,7 @@ class _HttpServerWrapper(BaseHTTPServer.HTTPServer, object):
             self.path_val_url_mapping[mth] = {}
 
         self.filter_mapping = OrderedDict()
+        self.res_conf = res_conf
 
     def __get_path_reg_pattern(self, url):
         _url = url

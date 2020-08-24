@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from simple_http_server.__logger__ import get_logger
+from simple_http_server.logger import get_logger
 try:
     unicode("")
 except NameError:

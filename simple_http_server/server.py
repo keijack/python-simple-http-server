@@ -4,7 +4,7 @@ import os
 import simple_http_server.http_server as http_server
 from simple_http_server import request_map
 from simple_http_server import StaticFile
-from simple_http_server.__logger__ import get_logger
+from simple_http_server.logger import get_logger
 import threading
 
 
