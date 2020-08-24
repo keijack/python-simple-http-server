@@ -160,6 +160,21 @@ if __name__ == "__main__":
     main()
 ```
 
+If you want to specify the host and port:
+
+```python
+    server.start(host="", port=8080)
+```
+
+If you want to specify the resources path: 
+
+*Notice: `/path_prefix/`/`/path_prefix/*`/`/path_prefix/**` is the same effect.*
+
+```python 
+    server.start(resources={"/path_prefix/*", "/absolute/dir/root/path",
+                            "/path_prefix/*", "/absolute/dir/root/path"})
+```
+
 ## Problems
 
 ### Unicode supporting

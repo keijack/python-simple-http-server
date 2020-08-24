@@ -1,8 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
-" Python TimedRotatingFileHandler works very badlly in multi-threading, so we first cached all message to a queue, 
-" then use a single thread to the log file.
-"""
+
 import sys
 import queue
 import logging

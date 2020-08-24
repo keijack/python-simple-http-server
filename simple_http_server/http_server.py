@@ -1,5 +1,18 @@
 # -*- coding: utf-8 -*-
 
+from simple_http_server import HttpError
+from simple_http_server import StaticFile
+from simple_http_server import Headers
+from simple_http_server import Redirect
+from simple_http_server import Response
+from simple_http_server import Cookie
+from simple_http_server import JSONBody
+from simple_http_server import Header
+from simple_http_server import Parameters
+from simple_http_server import PathValue
+from simple_http_server import Parameter
+from simple_http_server import MultipartFile
+from simple_http_server import Request
 import sys
 import os
 import re
@@ -43,21 +56,6 @@ from simple_http_server.logger import get_logger
 
 
 _logger = get_logger("simple_http_server.http_server")
-
-from simple_http_server import Request
-from simple_http_server import MultipartFile
-from simple_http_server import Parameter
-from simple_http_server import PathValue
-from simple_http_server import Parameters
-from simple_http_server import Header
-from simple_http_server import JSONBody
-from simple_http_server import Cookie
-
-from simple_http_server import Response
-from simple_http_server import Redirect
-from simple_http_server import Headers
-from simple_http_server import StaticFile
-from simple_http_server import HttpError
 
 
 class RequestWrapper(Request):
@@ -673,8 +671,6 @@ class _SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler)
         _logger.info("%s -  %s" % (self.client_address[0], format % args))
 
 
-
-
 class _HttpServerWrapper(BaseHTTPServer.HTTPServer, object):
 
     HTTP_METHODS = ["OPTIONS", "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT"]
@@ -688,7 +684,35 @@ class _HttpServerWrapper(BaseHTTPServer.HTTPServer, object):
             self.path_val_url_mapping[mth] = {}
 
         self.filter_mapping = OrderedDict()
+        self._res_conf = {}
         self.res_conf = res_conf
+
+    @property
+    def res_conf(self):
+        return self._res_conf
+
+    @res_conf.setter
+    def res_conf(self, val):
+        if not val or not isinstance(val, dict):
+            return
+        for res_k, v in val.items():
+            if res_k.startswith("/"):
+                k = res_k[1:]
+            else:
+                k = res_k
+            if k.endswith("/*"):
+                key = k[0:-1]
+            elif k.endswith("/**"):
+                key = k[0:-2]
+            elif k.endswith("/"):
+                key = k
+            else:
+                key = k + "/"
+            if v.endswith("/"):
+                val = v
+            else:
+                val = v + "/"
+            self._res_conf[key] = val
 
     def __get_path_reg_pattern(self, url):
         _url = url
@@ -723,7 +747,39 @@ class _HttpServerWrapper(BaseHTTPServer.HTTPServer, object):
         else:
             self.path_val_url_mapping[_method][path_pattern] = (fun, path_names)
 
-    def get_url_controller(self, path, method):
+    def _res_(self, path, res_pre, res_dir):
+        fpath = res_dir + path.replace(res_pre, "")
+        _logger.debug("static file. %s :: %s" % (path, fpath))
+        if not os.path.exists(fpath):
+            raise HttpError(404, "")
+        fname, fext = os.path.splitext(fpath)
+        ext = fext.lower()
+        if ext in (".html", ".htm", ".xhtml"):
+            content_type = "text/html"
+        elif ext == ".xml":
+            content_type = "text/xml"
+        elif ext == ".css":
+            content_type = "text/css"
+        elif ext in (".jpg", ".jpeg"):
+            content_type = "image/jpeg"
+        elif ext == ".png":
+            content_type = "image/png"
+        elif ext == ".webp":
+            content_type = "image/webp"
+        elif ext == ".js":
+            content_type = "text/javascript"
+        elif ext == ".pdf":
+            content_type = "application/pdf"
+        elif ext == ".mp4":
+            content_type = "video/mpeg4"
+        elif ext == ".mp3":
+            content_type = "audio/mp3"
+        else:
+            content_type = "application/octet-stream"
+
+        return StaticFile(fpath, content_type)
+
+    def get_url_controller(self, path="", method=""):
         if path in self.method_url_mapping[method]:
             return self.method_url_mapping[method][path], {}
         elif path in self.method_url_mapping["_"]:
@@ -735,6 +791,11 @@ class _HttpServerWrapper(BaseHTTPServer.HTTPServer, object):
             if fun_and_val is not None:
                 return fun_and_val
             else:
+                for k, v in self.res_conf.items():
+                    if path.startswith(k):
+                        def static_fun():
+                            return self._res_(path, k, v)
+                        return static_fun, {}
                 return None, {}
 
     def __try_get_from_path_val(self, path, method):
@@ -777,13 +838,16 @@ class SimpleDispatcherHttpServer(object):
     def map_request(self, url, fun, method=""):
         self.server.map_url(url, fun, method)
 
-    def __init__(self, host=('', 9090), multithread=True):
+    def __init__(self, host=('', 9090), multithread=True, resources={}):
         self.host = host
         self.multithread = multithread
         if self.multithread:
-            self.server = _ThreadingHttpServer(self.host)
+            self.server = _ThreadingHttpServer(self.host, res_conf=resources)
         else:
-            self.server = _HttpServerWrapper(self.host)
+            self.server = _HttpServerWrapper(self.host, res_conf=resources)
+
+    def resources(self, res={}):
+        self.server.res_conf = res
 
     def start(self):
         _logger.info("Dispatcher Http Server starts. Listen to port [" + str(self.host[1]) + "]")

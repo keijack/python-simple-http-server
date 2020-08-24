@@ -357,6 +357,21 @@ if __name__ == "__main__":
     main()
 ```
 
+如果需要指定IP或者端口：
+
+```python
+    server.start(host="", port=8080)
+```
+
+如果需要指定静态资源：
+
+*注意: `/path_prefix/`/`/path_prefix/*`/`/path_prefix/**` 具有相同的效果。*
+
+```python 
+    server.start(resources={"/path_prefix/*", "/absolute/dir/root/path",
+                            "/path_prefix/*", "/absolute/dir/root/path"})
+```
+
 ## 问题
 
 ### Unicode 支持

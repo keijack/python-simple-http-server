@@ -13,12 +13,12 @@ __lock = threading.Lock()
 __server = None
 
 
-def start(host="", port=9090):
+def start(host="", port=9090, resources={}):
     with __lock:
         global __server
         if __server is not None:
             __server.shutdown()
-        __server = http_server.SimpleDispatcherHttpServer((host, port))
+        __server = http_server.SimpleDispatcherHttpServer((host, port), resources=resources)
 
     from simple_http_server import _get_filters
     __filters = _get_filters()
