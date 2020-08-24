@@ -67,7 +67,7 @@ def set_handler(handler):
     _handler = handler
 
 
-def get_logger(tag="VideoTranscodeClient"):
+def get_logger(tag="pythone-simple-http-server"):
     if tag not in __cache_loggers:
         __cache_loggers[tag] = CachingLogger(tag)
     return __cache_loggers[tag]
