@@ -708,10 +708,11 @@ class _HttpServerWrapper(BaseHTTPServer.HTTPServer, object):
                 key = k
             else:
                 key = k + "/"
-            if v.endswith("/"):
+
+            if v.endswith(os.path.sep):
                 val = v
             else:
-                val = v + "/"
+                val = v + os.path.sep
             self._res_conf[key] = val
 
     def __get_path_reg_pattern(self, url):
@@ -748,7 +749,7 @@ class _HttpServerWrapper(BaseHTTPServer.HTTPServer, object):
             self.path_val_url_mapping[_method][path_pattern] = (fun, path_names)
 
     def _res_(self, path, res_pre, res_dir):
-        fpath = res_dir + path.replace(res_pre, "")
+        fpath = os.path.join(res_dir, path.replace(res_pre, ""))
         _logger.debug("static file. %s :: %s" % (path, fpath))
         if not os.path.exists(fpath):
             raise HttpError(404, "")

@@ -55,8 +55,10 @@ class CachingLogger(object):
 
 
 def set_level(level):
+    global _LOG_LEVEL_
     lv = level.upper()
     if lv in ("DEBUG", "INFO", "WARN", "ERROR"):
+        _LOG_LEVEL_ = lv
         _handler.setLevel(lv)
         _logger_ = get_logger("Logger")
         _logger_.info("global logger set to %s" % lv)
