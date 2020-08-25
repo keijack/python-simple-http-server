@@ -147,13 +147,13 @@ def filter_tuple(ctx):
 ### Start your server
 
 ```python
-# If you place the controllers method in the other files, you should import them here.
 
 import simple_http_server.server as server
-import my_test_ctrl
 
 
 def main(*args):
+    # You can use scan import controller modules.
+    server.scan("my_ctr_pkg", r".*controller.*")
     server.start()
 
 if __name__ == "__main__":
