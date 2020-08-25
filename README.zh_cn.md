@@ -351,6 +351,8 @@ import my_test_ctrl
 
 
 def main(*args):
+    # 除了 import 外，还可以通过 scan 方法批量加载 controller 文件。
+    server.scan("my_ctr_pkg", r".*controller.*")
     server.start()
 
 if __name__ == "__main__":
