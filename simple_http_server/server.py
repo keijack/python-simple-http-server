@@ -16,24 +16,47 @@ __lock = threading.Lock()
 __server = None
 
 
-def _load_all_files(work_dir, pkg):
-    abs_folder = work_dir + "/" + pkg
-    files = [os.path.join(pkg, f) for f in os.listdir(abs_folder) if f.endswith(".py")]
-    folders = [os.path.join(pkg, f) for f in os.listdir(abs_folder) if os.path.isdir(os.path.join(abs_folder, f)) and f != "__pycache__"]
-    for folder in folders:
-        files += _load_all_files(work_dir, folder)
-    return files
-
-
-def _is_match(regx=r"", string=""):
+def _is_match(string="", regx=r""):
     if not regx:
         return True
     pattern = re.compile(regx)
     match = pattern.match(string)
-    if match:
-        return True
-    else:
-        return False
+    return True if match else False
+
+
+def _to_module_name(fpath="", regx=r""):
+    fname, fext = os.path.splitext(fpath)
+
+    if fext != ".py":
+        return
+    mname = fname.replace(os.path.sep, '.')
+    if _is_match(fpath, regx) or _is_match(fname, regx) or _is_match(mname, regx):
+        return mname
+
+
+def _load_all_modules(work_dir, pkg, regx):
+    abs_folder = work_dir + "/" + pkg
+    all_files = os.listdir(abs_folder)
+    modules = []
+    folders = []
+    for f in all_files:
+        if os.path.isfile(os.path.join(abs_folder, f)):
+            mname = _to_module_name(os.path.join(pkg, f), regx)
+            if mname:
+                modules.append(mname)
+        elif f != "__pycache__":
+            folders.append(os.path.join(pkg, f))
+
+    for folder in folders:
+        modules += _load_all_modules(work_dir, folder, regx)
+    return modules
+
+
+def _import_module(mname):
+    try:
+        importlib.import_module(mname)
+    except:
+        __logger.warn("Import moudle [%s] error!" % mname)
 
 
 def scan(base_dir="", regx=r""):
@@ -41,14 +64,11 @@ def scan(base_dir="", regx=r""):
     fts = inspect.getouterframes(ft)
     entrance = fts[-1]
     work_dir = os.path.dirname(inspect.getabsfile(entrance[0]))
-    files = _load_all_files(work_dir, base_dir)
-    
-    for f in files:
-        fname = os.path.splitext(f)[0]
-        mname = fname.replace(os.path.sep, '.')
-        if _is_match(regx, fname) or _is_match(regx, mname):
-            __logger.info("import controllers from module: %s" % mname)
-            importlib.import_module(mname)
+    modules = _load_all_modules(work_dir, base_dir, regx)
+
+    for mname in modules:
+        __logger.info("Import controllers from module: %s" % mname)
+        _import_module(mname)
 
 
 def start(host="", port=9090, resources={}):
