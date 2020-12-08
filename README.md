@@ -188,8 +188,11 @@ If you want to use ssl:
     server.start(host="", 
                  port=8443,
                  ssl=True,
+                 ssl_protocol=ssl.PROTOCOL_TLS, # Optional, default is TLS
                  keyfile="/path/to/your/keyfile.key",
-                 certfile="/path/to/your/certfile.cert")
+                 certfile="/path/to/your/certfile.cert",
+                 keypass="", # Optional, your private key's password
+                 )
 ```
 
 ## Logger

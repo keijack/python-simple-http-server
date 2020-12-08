@@ -386,8 +386,11 @@ if __name__ == "__main__":
     server.start(host="", 
                  port=8443,
                  ssl=True,
+                 ssl_protocol=ssl.PROTOCOL_TLS, # 可选，默认使用 TLS
                  keyfile="/path/to/your/keyfile.key",
-                 certfile="/path/to/your/certfile.cert")
+                 certfile="/path/to/your/certfile.cert",
+                 keypass="", # 可选，如果你的私钥使用了密码加密
+                 )
     
 ```
 

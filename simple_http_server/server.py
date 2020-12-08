@@ -5,6 +5,7 @@ import threading
 import inspect
 import importlib
 import re
+import ssl as _ssl
 
 from typing import Dict
 
@@ -78,8 +79,10 @@ def scan(base_dir: str = "", regx: str = r"") -> None:
 def start(host: str = "",
           port: int = 9090,
           ssl: bool = False,
+          ssl_protocol: int = _ssl.PROTOCOL_TLS,
           keyfile: str = "",
           certfile: str = "",
+          keypass: str = "",
           resources: Dict[str, str] = {}) -> None:
     with __lock:
         global __server
@@ -87,8 +90,10 @@ def start(host: str = "",
             __server.shutdown()
         __server = http_server.SimpleDispatcherHttpServer(host=(host, port),
                                                           ssl=ssl,
+                                                          ssl_protocol=ssl_protocol,
                                                           keyfile=keyfile,
                                                           certfile=certfile,
+                                                          keypass=keypass,
                                                           resources=resources)
 
     from simple_http_server import _get_filters
