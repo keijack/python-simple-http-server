@@ -194,20 +194,33 @@ If you want to use ssl:
 
 ## Logger
 
-The default logger is try to write logs to the screen, you can specify the logger handler to write it to a file. 
+The default logger is try to write logs to the screen, you can specify the logger handler to write it to a file.
 
 ```python
 import simple_http_server.logger as logger
 import logging
 
 _formatter = logging.Formatter(fmt='[%(asctime)s]-[%(name)s]-%(levelname)-4s: %(message)s')
-_handler = logging.TimedRotatingFileHandler("/var/log/simple_http_server.log", when="midnight", backupCount=7)
+_handler = logging.TimedRotatingFileHandler("/var/log/py-eureka-client.log", when="midnight", backupCount=7)
 _handler.setFormatter(_formatter)
 _handler.setLevel("INFO")
 
 logger.set_handler(_handler)
-
 ```
+
+If you want to add a handler rather than replace the inner one, you can use:
+
+```python
+logger.add_handler(_handler)
+```
+
+If you want to change the logger level:
+
+```python
+logger.set_level("DEBUG")
+```
+
+This logger will first save all the log record to a global queue, and then output them in a background thread, so it is very suitable for getting several logger with a same handler, especialy the `TimedRotatingFileHandler` which may slice the log files not quite well in a mutiple thread environment. 
 
 ## Problems
 
