@@ -179,7 +179,7 @@ class FilterContex(object):
                 headers.update(item)
             elif isinstance(item, cookies.BaseCookie):
                 cks.update(item)
-            elif type(item) in (str,  dict, StaticFile, bytes):
+            elif type(item) in (str, dict, StaticFile, bytes):
                 if body is None:
                     body = item
         return status_code, headers, cks, body
@@ -746,7 +746,7 @@ class _HttpServerWrapper(http.server.HTTPServer, object):
         elif ext == ".pdf":
             content_type = "application/pdf"
         elif ext == ".mp4":
-            content_type = "video/mpeg4"
+            content_type = "video/mp4"
         elif ext == ".mp3":
             content_type = "audio/mp3"
         else:
