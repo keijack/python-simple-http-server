@@ -798,6 +798,7 @@ class SimpleDispatcherHttpServer(object):
                  resources: Dict[str, str] = {}):
         self.host = host
         self.multithread = multithread
+        self.ssl = ssl
         if self.multithread:
             self.server = _ThreadingHttpServer(self.host, res_conf=resources)
         else:
@@ -816,7 +817,11 @@ class SimpleDispatcherHttpServer(object):
         self.server.res_conf = res
 
     def start(self):
-        _logger.info("Dispatcher Http Server starts. Listen to port [" + str(self.host[1]) + "]")
+        if self.ssl:
+            ssl_hint = " with SSL on"
+        else:
+            ssl_hint = ""
+        _logger.info("Dispatcher Http Server starts. Listen to port [%d]%s." % (self.host[1], ssl_hint))
         self.server.serve_forever()
 
     def shutdown(self):
