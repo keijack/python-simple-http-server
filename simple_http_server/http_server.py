@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+from typing import Dict, Tuple
 from simple_http_server import HttpError
 from simple_http_server import StaticFile
 from simple_http_server import Headers
@@ -13,44 +14,19 @@ from simple_http_server import PathValue
 from simple_http_server import Parameter
 from simple_http_server import MultipartFile
 from simple_http_server import Request
-import sys
 import os
 import re
 import json
-import copy
+import ssl as _ssl
 import inspect
 from collections import OrderedDict
 import threading
-try:
-    import http.cookies as cookies
-except ImportError:
-    import Cookie as cookies
-try:
-    import http.server as BaseHTTPServer
-except ImportError:
-    import BaseHTTPServer
-try:
-    from socketserver import ThreadingMixIn
-except ImportError:
-    from SocketServer import ThreadingMixIn
-try:
-    from urllib.parse import unquote
-except ImportError:
-    from urllib import unquote
-try:
-    from urllib.parse import quote
-except ImportError:
-    from urllib import quote
-try:
-    long(0)
-except NameError:
-    # python 3 does no longer support long method, use int instead
-    long = int
-try:
-    unicode("")
-except NameError:
-    # python 3 does no longer support unicode method, use str instead
-    unicode = str
+import http.cookies as cookies
+import http.server
+
+from socketserver import ThreadingMixIn
+from urllib.parse import unquote
+from urllib.parse import quote
 
 from simple_http_server.logger import get_logger
 
@@ -78,22 +54,22 @@ class ResponseWrapper(Response):
         self.__send_lock__ = threading.Lock()
 
     @property
-    def is_sent(self):
+    def is_sent(self) -> bool:
         return self.__is_sent
 
-    def send_error(self, status_code, message=""):
+    def send_error(self, status_code: int, message: str = "") -> None:
         self.status_code = status_code
         msg = message if message is not None else ""
         self.body = {"error": msg}
         self.send_response()
 
-    def send_redirect(self, url):
+    def send_redirect(self, url: str) -> None:
         self.status_code = 302
         self.set_header("Location", url)
         self.body = None
         self.send_response()
 
-    def send_response(self):
+    def send_response(self) -> None:
         with self.__send_lock__:
             self.__send_response()
 
@@ -118,11 +94,11 @@ class FilterContex(object):
         self.__filters = filters if filters is not None else []
 
     @property
-    def request(self):
+    def request(self) -> Request:
         return self.__request
 
     @property
-    def response(self):
+    def response(self) -> Response:
         return self.__response
 
     def do_chain(self):
@@ -181,7 +157,7 @@ class FilterContex(object):
                 headers.update(item)
             elif isinstance(item, cookies.BaseCookie):
                 cks.update(item)
-            elif type(item) in (str, unicode, dict, StaticFile, bytes):
+            elif type(item) in (str,  dict, StaticFile, bytes):
                 if body is None:
                     body = item
         return status_code, headers, cks, body
@@ -226,14 +202,12 @@ class FilterContex(object):
                 kwarg_vals[k] = self.__build_params(k, v)
             elif isinstance(v, JSONBody):
                 kwarg_vals[k] = self.__build_json_body()
-            elif isinstance(v, str) or isinstance(v, unicode):
+            elif isinstance(v, str):
                 kwarg_vals[k] = self.__build_str(k, v)
             elif isinstance(v, bool):
                 kwarg_vals[k] = self.__build_bool(k, v)
             elif isinstance(v, int):
                 kwarg_vals[k] = self.__build_int(k, v)
-            elif isinstance(v, long):
-                kwarg_vals[k] = self.__build_long(k, v)
             elif isinstance(v, list):
                 kwarg_vals[k] = self.__build_list(k, v)
             elif isinstance(v, dict):
@@ -291,15 +265,6 @@ class FilterContex(object):
         else:
             return val
 
-    def __build_long(self, key, val=0):
-        if key in self.request.parameter.keys():
-            try:
-                return long(self.request.parameter[key])
-            except:
-                raise HttpError(400, "Parameter[%s] should be an int. " % key)
-        else:
-            return val
-
     def __build_int(self, key, val=0):
         if key in self.request.parameter.keys():
             try:
@@ -350,11 +315,6 @@ class FilterContex(object):
 
     def __build_param(self, key, val=Parameter()):
         name = val.name if val.name is not None and val.name != "" else key
-        if not isinstance(name, unicode):
-            """
-            " Python 2.7, change str => unicode, or it will fail to reconize the key that is unicode;
-            """
-            name = name.decode("utf-8")
         if val._required and name not in self.request.parameter:
             raise HttpError(400, "Parameter[%s] is required." % name)
         if name in self.request.parameter:
@@ -387,7 +347,7 @@ def _remove_url_first_slash(url):
     return _url
 
 
-class _SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
+class _SimpleDispatcherHttpRequestHandler(http.server.BaseHTTPRequestHandler):
     """The Class will dispatch the request to the controller configured in RequestMapping"""
 
     def __process(self, method):
@@ -541,13 +501,7 @@ class _SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler)
             return params
         pairs = query_string.split("&")
         for item in pairs:
-            """
-            " for python 2.7: val here is a unicode, after unquote,
-            " it still is a unicode, and may cause a encoding problem,
-            " so here we fource to change it into a str
-            """
-            str_item = str(item)
-            key, val = self.__break(str_item, "=")
+            key, val = self.__break(item, "=")
             if val is None:
                 val = ""
             self.__put_to(params, unquote(key), unquote(val))
@@ -574,11 +528,11 @@ class _SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler)
         self.send_response(status_code)
         self.send_header("Last-Modified", str(self.date_time_string()))
         for k, v in headers.items():
-            if isinstance(v, str) or isinstance(v, unicode):
+            if isinstance(v, str):
                 self.send_header(k, v)
             elif isinstance(v, list):
                 for iov in v:
-                    if isinstance(iov, str) or isinstance(iov, unicode):
+                    if isinstance(iov, str):
                         self.send_header(k, iov)
 
         for k in cks:
@@ -588,7 +542,7 @@ class _SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler)
         if body is None:
             self.send_header("Content-Length", 0)
             self.end_headers()
-        elif isinstance(body, str) or isinstance(body, unicode):
+        elif isinstance(body, str):
             try:
                 data = body.encode("utf-8")
                 self.send_header("Content-Length", len(data))
@@ -621,7 +575,7 @@ class _SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler)
         elif isinstance(raw_body, dict):
             content_type = "application/json; charset=utf8"
             body = json.dumps(raw_body, ensure_ascii=False)
-        elif isinstance(raw_body, str) or isinstance(raw_body, unicode):
+        elif isinstance(raw_body, str):
             body = raw_body.strip()
             if body.startswith("<?xml") and body.endswith(">"):
                 content_type = "text/xml; charset=utf8"
@@ -637,6 +591,8 @@ class _SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler)
         elif isinstance(raw_body, bytes):
             body = raw_body
             content_type = "application/octet-stream"
+        else:
+            body = raw_body
         return content_type, body
 
     def do_method(self, method):
@@ -671,7 +627,7 @@ class _SimpleDispatcherHttpRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler)
         _logger.info("%s -  %s" % (self.client_address[0], format % args))
 
 
-class _HttpServerWrapper(BaseHTTPServer.HTTPServer, object):
+class _HttpServerWrapper(http.server.HTTPServer, object):
 
     HTTP_METHODS = ["OPTIONS", "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT"]
 
@@ -717,8 +673,6 @@ class _HttpServerWrapper(BaseHTTPServer.HTTPServer, object):
 
     def __get_path_reg_pattern(self, url):
         _url = url
-        if not isinstance(_url, unicode):
-            _url = _url.decode("utf-8")
         path_names = re.findall("(?u)\\{\\w+\\}", _url)
         if len(path_names) == 0:
             # normal url
@@ -730,8 +684,6 @@ class _HttpServerWrapper(BaseHTTPServer.HTTPServer, object):
         quoted_names = []
         for name in path_names:
             name = name[1: -1]
-            if str != unicode:
-                name = name.encode("utf-8")
             quoted_names.append(quote(name))
         return _url, quoted_names
 
@@ -801,8 +753,6 @@ class _HttpServerWrapper(BaseHTTPServer.HTTPServer, object):
 
     def __try_get_from_path_val(self, path, method):
         for patterns, val in self.path_val_url_mapping[method].items():
-            if not isinstance(patterns, unicode):
-                patterns = patterns.decode("utf-8")
             m = re.match(patterns, path)
             is_match = m is not None
             _logger.debug("pattern::[%s] => path::[%s] match? %s" % (patterns, path, str(is_match)))
@@ -839,13 +789,28 @@ class SimpleDispatcherHttpServer(object):
     def map_request(self, url, fun, method=""):
         self.server.map_url(url, fun, method)
 
-    def __init__(self, host=('', 9090), multithread=True, resources={}):
+    def __init__(self,
+                 host: Tuple[str, int] = ('', 9090),
+                 ssl: bool = False,
+                 keyfile: str = "",
+                 certfile: str = "",
+                 multithread: bool = True,
+                 resources: Dict[str, str] = {}):
         self.host = host
         self.multithread = multithread
         if self.multithread:
             self.server = _ThreadingHttpServer(self.host, res_conf=resources)
         else:
             self.server = _HttpServerWrapper(self.host, res_conf=resources)
+
+        if ssl:
+            assert keyfile and certfile, "keyfile and certfile should be provided. "
+            self.server.socket = _ssl.wrap_socket(
+                self.server.socket,
+                keyfile=keyfile,
+                certfile=certfile,
+                server_side=True
+            )
 
     def resources(self, res={}):
         self.server.res_conf = res

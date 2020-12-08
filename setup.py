@@ -6,7 +6,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="simple_http_server",
-    version="0.3.1",
+    version="0.4.0",
     author="Keijack",
     author_email="keijack.wu@gmail.com",
     description="This is a simple http server, use MVC like design.",
@@ -15,10 +15,9 @@ setuptools.setup(
     url="https://github.com/keijack/python-simple-http-server",
     packages=setuptools.find_packages(),
     classifiers=[
-        "Programming Language :: Python :: 2.7",
-        "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+from typing import Dict
 import simple_http_server.http_server as http_server
 from simple_http_server import request_map
 from simple_http_server import StaticFile
@@ -59,7 +60,7 @@ def _import_module(mname):
         __logger.warn("Import moudle [%s] error!" % mname)
 
 
-def scan(base_dir="", regx=r""):
+def scan(base_dir: str = "", regx: str = r"") -> None:
     ft = inspect.currentframe()
     fts = inspect.getouterframes(ft)
     entrance = fts[-1]
@@ -71,12 +72,21 @@ def scan(base_dir="", regx=r""):
         _import_module(mname)
 
 
-def start(host="", port=9090, resources={}):
+def start(host: str = "",
+          port: int = 9090,
+          ssl: bool = False,
+          keyfile: str = "",
+          certfile: str = "",
+          resources: Dict[str, str] = {}) -> None:
     with __lock:
         global __server
         if __server is not None:
             __server.shutdown()
-        __server = http_server.SimpleDispatcherHttpServer((host, port), resources=resources)
+        __server = http_server.SimpleDispatcherHttpServer(host=(host, port),
+                                                          ssl=ssl,
+                                                          keyfile=keyfile,
+                                                          certfile=certfile,
+                                                          resources=resources)
 
     from simple_http_server import _get_filters
     __filters = _get_filters()
@@ -94,7 +104,7 @@ def start(host="", port=9090, resources={}):
     __server.start()
 
 
-def stop():
+def stop() -> None:
     with __lock:
         global __server
         if __server is not None:

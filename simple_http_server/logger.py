@@ -1,5 +1,27 @@
 # -*- coding: utf-8 -*-
 
+"""
+Copyright (c) 2018 Keijack Wu
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+"""
+
 import sys
 import queue
 import logging
@@ -7,7 +29,6 @@ from logging import StreamHandler
 from threading import Thread
 
 _LOG_LEVEL_ = "INFO"
-__loggers = {}
 __cache_loggers = {}
 
 __formatter_ = logging.Formatter(
@@ -18,94 +39,73 @@ _handler = logging.StreamHandler(sys.stdout)
 _handler.setFormatter(__formatter_)
 _handler.setLevel(_LOG_LEVEL_)
 
+_handlers = []
+_handlers.append(_handler)
+
 _msg_cache = queue.Queue(10000)
 
 
-class CachingLogger(object):
+class CachingLogger(logging.Logger):
 
-    def __init__(self, name):
-        self.name = name
+    def _call_handlers(self, record):
+        super(CachingLogger, self).callHandlers(record)
 
-    def _log(self, mth, msg, *args, **kwargs):
-        _msg_cache.put({
-            "name": self.name,
-            "method": mth,
-            "msg": msg,
-            "args": args,
-            "kwargs": kwargs,
-        })
-
-    def debug(self, msg, *args, **kwargs):
-        self._log("debug", msg, *args, **kwargs)
-
-    def info(self, msg, *args, **kwargs):
-        self._log("info", msg, *args, **kwargs)
-
-    def warning(self, msg, *args, **kwargs):
-        self._log("warn", msg, *args, **kwargs)
-
-    def warn(self, msg, *args, **kwargs):
-        self._log("warn", msg, *args, **kwargs)
-
-    def error(self, msg, *args, **kwargs):
-        self._log("error", msg, *args, **kwargs)
-
-    def exception(self, msg, *args, **kwargs):
-        self.error(msg, *args, exc_info=sys.exc_info(), ** kwargs)
+    def callHandlers(self, record):
+        _msg_cache.put((self, record))
 
 
-def set_level(level):
+def set_level(level: str) -> None:
     global _LOG_LEVEL_
     lv = level.upper()
     if lv in ("DEBUG", "INFO", "WARN", "ERROR"):
-        _LOG_LEVEL_ = lv
         _handler.setLevel(lv)
         _logger_ = get_logger("Logger")
         _logger_.info("global logger set to %s" % lv)
+        _LOG_LEVEL_ = lv
+        for l in __cache_loggers.values():
+            l.setLevel(lv)
 
 
-def set_handler(handler):
-    global _handler
-    _handler = handler
+def add_handler(handler: logging.Handler) -> None:
+    _handlers.append(handler)
+    for l in __cache_loggers.values():
+        l.addHandler(handler)
 
 
-def get_logger(tag="pythone-simple-http-server"):
+def remove_handler(handler: logging.Handler) -> None:
+    if handler in _handlers:
+        _handlers.remove(handler)
+    for l in __cache_loggers.values():
+        l.removeHandler(handler)
+
+
+def set_handler(handler: logging.Handler) -> None:
+    _handlers.clear()
+    _handlers.append(handler)
+    for l in __cache_loggers.values():
+        for hdlr in l.handlers:
+            l.removeHandler(hdlr)
+        l.addHandler(handler)
+
+
+def get_logger(tag: str = "pythone-simple-http-server") -> logging.Logger:
     if tag not in __cache_loggers:
-        __cache_loggers[tag] = CachingLogger(tag)
+        __cache_loggers[tag] = CachingLogger(tag, _LOG_LEVEL_)
+        for hdlr in _handlers:
+            __cache_loggers[tag].addHandler(hdlr)
     return __cache_loggers[tag]
 
 
-def _get_real_logger(tag=""):
-    # type (str, str) -> logging.Logger
-    if tag in __loggers:
-        return __loggers[tag]
-
-    logger = logging.getLogger(tag)
-    logger.addHandler(_handler)
-    logger.setLevel(_handler.level)
-    __loggers[tag] = logger
-    return logger
-
-
-def _log_():
-    while(True):
+def _log_msg_from_queue():
+    while True:
         msg = _msg_cache.get()
-        logger = _get_real_logger(msg["name"])
-        mth = msg["method"]
-        if mth == "debug":
-            logger.debug(msg["msg"], *msg["args"], **msg["kwargs"])
-        elif mth == "info":
-            logger.info(msg["msg"], *msg["args"], **msg["kwargs"])
-        elif mth == "warn":
-            logger.warn(msg["msg"], *msg["args"], **msg["kwargs"])
-        elif mth == "error":
-            logger.error(msg["msg"], *msg["args"], **msg["kwargs"])
+        msg[0]._call_handlers(msg[1])
 
 
-def _run_log_thread():
-    log_thread = Thread(target=_log_, name="log_thread")
+def _log_msg_in_backgrond():
+    log_thread = Thread(target=_log_msg_from_queue, name="logging-thread")
     log_thread.daemon = True
     log_thread.start()
 
 
-_run_log_thread()
+_log_msg_in_backgrond()

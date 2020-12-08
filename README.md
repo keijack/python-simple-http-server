@@ -1,18 +1,23 @@
 # python-simple-http-server
 
+[![PyPI version](https://badge.fury.io/py/simple-http-server.png)](https://badge.fury.io/py/simple-http-server)
+
 ## Discription
 
 This is a simple http server, use MVC like design.
 
 ## Support Python Version
 
-Python 2.7 / 3.6+ (It should also work at 3.5, not test)
+Python 3.7+
+
+from `0.4.0`, python 2.7 is no longer supported, if you are using python 2.7, please use version `0.3.1`
 
 ## Why choose
 
 * Lightway.
 * Filter chain support.
 * Spring MVC like request mapping.
+* SSL support.
 * Easy to use.
 * Free style controller writing.
 
@@ -177,6 +182,16 @@ If you want to specify the resources path:
                             "/path_prefix/*", "/absolute/dir/root/path"})
 ```
 
+If you want to use ssl:
+
+```python
+    server.start(host="", 
+                 port=8443,
+                 ssl=True,
+                 keyfile="/path/to/your/keyfile.key",
+                 certfile="/path/to/your/certfile.cert")
+```
+
 ## Logger
 
 The default logger is try to write logs to the screen, you can specify the logger handler to write it to a file. 
@@ -195,10 +210,6 @@ logger.set_handler(_handler)
 ```
 
 ## Problems
-
-### Unicode supporting
-
-Although I have tried to fixed the unicode problem in python 2.7, it still may cause some problems for the reason that python 2.7 is quite unfriendly for unicodes. The best way to ensure unicode works is to use python 3.6+
 
 ### Multipul threading safety
 
