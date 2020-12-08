@@ -1,12 +1,16 @@
 # python-simple-http-server
 
+[![PyPI version](https://badge.fury.io/py/simple-http-server.png)](https://badge.fury.io/py/simple-http-server)
+
 ## 简介
 
 这是一个轻量级的基于 Python http.server 编写的服务器，你可以非常容易的搭建一个 Restful API。其中一些请求的转发等参考了 SpringMVC 的设计。
 
 ## 支持的 Python 的版本
 
-Python 2.7 / 3.6+ (3.5 也应该支持，没有在3.5环境测试过)
+Python 3.7
+
+从 `0.4.0` 开始，该项目仅支持 Python 3.7，如果你在使用 Python 2.7，请使用 `0.3.1` 版本。
 
 ## 为什么要选择这个项目？
 
@@ -14,6 +18,7 @@ Python 2.7 / 3.6+ (3.5 也应该支持，没有在3.5环境测试过)
 * 支持过滤器链
 * Spring MVC 风格的请求映射配置
 * 简单易用
+* 支持 SSL
 * 编写风格自由
 
 ## 安装
@@ -374,6 +379,17 @@ if __name__ == "__main__":
                             "/path_prefix/*", "/absolute/dir/root/path"})
 ```
 
+如果需要支持 HTTPS（SSL）
+
+
+```python
+    server.start(host="", 
+                 port=8443,
+                 ssl=True,
+                 keyfile="/path/to/your/keyfile.key",
+    
+```
+
 ## 日志
 
 默认情况下，日志会输出到控制台，你创建自己的 Logging Handler 来将日志输出到别处，例如一个滚动文件中：
@@ -392,10 +408,6 @@ logger.set_handler(_handler)
 ```
 
 ## 问题
-
-### Unicode 支持
-
-虽然我已经尽力使得该框架在 Python 2.7 的环境下支持 unicode 字符串，但是由于 python 2.7 本身对 unicode 支持得不太友好，所以，普通的中文字可能问题不大，但是一些罕见字和字符可能还是会发生错误。而最有效的方法则是使用 Python 3。
 
 ### 多线程的安全性
 
