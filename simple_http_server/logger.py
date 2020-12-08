@@ -25,7 +25,6 @@ SOFTWARE.
 import sys
 import queue
 import logging
-from logging import StreamHandler
 from threading import Thread
 
 _LOG_LEVEL_ = "INFO"
@@ -48,7 +47,7 @@ _msg_cache = queue.Queue(10000)
 class CachingLogger(logging.Logger):
 
     def _call_handlers(self, record):
-        super(CachingLogger, self).callHandlers(record)
+        super().callHandlers(record)
 
     def callHandlers(self, record):
         _msg_cache.put((self, record))

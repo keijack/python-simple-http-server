@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
-from types import FunctionType
-from typing import Any, Dict, List, Union
-from simple_http_server.logger import get_logger
 import http.cookies
+from typing import Dict, List, Union, Callable
+from simple_http_server.logger import get_logger
 
 name = "simple_http_server"
 
@@ -20,7 +19,7 @@ def _log():
     return __logger
 
 
-def request_map(url: str = "", method: Union[str, list] = "") -> FunctionType:
+def request_map(url: str = "", method: Union[str, list] = "") -> Callable:
     def map(ctrl_fun):
         if isinstance(method, list):
             mths = method
@@ -38,7 +37,7 @@ def request_map(url: str = "", method: Union[str, list] = "") -> FunctionType:
     return map
 
 
-def filter_map(pattern: str = "") -> FunctionType:
+def filter_map(pattern: str = "") -> Callable:
     def map(filter_fun):
         __filters.append({"url_pattern": pattern, "func": filter_fun})
         return filter_fun

@@ -1,15 +1,18 @@
 # -*- coding: utf-8 -*-
 
 import os
-from typing import Dict
-import simple_http_server.http_server as http_server
-from simple_http_server import request_map
-from simple_http_server import StaticFile
-from simple_http_server.logger import get_logger
 import threading
 import inspect
 import importlib
 import re
+
+from typing import Dict
+
+import simple_http_server.http_server as http_server
+
+from simple_http_server import request_map
+from simple_http_server import StaticFile
+from simple_http_server.logger import get_logger
 
 
 __logger = get_logger("simple_http_server.server")

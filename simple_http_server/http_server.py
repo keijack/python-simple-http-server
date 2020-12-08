@@ -1,6 +1,20 @@
 # -*- coding: utf-8 -*-
 
+import os
+import re
+import json
+import ssl as _ssl
+import inspect
+import threading
+import http.cookies as cookies
+import http.server
+
+from collections import OrderedDict
+from socketserver import ThreadingMixIn
+from urllib.parse import unquote
+from urllib.parse import quote
 from typing import Dict, Tuple
+
 from simple_http_server import HttpError
 from simple_http_server import StaticFile
 from simple_http_server import Headers
@@ -14,22 +28,8 @@ from simple_http_server import PathValue
 from simple_http_server import Parameter
 from simple_http_server import MultipartFile
 from simple_http_server import Request
-import os
-import re
-import json
-import ssl as _ssl
-import inspect
-from collections import OrderedDict
-import threading
-import http.cookies as cookies
-import http.server
-
-from socketserver import ThreadingMixIn
-from urllib.parse import unquote
-from urllib.parse import quote
 
 from simple_http_server.logger import get_logger
-
 
 _logger = get_logger("simple_http_server.http_server")
 
