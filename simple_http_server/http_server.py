@@ -793,6 +793,7 @@ class SimpleDispatcherHttpServer(object):
                  host: Tuple[str, int] = ('', 9090),
                  ssl: bool = False,
                  ssl_protocol: int = _ssl.PROTOCOL_TLS,
+                 ssl_check_hostname: bool = False,
                  keyfile: str = "",
                  certfile: str = "",
                  keypass: str = "",
@@ -809,6 +810,7 @@ class SimpleDispatcherHttpServer(object):
         if ssl:
             assert keyfile and certfile, "keyfile and certfile should be provided. "
             ssl_ctx = _ssl.SSLContext(protocol=ssl_protocol)
+            ssl_ctx.check_hostname = ssl_check_hostname
             ssl_ctx.load_cert_chain(certfile=certfile, keyfile=keyfile, password=keypass)
             self.server.socket = ssl_ctx.wrap_socket(
                 self.server.socket,

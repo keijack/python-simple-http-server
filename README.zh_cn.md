@@ -387,6 +387,7 @@ if __name__ == "__main__":
                  port=8443,
                  ssl=True,
                  ssl_protocol=ssl.PROTOCOL_TLS, # 可选，默认使用 TLS
+                 ssl_check_hostname=False, # 可选，是否检查域名，如果设为 True，那么如果不是通过该域名访问则无法建立对应链接。
                  keyfile="/path/to/your/keyfile.key",
                  certfile="/path/to/your/certfile.cert",
                  keypass="", # 可选，如果你的私钥使用了密码加密
