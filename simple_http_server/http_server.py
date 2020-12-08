@@ -428,15 +428,15 @@ class _SimpleDispatcherHttpRequestHandler(http.server.BaseHTTPRequestHandler):
                     dic[k].append(i)
         return dic
 
-    def __get_query_string(self, oriPath):
-        parts = oriPath.split('?')
+    def __get_query_string(self, ori_path):
+        parts = ori_path.split('?')
         if len(parts) == 2:
             return parts[1]
         else:
             return ""
 
-    def __get_path(self, oriPath):
-        path = oriPath.split('?', 1)[0]
+    def __get_path(self, ori_path):
+        path = ori_path.split('?', 1)[0]
         path = path.split('#', 1)[0]
         path = _remove_url_first_slash(path)
         return path
