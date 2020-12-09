@@ -188,7 +188,7 @@ If you want to use ssl:
     server.start(host="", 
                  port=8443,
                  ssl=True,
-                 ssl_protocol=ssl.PROTOCOL_TLS, # Optional, default is TLS
+                 ssl_protocol=ssl.PROTOCOL_TLS_SERVER, # Optional, default is ssl.PROTOCOL_TLS_SERVER, which will auto detect the highted protocol version that both server and client support. 
                  ssl_check_hostname=False, #Optional, if set to True, if the hostname is not match the certificat, it cannot establish the connection, default is False.
                  keyfile="/path/to/your/keyfile.key",
                  certfile="/path/to/your/certfile.cert",

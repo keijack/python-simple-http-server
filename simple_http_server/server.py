@@ -33,6 +33,8 @@ from typing import Dict
 
 import simple_http_server.http_server as http_server
 
+from simple_http_server import _get_filters
+from simple_http_server import _get_request_mappings
 from simple_http_server import request_map
 from simple_http_server import StaticFile
 from simple_http_server.logger import get_logger
@@ -101,11 +103,12 @@ def scan(base_dir: str = "", regx: str = r"") -> None:
 def start(host: str = "",
           port: int = 9090,
           ssl: bool = False,
-          ssl_protocol: int = _ssl.PROTOCOL_TLS,
+          ssl_protocol: int = _ssl.PROTOCOL_TLS_SERVER,
           ssl_check_hostname: bool = False,
           keyfile: str = "",
           certfile: str = "",
           keypass: str = "",
+          ssl_context: _ssl.SSLContext = None,
           resources: Dict[str, str] = {}) -> None:
     with __lock:
         global __server
@@ -118,15 +121,14 @@ def start(host: str = "",
                                                           keyfile=keyfile,
                                                           certfile=certfile,
                                                           keypass=keypass,
+                                                          ssl_context=ssl_context,
                                                           resources=resources)
 
-    from simple_http_server import _get_filters
     __filters = _get_filters()
     # filter configuration
     for ft in __filters:
         __server.map_filter(ft["url_pattern"], ft["func"])
 
-    from simple_http_server import _get_request_mappings
     __request_mappings = _get_request_mappings()
     # request mapping
     for ctr in __request_mappings:

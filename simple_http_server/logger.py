@@ -31,7 +31,7 @@ _LOG_LEVEL_ = "INFO"
 __cache_loggers = {}
 
 __formatter_ = logging.Formatter(
-    fmt='[%(asctime)s]-[%(name)s]-[line:%(lineno)d] -%(levelname)-4s: %(message)s',
+    fmt='[%(asctime)s]-[%(name)s:%(lineno)d] -%(levelname)-4s: %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S')
 
 _handler = logging.StreamHandler(sys.stdout)
