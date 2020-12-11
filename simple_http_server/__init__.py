@@ -23,8 +23,9 @@ SOFTWARE.
 """
 
 import http.cookies
-from typing import Dict, List, Union, Callable
-from simple_http_server.logger import get_logger
+import time
+from typing import Any, Dict, List, Tuple, Union, Callable
+from simple_http_server.logger import get_logger, set_level
 
 name = "simple_http_server"
 
@@ -75,6 +76,75 @@ def _get_filters():
     return __filters
 
 
+class Session:
+
+    def __init__(self):
+        self.max_inactive_interval: int = 30 * 60
+
+    @property
+    def id(self) -> str:
+        return ""
+
+    @property
+    def creation_time(self) -> float:
+        return 0
+
+    @property
+    def last_acessed_time(self) -> float:
+        return 0
+
+    @property
+    def attribute_names(self) -> Tuple:
+        return ()
+
+    @property
+    def is_new(self) -> bool:
+        return False
+
+    @property
+    def is_valid(self) -> bool:
+        return time.time() - self.last_acessed_time < self.max_inactive_interval
+
+    def get_attribute(self, name: str) -> Any:
+        return None
+
+    def set_attribute(self, name: str, value: str) -> None:
+        pass
+
+    def invalidate(self) -> None:
+        pass
+
+
+class _Session(Session):
+
+    def __init__(self, id: str, creation_time: float):
+        super().__init__()
+        self.__id = id
+        self.__creation_time = creation_time
+        self.__last_acessed_time = creation_time
+        self.__is_new = True
+
+    @property
+    def id(self) -> str:
+        return self.__id
+
+    @property
+    def creation_time(self) -> float:
+        return self.__creation_time
+
+    @property
+    def last_acessed_time(self) -> float:
+        return self.__last_acessed_time
+
+    @property
+    def is_new(self) -> bool:
+        return self.__is_new
+
+    def _set_last_acessed_time(self, last_acessed_time: float):
+        self.__last_acessed_time = last_acessed_time
+        self.__is_new = False
+
+
 class Cookies(http.cookies.SimpleCookie):
     EXPIRE_DATE_FORMAT = "%a, %d %b %Y %H:%M:%S GMT"
 
@@ -83,16 +153,16 @@ class Request:
     """Request"""
 
     def __init__(self):
-        self.method = ""  # GET, POST, PUT, DELETE, HEAD, etc.
-        self.headers = {}  # Request headers
+        self.method: str = ""  # GET, POST, PUT, DELETE, HEAD, etc.
+        self.headers: Dict[str, str] = {}  # Request headers
         self.__cookies = Cookies()
-        self.query_string = ""  # Query String
-        self.path_values = {}
-        self.path = ""  # Path
+        self.query_string: str = ""  # Query String
+        self.path_values: Dict[str, str] = {}
+        self.path: str = ""  # Path
         self.__parameters = {}  # Parameters, key-value array, merged by query string and request body if the `Content-Type` in request header is `application/x-www-form-urlencoded` or `multipart/form-data`
         self.__parameter = {}  # Parameters, key-value, if more than one parameters with the same key, only the first one will be stored.
-        self.body = ""  # Request body
-        self.json = None  # A dictionary if the `Content-Type` in request header is `application/json`
+        self.body: bytes = b""  # Request body
+        self.json: Dict[str, Any] = None  # A dictionary if the `Content-Type` in request header is `application/json`
 
     @property
     def cookies(self) -> Cookies:
@@ -118,6 +188,10 @@ class Request:
             return default
         else:
             return self.parameter[key]
+
+    def get_session(self, create: bool = False) -> Session:
+        # This is abstract method
+        return None
 
 
 class MultipartFile:

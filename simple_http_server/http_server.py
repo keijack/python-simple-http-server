@@ -22,6 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+from build.lib.simple_http_server import Cookies
 import os
 import re
 import json
@@ -30,12 +31,15 @@ import inspect
 import threading
 import http.cookies as cookies
 import http.server
+import datetime
 
 from collections import OrderedDict
 from socketserver import ThreadingMixIn
 from urllib.parse import unquote
 from urllib.parse import quote
 from typing import Dict, Tuple
+
+import simple_http_server.http_session as http_session
 
 from simple_http_server import HttpError
 from simple_http_server import StaticFile
@@ -50,6 +54,7 @@ from simple_http_server import PathValue
 from simple_http_server import Parameter
 from simple_http_server import MultipartFile
 from simple_http_server import Request
+from simple_http_server import Session
 
 from simple_http_server.logger import get_logger
 
@@ -59,9 +64,16 @@ _logger = get_logger("simple_http_server.http_server")
 class RequestWrapper(Request):
 
     def __init__(self):
-        super(RequestWrapper, self).__init__()
+        super().__init__()
         self._headers_keys_in_lowcase = {}
         self._path = ""
+        self.__session = None
+
+    def get_session(self, create: bool = False) -> Session:
+        if not self.__session:
+            sid = self.cookies[http_session.SESSION_COOKIE_NAME].value if http_session.SESSION_COOKIE_NAME in self.cookies.keys() else ""
+            self.__session = http_session.get_session(sid, create)
+        return self.__session
 
 
 class ResponseWrapper(Response):
@@ -135,6 +147,16 @@ class FilterContex(object):
             else:
                 ctr_res = self.__controller(*args, **kwargs)
 
+            session = self.request.get_session()
+            if session:
+                exp = datetime.datetime.utcfromtimestamp(session.last_acessed_time + session.max_inactive_interval)
+                sck = Cookies()
+                sck[http_session.SESSION_COOKIE_NAME] = session.id
+                sck[http_session.SESSION_COOKIE_NAME]["httponly"] = True
+                sck[http_session.SESSION_COOKIE_NAME]["path"] = "/"
+                sck[http_session.SESSION_COOKIE_NAME]["expires"] = exp.strftime(Cookies.EXPIRE_DATE_FORMAT)
+                self.response.cookies.update(sck)
+
             if ctr_res is not None:
                 if isinstance(ctr_res, tuple):
                     status, headers, cks, body = self.__decode_tuple_response(ctr_res)
@@ -204,6 +226,8 @@ class FilterContex(object):
                 kwarg_vals[k] = self.__build_str(k, v)
             elif isinstance(v, Request):
                 kwarg_vals[k] = self.request
+            elif isinstance(v, Session):
+                kwarg_vals[k] = self.request.get_session(True)
             elif isinstance(v, Response):
                 kwarg_vals[k] = self.response
             elif isinstance(v, Headers):
