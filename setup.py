@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 import setuptools
+import simple_http_server
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
     name="simple_http_server",
-    version="0.5.0",
+    version=simple_http_server.version,
     author="Keijack",
     author_email="keijack.wu@gmail.com",
     description="This is a simple http server, use MVC like design.",

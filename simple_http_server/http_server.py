@@ -22,7 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from build.lib.simple_http_server import Cookies
+
 import os
 import re
 import json
@@ -41,11 +41,13 @@ from typing import Dict, Tuple
 
 import simple_http_server.http_session as http_session
 
+
 from simple_http_server import HttpError
 from simple_http_server import StaticFile
 from simple_http_server import Headers
 from simple_http_server import Redirect
 from simple_http_server import Response
+from simple_http_server import Cookies
 from simple_http_server import Cookie
 from simple_http_server import JSONBody
 from simple_http_server import Header
@@ -55,6 +57,7 @@ from simple_http_server import Parameter
 from simple_http_server import MultipartFile
 from simple_http_server import Request
 from simple_http_server import Session
+from simple_http_server import version
 
 from simple_http_server.logger import get_logger
 
@@ -164,7 +167,6 @@ class FilterContex(object):
                 sck[http_session.SESSION_COOKIE_NAME]["path"] = "/"
                 sck[http_session.SESSION_COOKIE_NAME]["expires"] = exp.strftime(Cookies.EXPIRE_DATE_FORMAT)
                 self.response.cookies.update(sck)
-
 
             if ctr_res is not None:
                 if isinstance(ctr_res, tuple):
@@ -404,6 +406,8 @@ def _remove_url_first_slash(url):
 
 class _SimpleDispatcherHttpRequestHandler(http.server.BaseHTTPRequestHandler):
     """The Class will dispatch the request to the controller configured in RequestMapping"""
+
+    server_version = "python-simple-http-server/" + version
 
     def __process(self, method):
         mth = method.upper()
