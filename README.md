@@ -15,7 +15,9 @@ from `0.4.0`, python 2.7 is no longer supported, if you are using python 2.7, pl
 ## Why choose
 
 * Lightway.
+* Functional programing.
 * Filter chain support.
+* Session support.
 * Spring MVC like request mapping.
 * SSL support.
 * Easy to use.
@@ -125,6 +127,18 @@ def my_path_val_ctr(path_val=PathValue()):
 @request_map("/redirect")
 def redirect():
     return Redirect("/index")
+
+@request_map("session")
+def test_session(session=Session(), invalid=False):
+    ins = session.get_attribute("in-session")
+    if not ins:
+        session.set_attribute("in-session", "Hello, Session!")
+
+    __logger.info("session id: %s" % session.id)
+    if invalid:
+        __logger.info("session[%s] is being invalidated. " % session.id)
+        session.invalidate()
+    return "<!DOCTYPE html><html><body>%s</body></html>" % str(ins)
 ```
 
 ### Write filters

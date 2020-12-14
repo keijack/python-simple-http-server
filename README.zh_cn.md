@@ -15,6 +15,8 @@ Python 3.7
 ## 为什么要选择这个项目？
 
 * 轻量级
+* 函数化编程
+* 支持 Session 会话
 * 支持过滤器链
 * Spring MVC 风格的请求映射配置
 * 简单易用
@@ -121,6 +123,11 @@ def your_ctroller_function(req=Request()):
     ##
     # 当你的请求的 Content-Type 是 application/json 时，框架会自动将请求体中的 JSON 对象加载为一个dict对象。
     print(req.json)
+    ##
+    # Session
+    session = req.getSession()
+    ins = session.get_attribute("in-session")
+    session.set_attribute("in-session", "Hello, Session!")
     return "<html><body>Hello, World!</body></html>"
 ```
 
@@ -153,6 +160,7 @@ from simple_http_server import Header
 from simple_http_server import Cookies
 from simple_http_server import Cookie
 from simple_http_server import PathValue
+from simple_http_server import Session
 
 
 @request_map("/say_hello/to/{name}", method=["GET", "POST", "PUT"])
@@ -165,7 +173,8 @@ def your_ctroller_function(
         user_token=Header(name="userToken", required=True), # 传入 req.headers["userToken"]，如果请求头中没有 "userToken" 字段，则响应为 400 参数错误
         all_cookies=Cookies(), # 传入 req.cookies，返回所有当前请求的 cookies
         user_info=Cookie("userInfo", required=False), # 传入 req.cookies["userInfo"]，如果没有该 cookie，则响应为 400 参数错误
-        name=PathValue("name"), # 传入 req.path_values["name"]，返回路径中你路由配置中匹配 {name} 的字符串
+        name=PathValue("name"), # 传入 req.path_values["name"]，返回路径中你路由配置中匹配 {name} 的字符串,
+        session=Session() # 传入 req.getSession(True)，取得当前 request 的 Session 会话，如果没有会创建一个。
     ):
     return "<html><body>Hello, World!</body></html>"
 ```
