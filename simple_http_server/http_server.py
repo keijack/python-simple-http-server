@@ -148,7 +148,7 @@ class FilterContex(object):
                 ctr_res = self.__controller(*args, **kwargs)
 
             session = self.request.get_session()
-            if session:
+            if session and session.is_valid:
                 exp = datetime.datetime.utcfromtimestamp(session.last_acessed_time + session.max_inactive_interval)
                 sck = Cookies()
                 sck[http_session.SESSION_COOKIE_NAME] = session.id
@@ -156,6 +156,15 @@ class FilterContex(object):
                 sck[http_session.SESSION_COOKIE_NAME]["path"] = "/"
                 sck[http_session.SESSION_COOKIE_NAME]["expires"] = exp.strftime(Cookies.EXPIRE_DATE_FORMAT)
                 self.response.cookies.update(sck)
+            elif session and http_session.SESSION_COOKIE_NAME in self.request.cookies:
+                exp = datetime.datetime.utcfromtimestamp(0)
+                sck = Cookies()
+                sck[http_session.SESSION_COOKIE_NAME] = session.id
+                sck[http_session.SESSION_COOKIE_NAME]["httponly"] = True
+                sck[http_session.SESSION_COOKIE_NAME]["path"] = "/"
+                sck[http_session.SESSION_COOKIE_NAME]["expires"] = exp.strftime(Cookies.EXPIRE_DATE_FORMAT)
+                self.response.cookies.update(sck)
+
 
             if ctr_res is not None:
                 if isinstance(ctr_res, tuple):
