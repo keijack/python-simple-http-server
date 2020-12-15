@@ -28,7 +28,7 @@ from typing import Any, Dict, List, Tuple, Union, Callable
 from simple_http_server.logger import get_logger
 
 name = "simple_http_server"
-version = "0.5.0"
+version = "0.5.1"
 
 __request_mappings = []
 __filters = []
