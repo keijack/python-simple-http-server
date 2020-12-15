@@ -382,7 +382,7 @@ class FilterContex(object):
 
 
 def _get_args_(func):
-    args = inspect.getargspec(func)
+    args = inspect.getfullargspec(func)
     if args.defaults is None:
         return args.args
     else:
@@ -390,7 +390,7 @@ def _get_args_(func):
 
 
 def _get_kwargs_(func):
-    args = inspect.getargspec(func)
+    args = inspect.getfullargspec(func)
     if args.defaults is None:
         return None
     else:
