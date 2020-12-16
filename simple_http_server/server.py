@@ -85,7 +85,7 @@ def _import_module(mname):
     try:
         importlib.import_module(mname)
     except:
-        __logger.warn("Import moudle [%s] error!" % mname)
+        __logger.warn(f"Import moudle [{mname}] error!")
 
 
 def scan(base_dir: str = "", regx: str = r"") -> None:
@@ -96,7 +96,7 @@ def scan(base_dir: str = "", regx: str = r"") -> None:
     modules = _load_all_modules(work_dir, base_dir, regx)
 
     for mname in modules:
-        __logger.info("Import controllers from module: %s" % mname)
+        __logger.info(f"Import controllers from module: {mname}")
         _import_module(mname)
 
 

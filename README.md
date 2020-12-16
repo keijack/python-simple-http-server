@@ -141,6 +141,24 @@ def test_session(session=Session(), invalid=False):
     return "<!DOCTYPE html><html><body>%s</body></html>" % str(ins)
 ```
 
+Beside using the default values, you can also use variable annotations to specify your controller function's variables.
+
+```python
+@request_map("/say_hello/to/{name}", method=["GET", "POST", "PUT"])
+def your_ctroller_function(
+        user_name: str, # req.parameter["user_name"]，400 error will raise when there's no such parameter in the query string.
+        password: str, # req.parameter["password"]，400 error will raise when there's no such parameter in the query string.
+        skills: list, # req.parameters["skills"]，400 error will raise when there's no such parameter in the query string.
+        all_headers: Headers, # req.headers
+        user_token: Header, # req.headers["user_token"]，400 error will raise when there's no such parameter in the quest headers.
+        all_cookies: Cookies, # req.cookies, return all cookies
+        user_info: Cookie, # req.cookies["user_info"]，400 error will raise when there's no such parameter in the cookies.
+        name: PathValue, # req.path_values["name"]，get the {name} value from your path.
+        session: Session # req.getSession(True)，get the session, if there is no sessions, create one.
+    ):
+    return "<html><body>Hello, World!</body></html>"
+```
+
 ### Write filters
 
 ```python

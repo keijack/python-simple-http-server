@@ -217,6 +217,24 @@ def upload(
 
 ```
 
+你也可以使用 Python3 的函数变量标注(variable annotation) 来定义你需要取得的数据类型。
+
+```python
+@request_map("/say_hello/to/{name}", method=["GET", "POST", "PUT"])
+def your_ctroller_function(
+        user_name: str, # 传入 req.parameter["user_name"]，如果该参数为空，则会响应为 400 参数错误
+        password: str, # 传入 req.parameter["password"]，如果参数为空，则会响应为 400 参数错误
+        skills: list, # 传入 req.parameters["skills"]，会返回一个数组，如果没有传入任何的内容，则响应为 400 参数错误
+        all_headers: Headers, # 传入 req.headers
+        user_token: Header, # 传入 req.headers["user_token"]，如果请求头中没有 "userToken" 字段，则响应为 400 参数错误
+        all_cookies: Cookies, # 传入 req.cookies，返回所有当前请求的 cookies
+        user_info: Cookie, # 传入 req.cookies["user_info"]，如果没有该 cookie，则响应为 400 参数错误
+        name: PathValue, # 传入 req.path_values["name"]，返回路径中你路由配置中匹配 {name} 的字符串,
+        session: Session # 传入 req.getSession(True)，取得当前 request 的 Session 会话，如果没有会创建一个。
+    ):
+    return "<html><body>Hello, World!</body></html>"
+```
+
 ### 响应请求
 
 从上述的例子中可以看出，取得请求中的参数我们有许多方式，这个给了开发者很高的自由度来编写这些信息。而响应的方法一样具有各种方法。

@@ -220,57 +220,69 @@ class FilterContex(object):
     def __prepare_args(self):
         args = _get_args_(self.__controller)
         arg_vals = []
-        for arg in args:
-            if arg not in self.request.parameter.keys():
+        for arg, arg_type_anno in args:
+            if arg not in self.request.parameter.keys() and arg_type_anno not in (Request, Session, Response, Headers, cookies.BaseCookie, cookies.SimpleCookie, Cookies):
                 raise HttpError(400, "Parameter[%s] is required]" % arg)
-            param = Parameter(name=arg, default=self.request.parameter[arg], required=True)
+            param = self.__get_params_(arg, arg_type_anno)
             arg_vals.append(param)
         return arg_vals
+
+    def __get_params_(self, arg, arg_type, val=None, type_check=True):
+        if val:
+            kws = {"val": val}
+        else:
+            kws = {}
+
+        if arg_type == Request:
+            param = self.request
+        elif arg_type == Session:
+            param = self.request.get_session(True)
+        elif arg_type == Response:
+            param = self.response
+        elif arg_type == Headers:
+            param = Headers(self.request.headers)
+        elif arg_type == Header:
+            param = self.__build_header(arg, **kws)
+        elif issubclass(arg_type, cookies.BaseCookie):
+            param = self.request.cookies
+        elif arg_type == Cookie:
+            param = self.__build_cookie(arg, **kws)
+        elif arg_type == MultipartFile:
+            param = self.__build_multipart(arg, **kws)
+        elif arg_type == Parameter:
+            param = self.__build_param(arg, **kws)
+        elif arg_type == PathValue:
+            param = self.__build_path_value(arg, **kws)
+        elif arg_type == Parameters:
+            param = self.__build_params(arg, **kws)
+        elif arg_type == JSONBody:
+            param = self.__build_json_body()
+        elif arg_type == str:
+            param = self.__build_str(arg, **kws)
+        elif arg_type == bool:
+            param = self.__build_bool(arg, **kws)
+        elif arg_type == int:
+            param = self.__build_int(arg, **kws)
+        elif arg_type == float:
+            param = self.__build_float(arg, **kws)
+        elif arg_type == list:
+            param = self.__build_list(arg, **kws)
+        elif arg_type == dict:
+            param = self.__build_dict(arg, **kws)
+        elif type_check:
+            raise HttpError(400, f"Parameter[{arg}] with Type {arg_type} is not supported yet.")
+        else:
+            param = None
+        return param
 
     def __prepare_kwargs(self):
         kwargs = _get_kwargs_(self.__controller)
         if kwargs is None:
             return None
         kwarg_vals = {}
-        for k, v in kwargs.items():
-            if v is None:
-                kwarg_vals[k] = self.__build_str(k, v)
-            elif isinstance(v, Request):
-                kwarg_vals[k] = self.request
-            elif isinstance(v, Session):
-                kwarg_vals[k] = self.request.get_session(True)
-            elif isinstance(v, Response):
-                kwarg_vals[k] = self.response
-            elif isinstance(v, Headers):
-                kwarg_vals[k] = Headers(self.request.headers)
-            elif isinstance(v, Header):
-                kwarg_vals[k] = self.__build_header(k, v)
-            elif isinstance(v, cookies.BaseCookie):
-                kwarg_vals[k] = self.request.cookies
-            elif isinstance(v, Cookie):
-                kwarg_vals[k] = self.__build_cookie(k, v)
-            elif isinstance(v, MultipartFile):
-                kwarg_vals[k] = self.__build_multipart(k, v)
-            elif isinstance(v, Parameter):
-                kwarg_vals[k] = self.__build_param(k, v)
-            elif isinstance(v, PathValue):
-                kwarg_vals[k] = self.__build_path_value(k, v)
-            elif isinstance(v, Parameters):
-                kwarg_vals[k] = self.__build_params(k, v)
-            elif isinstance(v, JSONBody):
-                kwarg_vals[k] = self.__build_json_body()
-            elif isinstance(v, str):
-                kwarg_vals[k] = self.__build_str(k, v)
-            elif isinstance(v, bool):
-                kwarg_vals[k] = self.__build_bool(k, v)
-            elif isinstance(v, int):
-                kwarg_vals[k] = self.__build_int(k, v)
-            elif isinstance(v, list):
-                kwarg_vals[k] = self.__build_list(k, v)
-            elif isinstance(v, dict):
-                kwarg_vals[k] = self.__build_dict(k, v)
-            else:
-                kwarg_vals[k] = v
+        for k, v, t in kwargs:
+            param = self.__get_params_(k, type(v) if v is not None else t, v, False)
+            kwarg_vals[k] = param if param is not None else v
 
         return kwarg_vals
 
@@ -279,12 +291,12 @@ class FilterContex(object):
         if name in self.request.path_values:
             return PathValue(name=name, _value=self.request.path_values[name])
         else:
-            raise HttpError(500, "path name[%s] not in your url mapping!" % name)
+            raise HttpError(500, f"path name[{name}] not in your url mapping!")
 
-    def __build_cookie(self, key, val=Cookie()):
+    def __build_cookie(self, key, val=None):
         name = val.name if val.name is not None and val.name != "" else key
         if val._required and name not in self.request.cookies:
-            raise HttpError(400, "Cookie[%s] is required." % name)
+            raise HttpError(400, f"Cookie[{name}] is required.")
         if name in self.request.cookies:
             morsel = self.request.cookies[name]
             cookie = Cookie()
@@ -297,13 +309,13 @@ class FilterContex(object):
     def __build_multipart(self, key, val=MultipartFile()):
         name = val.name if val.name is not None and val.name != "" else key
         if val._required and name not in self.request.parameter.keys():
-            raise HttpError(400, "Parameter[%s] is required." % name)
+            raise HttpError(400, f"Parameter[{name}] is required.")
         if name in self.request.parameter.keys():
             v = self.request.parameter[key]
             if isinstance(v, MultipartFile):
                 return v
             else:
-                raise HttpError(400, "Parameter[%s] should be a file." % name)
+                raise HttpError(400, f"Parameter[{name}] should be a file.")
         else:
             return val
 
@@ -312,7 +324,7 @@ class FilterContex(object):
             try:
                 return json.loads(self.request.parameter[key])
             except:
-                raise HttpError(400, "Parameter[%s] should be a JSON type string." % key)
+                raise HttpError(400, f"Parameter[{key}] should be a JSON type string.")
         else:
             return val
 
@@ -322,25 +334,36 @@ class FilterContex(object):
         else:
             return val
 
-    def __build_int(self, key, val=0):
+    def __build_float(self, key, val=None):
+        if key in self.request.parameter.keys():
+            try:
+                return float(self.request.parameter[key])
+            except:
+                raise HttpError(400, f"Parameter[{key}] should be an float. ")
+        else:
+            return val
+
+    def __build_int(self, key, val=None):
         if key in self.request.parameter.keys():
             try:
                 return int(self.request.parameter[key])
             except:
-                raise HttpError(400, "Parameter[%s] should be an int. " % key)
+                raise HttpError(400, f"Parameter[{key}] should be an int. ")
         else:
             return val
 
-    def __build_bool(self, key, val=True):
+    def __build_bool(self, key, val=None):
         if key in self.request.parameter.keys():
             v = self.request.parameter[key]
             return v.lower() not in ("0", "false", "")
         else:
             return val
 
-    def __build_str(self, key, val=""):
+    def __build_str(self, key, val=None):
         if key in self.request.parameter.keys():
             return Parameter(name=key, default=self.request.parameter[key], required=False)
+        elif val is None:
+            return None
         else:
             return Parameter(name=key, default=val, required=False)
 
@@ -363,7 +386,7 @@ class FilterContex(object):
     def __build_params(self, key, val=Parameters()):
         name = val.name if val.name is not None and val.name != "" else key
         if val._required and name not in self.request.parameters:
-            raise HttpError(400, "Parameter[%s] is required." % name)
+            raise HttpError(400, f"Parameter[{name}] is required.")
         if name in self.request.parameters:
             v = self.request.parameters[name]
             return Parameters(name=name, default=v, required=val._required)
@@ -373,7 +396,7 @@ class FilterContex(object):
     def __build_param(self, key, val=Parameter()):
         name = val.name if val.name is not None and val.name != "" else key
         if val._required and name not in self.request.parameter:
-            raise HttpError(400, "Parameter[%s] is required." % name)
+            raise HttpError(400, f"Parameter[{name}] is required.")
         if name in self.request.parameter:
             v = self.request.parameter[name]
             return Parameter(name=name, default=v, required=val._required)
@@ -382,19 +405,35 @@ class FilterContex(object):
 
 
 def _get_args_(func):
-    args = inspect.getfullargspec(func)
-    if args.defaults is None:
-        return args.args
+    argspec = inspect.getfullargspec(func)
+    if argspec.defaults is None:
+        args = argspec.args
     else:
-        return args.args[0: len(args.args) - len(args.defaults)]
+        args = argspec.args[0: len(argspec.args) - len(argspec.defaults)]
+    arg_turples = []
+    for arg in args:
+        if arg in argspec.annotations:
+            ty = argspec.annotations[arg]
+        else:
+            ty = str
+        arg_turples.append((arg, ty))
+    return arg_turples
 
 
 def _get_kwargs_(func):
-    args = inspect.getfullargspec(func)
-    if args.defaults is None:
+    argspec = inspect.getfullargspec(func)
+    if argspec.defaults is None:
         return None
-    else:
-        return OrderedDict(zip(args.args[-len(args.defaults):], args.defaults))
+
+    kwargs = OrderedDict(zip(argspec.args[-len(argspec.defaults):], argspec.defaults))
+    kwarg_turples = []
+    for k, v in kwargs.items():
+        if k in argspec.annotations:
+            k_anno = argspec.annotations[k]
+        else:
+            k_anno = str
+        kwarg_turples.append((k, v, k_anno))
+    return kwarg_turples
 
 
 def _remove_url_first_slash(url):
@@ -407,7 +446,10 @@ def _remove_url_first_slash(url):
 class _SimpleDispatcherHttpRequestHandler(http.server.BaseHTTPRequestHandler):
     """The Class will dispatch the request to the controller configured in RequestMapping"""
 
-    server_version = "python-simple-http-server/" + version
+    server_version = f"python-simple-http-server/{version}"
+
+    def version_string(self):
+        return self.server_version
 
     def __process(self, method):
         mth = method.upper()
@@ -732,12 +774,12 @@ class _HttpServerWrapper(http.server.HTTPServer, object):
 
     def __get_path_reg_pattern(self, url):
         _url = url
-        path_names = re.findall("(?u)\\{\\w+\\}", _url)
+        path_names = re.findall(r"(?u)\\{\\w+\\}", _url)
         if len(path_names) == 0:
             # normal url
             return None, path_names
         for name in path_names:
-            _url = _url.replace(name, "([\\w%.-@!\\(\\)\\[\\]\\|\\$]+)")
+            _url = _url.replace(name, r"([\\w%.-@!\\(\\)\\[\\]\\|\\$]+)")
         _url = "^%s$" % _url
 
         quoted_names = []
@@ -814,7 +856,7 @@ class _HttpServerWrapper(http.server.HTTPServer, object):
         for patterns, val in self.path_val_url_mapping[method].items():
             m = re.match(patterns, path)
             is_match = m is not None
-            _logger.debug("pattern::[%s] => path::[%s] match? %s" % (patterns, path, str(is_match)))
+            _logger.debug(f"pattern::[{patterns}] => path::[{path}] match? {is_match}")
             if is_match:
                 fun, path_names = val
                 path_values = {}
@@ -888,7 +930,7 @@ class SimpleDispatcherHttpServer(object):
             ssl_hint = " with SSL on"
         else:
             ssl_hint = ""
-        _logger.info("Dispatcher Http Server starts. Listen to port [%d]%s." % (self.host[1], ssl_hint))
+        _logger.info(f"Dispatcher Http Server starts. Listen to port [{self.host[1]}]{ssl_hint}.")
         self.server.serve_forever()
 
     def shutdown(self):
