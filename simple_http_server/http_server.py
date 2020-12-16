@@ -272,7 +272,7 @@ class FilterContex(object):
         elif type_check:
             raise HttpError(400, f"Parameter[{arg}] with Type {arg_type} is not supported yet.")
         else:
-            param = None
+            param = val
         return param
 
     def __prepare_kwargs(self):
@@ -281,8 +281,7 @@ class FilterContex(object):
             return None
         kwarg_vals = {}
         for k, v, t in kwargs:
-            param = self.__get_params_(k, type(v) if v is not None else t, v, False)
-            kwarg_vals[k] = param if param is not None else v
+            kwarg_vals[k] = self.__get_params_(k, type(v) if v is not None else t, v, False)
 
         return kwarg_vals
 
