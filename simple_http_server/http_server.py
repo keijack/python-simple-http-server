@@ -121,7 +121,7 @@ class ResponseWrapper(Response):
         })
 
 
-class FilterContex(object):
+class FilterContex:
     """Context of a filter"""
 
     def __init__(self, req, res, controller, filters=None):
@@ -405,10 +405,12 @@ class FilterContex(object):
 
 def _get_args_(func):
     argspec = inspect.getfullargspec(func)
+    # ignore `self`
+    start = 1 if inspect.ismethod(func) else 0
     if argspec.defaults is None:
-        args = argspec.args
+        args = argspec.args[start:]
     else:
-        args = argspec.args[0: len(argspec.args) - len(argspec.defaults)]
+        args = argspec.args[start: len(argspec.args) - len(argspec.defaults)]
     arg_turples = []
     for arg in args:
         if arg in argspec.annotations:
@@ -789,7 +791,7 @@ class _HttpServerWrapper(http.server.HTTPServer, object):
 
     def map_url(self, url, fun, method=""):
         assert url is not None
-        assert fun is not None and inspect.isfunction(fun)
+        assert fun is not None and (inspect.isfunction(fun) or inspect.ismethod(fun))
         assert method is None or method == "" or method.upper() in _HttpServerWrapper.HTTP_METHODS
         _method = method.upper() if method is not None and method != "" else "_"
         _url = _remove_url_first_slash(url)

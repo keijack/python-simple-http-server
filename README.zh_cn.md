@@ -235,6 +235,25 @@ def your_ctroller_function(
     return "<html><body>Hello, World!</body></html>"
 ```
 
+我们建议使用函数式编程来编写你的控制器（Controller），不过你更喜欢使用对象的话，你可以将你的对象先创建出来，然后将对象方法传入 request_map():
+
+```python
+
+class MyController:
+
+    def __init__(self) -> None:
+        self._name = "ctr object"
+
+    def my_ctrl_mth(self, name: str):
+        return {"message": f"hello, {name}, {self._name} says. "}
+
+
+my_ctrl_obj = MyController()
+
+request_map("/obj/say_hello", method="GET")(my_ctrl_obj.my_ctrl_mth)
+
+```
+
 ### 响应请求
 
 从上述的例子中可以看出，取得请求中的参数我们有许多方式，这个给了开发者很高的自由度来编写这些信息。而响应的方法一样具有各种方法。

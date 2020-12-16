@@ -159,6 +159,26 @@ def your_ctroller_function(
     return "<html><body>Hello, World!</body></html>"
 ```
 
+We recommend using functional programing to write controller functions. but if you realy want to use Object, you should create the object, and pass the method from the object. 
+
+```python
+
+class MyController:
+
+    def __init__(self) -> None:
+        self._name = "ctr object"
+
+    def my_ctrl_mth(self, name: str):
+        return {"message": f"hello, {name}, {self._name} says. "}
+
+
+my_ctrl_obj = MyController()
+
+request_map("/obj/say_hello", method="GET")(my_ctrl_obj.my_ctrl_mth)
+
+```
+
+
 ### Write filters
 
 ```python
