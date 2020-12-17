@@ -178,6 +178,64 @@ request_map("/obj/say_hello", method="GET")(my_ctrl_obj.my_ctrl_mth)
 
 ```
 
+### Session
+
+Defaultly, the session is stored in local, you can extend `SessionFactory` and `Session` classes to implement your own session storage requirement (like store all data in redis or memcache)
+
+```python
+from simple_http_server import Session, SessionFactory, set_session_factory
+
+class MySessionImpl(Session):
+
+    def __init__(self):
+        super().__init__()
+        # your own implementation
+
+    @property
+    def id(self) -> str:
+        # your own implementation
+
+    @property
+    def creation_time(self) -> float:
+        # your own implementation
+
+    @property
+    def last_acessed_time(self) -> float:
+        # your own implementation
+
+    @property
+    def is_new(self) -> bool:
+        # your own implementation
+
+    @property
+    def attribute_names(self) -> Tuple:
+        # your own implementation
+
+    def get_attribute(self, name: str) -> Any:
+        # your own implementation
+
+    def set_attribute(self, name: str, value: Any) -> None:
+        # your own implementation
+
+    def invalidate(self) -> None:
+        # your own implementation
+
+class MySessionFacImpl(SessionFactory):
+
+    def __init__(self):
+        super().__init__()
+        # your own implementation
+
+    def clean_session(self, session_id: str):
+        # your own implementation
+
+    def get_session(self, session_id: str, create: bool = False) -> Session:
+        # your own implementation
+        return MySessionImpl()
+
+set_session_factory(MySessionFacImpl())
+
+```
 
 ### Write filters
 

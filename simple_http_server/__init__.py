@@ -28,53 +28,9 @@ from typing import Any, Dict, List, Tuple, Union, Callable
 from simple_http_server.logger import get_logger
 
 name = "simple_http_server"
-version = "0.5.3"
+version = "0.5.4"
 
-__request_mappings = []
-__filters = []
-
-
-__logger = None
-
-
-def _log():
-    global __logger
-    if __logger is None:
-        __logger = get_logger("simple_http_server.__init__")
-    return __logger
-
-
-def request_map(url: str = "", method: Union[str, list] = "") -> Callable:
-    def map(ctrl_fun):
-        if isinstance(method, list):
-            mths = method
-        else:
-            mths = [method]
-        for mth in mths:
-            _log().debug("map url %s with method[%s] to function %s. " % (url, mth, str(ctrl_fun)))
-            __request_mappings.append({
-                "url": url,
-                "method": mth,
-                "func": ctrl_fun
-            })
-        # return the original function, so you can use a decoration chain
-        return ctrl_fun
-    return map
-
-
-def filter_map(pattern: str = "") -> Callable:
-    def map(filter_fun):
-        __filters.append({"url_pattern": pattern, "func": filter_fun})
-        return filter_fun
-    return map
-
-
-def _get_request_mappings():
-    return __request_mappings
-
-
-def _get_filters():
-    return __filters
+__logger = get_logger("simple_http_server.__init__")
 
 
 class Session:
@@ -116,34 +72,13 @@ class Session:
         pass
 
 
-class _Session(Session):
+class SessionFactory:
 
-    def __init__(self, id: str, creation_time: float):
-        super().__init__()
-        self.__id = id
-        self.__creation_time = creation_time
-        self.__last_acessed_time = creation_time
-        self.__is_new = True
+    def clean_session(self, session_id: str):
+        pass
 
-    @property
-    def id(self) -> str:
-        return self.__id
-
-    @property
-    def creation_time(self) -> float:
-        return self.__creation_time
-
-    @property
-    def last_acessed_time(self) -> float:
-        return self.__last_acessed_time
-
-    @property
-    def is_new(self) -> bool:
-        return self.__is_new
-
-    def _set_last_acessed_time(self, last_acessed_time: float):
-        self.__last_acessed_time = last_acessed_time
-        self.__is_new = False
+    def get_session(self, session_id: str, create: bool = False) -> Session:
+        return None
 
 
 class Cookies(http.cookies.SimpleCookie):
@@ -440,3 +375,51 @@ class Cookie(http.cookies.Morsel):
     @property
     def _required(self) -> bool:
         return self.__required
+
+
+__request_mappings = []
+__filters = []
+
+__session_facory: SessionFactory = None
+
+
+def request_map(url: str = "", method: Union[str, list] = "") -> Callable:
+    def map(ctrl_fun):
+        if isinstance(method, list):
+            mths = method
+        else:
+            mths = [method]
+        for mth in mths:
+            __logger.debug("map url %s with method[%s] to function %s. " % (url, mth, str(ctrl_fun)))
+            __request_mappings.append({
+                "url": url,
+                "method": mth,
+                "func": ctrl_fun
+            })
+        # return the original function, so you can use a decoration chain
+        return ctrl_fun
+    return map
+
+
+def filter_map(pattern: str = "") -> Callable:
+    def map(filter_fun):
+        __filters.append({"url_pattern": pattern, "func": filter_fun})
+        return filter_fun
+    return map
+
+
+def set_session_factory(session_factory: SessionFactory):
+    global __session_facory
+    __session_facory = session_factory
+
+
+def _get_request_mappings():
+    return __request_mappings
+
+
+def _get_filters():
+    return __filters
+
+
+def _get_session_factory() -> SessionFactory:
+    return __session_facory

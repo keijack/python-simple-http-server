@@ -254,6 +254,65 @@ request_map("/obj/say_hello", method="GET")(my_ctrl_obj.my_ctrl_mth)
 
 ```
 
+### Session
+
+默认情况下，Session 中的数据会存储到本地，如果你需要做分布式 Session，例如将 Session内容存储在 Redis 或者 Memcache，你可以自定义自己的 `Session` 和 `SessionFactory`，然后创建一个你定义的 SessionFactory 对象通过 `simple_http_server.set_session_factory` 设置到框架中。
+
+```python
+from simple_http_server import Session, SessionFactory, set_session_factory
+
+class MySessionImpl(Session):
+
+    def __init__(self):
+        super().__init__()
+        # your own implementation
+
+    @property
+    def id(self) -> str:
+        # your own implementation
+
+    @property
+    def creation_time(self) -> float:
+        # your own implementation
+
+    @property
+    def last_acessed_time(self) -> float:
+        # your own implementation
+
+    @property
+    def is_new(self) -> bool:
+        # your own implementation
+
+    @property
+    def attribute_names(self) -> Tuple:
+        # your own implementation
+
+    def get_attribute(self, name: str) -> Any:
+        # your own implementation
+
+    def set_attribute(self, name: str, value: Any) -> None:
+        # your own implementation
+
+    def invalidate(self) -> None:
+        # your own implementation
+
+class MySessionFacImpl(SessionFactory):
+
+    def __init__(self):
+        super().__init__()
+        # your own implementation
+
+    def clean_session(self, session_id: str):
+        # your own implementation
+
+    def get_session(self, session_id: str, create: bool = False) -> Session:
+        # your own implementation
+        return MySessionImpl()
+
+set_session_factory(MySessionFacImpl())
+
+```
+
 ### 响应请求
 
 从上述的例子中可以看出，取得请求中的参数我们有许多方式，这个给了开发者很高的自由度来编写这些信息。而响应的方法一样具有各种方法。

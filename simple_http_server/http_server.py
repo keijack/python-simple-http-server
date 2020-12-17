@@ -39,9 +39,7 @@ from urllib.parse import unquote
 from urllib.parse import quote
 from typing import Dict, Tuple
 
-import simple_http_server.http_session as http_session
-
-
+from simple_http_server import _get_session_factory
 from simple_http_server import HttpError
 from simple_http_server import StaticFile
 from simple_http_server import Headers
@@ -58,6 +56,7 @@ from simple_http_server import MultipartFile
 from simple_http_server import Request
 from simple_http_server import Session
 from simple_http_server import version
+from simple_http_server._http_session_local_impl import SESSION_COOKIE_NAME
 
 from simple_http_server.logger import get_logger
 
@@ -74,8 +73,9 @@ class RequestWrapper(Request):
 
     def get_session(self, create: bool = False) -> Session:
         if not self.__session:
-            sid = self.cookies[http_session.SESSION_COOKIE_NAME].value if http_session.SESSION_COOKIE_NAME in self.cookies.keys() else ""
-            self.__session = http_session.get_session(sid, create)
+            sid = self.cookies[SESSION_COOKIE_NAME].value if SESSION_COOKIE_NAME in self.cookies.keys() else ""
+            session_fac = _get_session_factory()
+            self.__session = session_fac.get_session(sid, create)
         return self.__session
 
 
@@ -154,18 +154,18 @@ class FilterContex:
             if session and session.is_valid:
                 exp = datetime.datetime.utcfromtimestamp(session.last_acessed_time + session.max_inactive_interval)
                 sck = Cookies()
-                sck[http_session.SESSION_COOKIE_NAME] = session.id
-                sck[http_session.SESSION_COOKIE_NAME]["httponly"] = True
-                sck[http_session.SESSION_COOKIE_NAME]["path"] = "/"
-                sck[http_session.SESSION_COOKIE_NAME]["expires"] = exp.strftime(Cookies.EXPIRE_DATE_FORMAT)
+                sck[SESSION_COOKIE_NAME] = session.id
+                sck[SESSION_COOKIE_NAME]["httponly"] = True
+                sck[SESSION_COOKIE_NAME]["path"] = "/"
+                sck[SESSION_COOKIE_NAME]["expires"] = exp.strftime(Cookies.EXPIRE_DATE_FORMAT)
                 self.response.cookies.update(sck)
-            elif session and http_session.SESSION_COOKIE_NAME in self.request.cookies:
+            elif session and SESSION_COOKIE_NAME in self.request.cookies:
                 exp = datetime.datetime.utcfromtimestamp(0)
                 sck = Cookies()
-                sck[http_session.SESSION_COOKIE_NAME] = session.id
-                sck[http_session.SESSION_COOKIE_NAME]["httponly"] = True
-                sck[http_session.SESSION_COOKIE_NAME]["path"] = "/"
-                sck[http_session.SESSION_COOKIE_NAME]["expires"] = exp.strftime(Cookies.EXPIRE_DATE_FORMAT)
+                sck[SESSION_COOKIE_NAME] = session.id
+                sck[SESSION_COOKIE_NAME]["httponly"] = True
+                sck[SESSION_COOKIE_NAME]["path"] = "/"
+                sck[SESSION_COOKIE_NAME]["expires"] = exp.strftime(Cookies.EXPIRE_DATE_FORMAT)
                 self.response.cookies.update(sck)
 
             if ctr_res is not None:

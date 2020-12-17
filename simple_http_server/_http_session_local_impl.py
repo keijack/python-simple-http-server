@@ -28,7 +28,7 @@ import time
 
 from typing import Any, Dict, Tuple
 from threading import RLock
-from simple_http_server import _Session, Session
+from simple_http_server import Session, SessionFactory, set_session_factory
 from simple_http_server.logger import get_logger
 
 _logger = get_logger("http_session")
@@ -48,22 +48,37 @@ def _get_from_dict(adict: Dict[str, Any], key: str) -> Any:
         return None
 
 
-class SessionFactory:
-
-    def clean_session(self, session_id: str):
-        pass
-
-    def get_session(self, session_id: str, create: bool = False) -> Session:
-        return None
-
-
-class LocalSessionImpl(_Session):
+class LocalSessionImpl(Session):
 
     def __init__(self, id: str, creation_time: float, session_fac: SessionFactory):
-        super().__init__(id, creation_time)
+        super().__init__()
+        self.__id = id
+        self.__creation_time = creation_time
+        self.__last_acessed_time = creation_time
+        self.__is_new = True
         self.__attr_lock = RLock()
         self.__attrs = {}
         self.__ses_fac = session_fac
+
+    @property
+    def id(self) -> str:
+        return self.__id
+
+    @property
+    def creation_time(self) -> float:
+        return self.__creation_time
+
+    @property
+    def last_acessed_time(self) -> float:
+        return self.__last_acessed_time
+
+    @property
+    def is_new(self) -> bool:
+        return self.__is_new
+
+    def _set_last_acessed_time(self, last_acessed_time: float):
+        self.__last_acessed_time = last_acessed_time
+        self.__is_new = False
 
     @property
     def attribute_names(self) -> Tuple:
@@ -84,7 +99,7 @@ class LocalSessionImpl(_Session):
 class LocalSessionFactory(SessionFactory):
 
     def __init__(self):
-        self.__sessions: Dict[str, _Session] = {}
+        self.__sessions: Dict[str, LocalSessionImpl] = {}
         self.__session_lock = RLock()
         self.__started = False
         self.__clearing_thread = threading.Thread(target=self._clear_time_out_session_in_bg, daemon=True)
@@ -104,9 +119,9 @@ class LocalSessionFactory(SessionFactory):
     def _clear_time_out_session_in_bg(self):
         while True:
             time.sleep(_SESSION_TIME_CLEANING_INTERVAL)
-            self._clear_time_out_sessin()
+            self._clear_time_out_session()
 
-    def _clear_time_out_sessin(self):
+    def _clear_time_out_session(self):
         cl_ids = []
         for k, v in self.__sessions.items():
             if not v.is_valid:
@@ -124,10 +139,10 @@ class LocalSessionFactory(SessionFactory):
             except KeyError:
                 _logger.debug("Session[#%s] in session cache is already deleted. " % session_id)
 
-    def _get_session(self, session_id: str) -> _Session:
+    def _get_session(self, session_id: str) -> LocalSessionImpl:
         if not session_id:
             return None
-        sess: _Session = _get_from_dict(self.__sessions, session_id)
+        sess: LocalSessionImpl = _get_from_dict(self.__sessions, session_id)
         if sess and sess.is_valid:
             return sess
         else:
@@ -147,8 +162,4 @@ class LocalSessionFactory(SessionFactory):
             return session
 
 
-session_factory = LocalSessionFactory()
-
-
-def get_session(session_id: str, create: bool = False) -> Session:
-    return session_factory.get_session(session_id, create)
+set_session_factory(LocalSessionFactory())
