@@ -16,7 +16,7 @@ Python 3.7
 
 * 轻量级
 * 函数化编程
-* 支持 Session 会话
+* 支持 Session 会话，你甚至可以自定义自己的 Session 实现
 * 支持过滤器链
 * Spring MVC 风格的请求映射配置
 * 简单易用

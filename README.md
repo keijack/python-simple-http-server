@@ -17,7 +17,7 @@ from `0.4.0`, python 2.7 is no longer supported, if you are using python 2.7, pl
 * Lightway.
 * Functional programing.
 * Filter chain support.
-* Session support.
+* Session support, and even, you can apply your own session implementation.
 * Spring MVC like request mapping.
 * SSL support.
 * Easy to use.
