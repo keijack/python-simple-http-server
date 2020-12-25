@@ -28,7 +28,7 @@ from typing import Any, Dict, List, Tuple, Union, Callable
 from simple_http_server.logger import get_logger
 
 name = "simple_http_server"
-version = "0.5.4"
+version = "0.5.5"
 
 __logger = get_logger("simple_http_server.__init__")
 
@@ -383,7 +383,7 @@ __filters = []
 __session_facory: SessionFactory = None
 
 
-def request_map(url: str = "", method: Union[str, list] = "") -> Callable:
+def request_map(url: str = "", method: Union[str, list] = "", controller_function: Callable = None) -> Callable:
     def map(ctrl_fun):
         if isinstance(method, list):
             mths = method
@@ -398,13 +398,17 @@ def request_map(url: str = "", method: Union[str, list] = "") -> Callable:
             })
         # return the original function, so you can use a decoration chain
         return ctrl_fun
+    if controller_function:
+        map(controller_function)
     return map
 
 
-def filter_map(pattern: str = "") -> Callable:
+def filter_map(pattern: str = "", filter_function: Callable = None) -> Callable:
     def map(filter_fun):
         __filters.append({"url_pattern": pattern, "func": filter_fun})
         return filter_fun
+    if filter_function:
+        map(filter_function)
     return map
 
 

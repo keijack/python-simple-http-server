@@ -250,7 +250,7 @@ class MyController:
 
 my_ctrl_obj = MyController()
 
-request_map("/obj/say_hello", method="GET")(my_ctrl_obj.my_ctrl_mth)
+request_map("/obj/say_hello", method="GET", controller_function=my_ctrl_obj.my_ctrl_mth)
 
 ```
 
