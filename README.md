@@ -335,9 +335,3 @@ logger.set_level("DEBUG")
 ```
 
 This logger will first save all the log record to a global queue, and then output them in a background thread, so it is very suitable for getting several logger with a same handler, especialy the `TimedRotatingFileHandler` which may slice the log files not quite well in a mutiple thread environment. 
-
-## Problems
-
-### Multipul threading safety
-
-For this is a SIMPLE http server, I have not done much work to ensure multipul threading safety. It may cause some problem if you trid to write data to `Request` and `Response` objects in multipul threads in one request scope (including in filters and controller functions).
