@@ -150,4 +150,4 @@ def stop() -> None:
 @request_map("/favicon.ico")
 def _favicon():
     root = os.path.dirname(os.path.abspath(__file__))
-    return StaticFile("%s/favicon.ico" % root, "image/x-icon")
+    return StaticFile(f"{root}/favicon.ico", "image/x-icon")

@@ -386,7 +386,7 @@ class FilterContex:
     def __build_header(self, key, val=Header()):
         name = val.name if val.name is not None and val.name != "" else key
         if val._required and name not in self.request.headers:
-            raise HttpError(400, "Header[%s] is required." % name)
+            raise HttpError(400, f"Header[{name}] is required.")
         if name in self.request.headers:
             v = self.request.headers[name]
             return Header(name=name, default=v, required=val._required)
@@ -737,7 +737,7 @@ class _SimpleDispatcherHttpRequestHandler(http.server.BaseHTTPRequestHandler):
 
     # @override
     def log_message(self, format, *args):
-        _logger.info("%s -  %s" % (self.client_address[0], format % args))
+        _logger.info(f"{self.client_address[0]} - {format % args}")
 
 
 class _HttpServerWrapper(http.server.HTTPServer, object):
@@ -815,7 +815,7 @@ class _HttpServerWrapper(http.server.HTTPServer, object):
 
     def _res_(self, path, res_pre, res_dir):
         fpath = os.path.join(res_dir, path.replace(res_pre, ""))
-        _logger.debug("static file. %s :: %s" % (path, fpath))
+        _logger.debug(f"static file. {path} :: {fpath}")
         if not os.path.exists(fpath):
             raise HttpError(404, "")
         fname, fext = os.path.splitext(fpath)
