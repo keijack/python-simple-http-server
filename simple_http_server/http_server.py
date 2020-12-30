@@ -39,7 +39,7 @@ from urllib.parse import unquote
 from urllib.parse import quote
 from typing import Dict, Tuple
 
-from simple_http_server import _get_session_factory
+from simple_http_server import ModelDict, _get_session_factory
 from simple_http_server import HttpError
 from simple_http_server import StaticFile
 from simple_http_server import Headers
@@ -221,8 +221,8 @@ class FilterContex:
         args = _get_args_(self.__controller)
         arg_vals = []
         for arg, arg_type_anno in args:
-            if arg not in self.request.parameter.keys() and arg_type_anno not in (Request, Session, Response, Headers, cookies.BaseCookie, cookies.SimpleCookie, Cookies):
-                raise HttpError(400, "Parameter[%s] is required]" % arg)
+            if arg not in self.request.parameter.keys() and arg_type_anno not in (Request, Session, Response, Headers, cookies.BaseCookie, cookies.SimpleCookie, Cookies, PathValue, JSONBody, ModelDict):
+                raise HttpError(400, f"Parameter[{arg}] is required! ")
             param = self.__get_params_(arg, arg_type_anno)
             arg_vals.append(param)
         return arg_vals
@@ -267,6 +267,8 @@ class FilterContex:
             param = self.__build_float(arg, **kws)
         elif arg_type == list:
             param = self.__build_list(arg, **kws)
+        elif arg_type == ModelDict:
+            param = self.__build_model_dict()
         elif arg_type == dict:
             param = self.__build_dict(arg, **kws)
         elif type_check:
@@ -274,6 +276,15 @@ class FilterContex:
         else:
             param = val
         return param
+
+    def __build_model_dict(self):
+        mdict = ModelDict()
+        for k, v in self.request.parameters.items():
+            if len(v) == 1:
+                mdict[k] = v[0]
+            else:
+                mdict[k] = v
+        return mdict
 
     def __prepare_kwargs(self):
         kwargs = _get_kwargs_(self.__controller)
@@ -776,7 +787,6 @@ class _HttpServerWrapper(http.server.HTTPServer, object):
     def __get_path_reg_pattern(self, url):
         _url = url
         path_names = re.findall("(?u)\\{\\w+\\}", _url)
-        _logger.debug(f"url::{url} find path values {path_names}")
         if len(path_names) == 0:
             # normal url
             return None, path_names

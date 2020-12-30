@@ -28,7 +28,7 @@ from typing import Any, Dict, List, Tuple, Union, Callable
 from simple_http_server.logger import get_logger
 
 name = "simple_http_server"
-version = "0.5.6"
+version = "0.5.7"
 
 __logger = get_logger("simple_http_server.__init__")
 
@@ -234,6 +234,8 @@ class Parameters(list):
         obj.extend(default)
         return obj
 
+class ModelDict(dict):
+    pass
 
 class Header(ParamStringValue):
     pass

@@ -48,6 +48,7 @@ from simple_http_server import Headers
 from simple_http_server import Cookies
 from simple_http_server import Cookie
 from simple_http_server import Redirect
+from simple_http_server import ModelDict
 
 
 @request_map("/index")
@@ -56,8 +57,10 @@ def my_ctrl():
 
 
 @request_map("/say_hello", method=["GET", "POST"])
-def my_ctrl2(name, name2=Parameter("name", default="KEIJACK")):
+def my_ctrl2(name, name2=Parameter("name", default="KEIJACK"), model=ModelDict()):
     """name and name2 is the same"""
+    name == name2 # True
+    name == model["name"] # True
     return "<!DOCTYPE html><html><body>hello, %s, %s</body></html>" % (name, name2)
 
 

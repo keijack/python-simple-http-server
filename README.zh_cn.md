@@ -131,6 +131,20 @@ def your_ctroller_function(req=Request()):
     return "<html><body>Hello, World!</body></html>"
 ```
 
+你也可以通过 `ModelDict` 来直接取得 request 里的参数。
+
+```python
+
+@request_map("/say_hello/to/{name}", method=["GET", "POST", "PUT"])
+def your_ctroller_function(model=ModelDict(), name=PathValue()):
+    # 如果你访问 http://.../say_hello/to/keijack?a=1&b=2&b=3
+    print(name) # 输出 keijack
+    print(model["a"]) # 输出 1
+    print(model["b"]) # 取得一个列表，输出 ["2,", "3"]
+    return "<html><body>Hello, World!</body></html>"
+
+```
+
 我们还可以通过更直接的参数和关键字参数来获取请求中的信息，使得编码更加简洁和方便。
 
 ```python
