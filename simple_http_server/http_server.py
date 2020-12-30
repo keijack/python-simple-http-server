@@ -857,11 +857,20 @@ class _HttpServerWrapper(http.server.HTTPServer, object):
             if fun_and_val is not None:
                 return fun_and_val
             else:
+                match_res_conf = []
                 for k, v in self.res_conf.items():
                     if path.startswith(k):
-                        def static_fun():
-                            return self._res_(path, k, v)
-                        return static_fun, {}
+                        match_res_conf.append((k, v))
+                if match_res_conf:
+                    kk, vv = match_res_conf[0]
+                    for k, v in match_res_conf[1:]:
+                        if len(k) > len(kk):
+                            _logger.debug(f"path[{k}] is more detailed than [{kk}], use it for [{path}]")
+                            kk, vv = k, v
+
+                    def static_fun():
+                        return self._res_(path, kk, vv)
+                    return static_fun, {}
                 return None, {}
 
     def __try_get_from_path_val(self, path, method):
