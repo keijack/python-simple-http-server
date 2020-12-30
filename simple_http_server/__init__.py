@@ -21,16 +21,17 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
-
+import sys
 import http.cookies
+import inspect
 import time
 from typing import Any, Dict, List, Tuple, Union, Callable
 from simple_http_server.logger import get_logger
 
 name = "simple_http_server"
-version = "0.5.8"
+version = "0.6.0"
 
-__logger = get_logger("simple_http_server.__init__")
+_logger = get_logger("simple_http_server.__init__")
 
 
 class Session:
@@ -234,8 +235,10 @@ class Parameters(list):
         obj.extend(default)
         return obj
 
+
 class ModelDict(dict):
     pass
+
 
 class Header(ParamStringValue):
     pass
@@ -379,27 +382,89 @@ class Cookie(http.cookies.Morsel):
         return self.__required
 
 
+def _get_class_of_method(method_defind):
+    vals = vars(sys.modules[method_defind.__module__])
+    for attr in method_defind.__qualname__.split('.')[:-1]:
+        if attr in vals:
+            vals = vals[attr]
+    if inspect.isclass(vals):
+        return vals
+
+
+class ControllerFunction:
+
+    def __init__(self, url: str = "",
+                 method: str = "",
+                 ctr_obj: object = None,
+                 func: Callable = None) -> None:
+        assert url is not None
+        assert func is not None and (inspect.isfunction(func) or inspect.ismethod(func))
+        self.__url: str = url
+        self.__method: str = method
+        self.__ctr_obj: object = ctr_obj
+        self.__func: Callable = func
+        self.__clz = False
+
+    @property
+    def url(self) -> str:
+        return self.__url
+
+    @property
+    def method(self) -> str:
+        return self.__method
+
+    @property
+    def clz(self) -> str:
+        if self.__clz != False:
+            return self.__clz
+        if inspect.isfunction(self.func):
+            self.__clz = _get_class_of_method(self.func)
+        else:
+            self.__clz = None
+        return self.__clz
+
+    @property
+    def ctrl_object(self) -> object:
+        if self.__ctr_obj is None and self.clz is not None:
+            self.__ctr_obj = self.__clz()
+        return self.__ctr_obj
+
+    @ctrl_object.setter
+    def ctrl_object(self, val) -> None:
+        self.__ctr_obj = val
+
+    @property
+    def func(self) -> Callable:
+        return self.__func
+
+
 __request_mappings = []
 __filters = []
+__singletion_ctrls = {}
 
 __session_facory: SessionFactory = None
 
 
+def controller(*args):
+    def map(ctr_obj):
+        __singletion_ctrls[ctr_obj] = ctr_obj()
+        return ctr_obj
+    if len(args) == 1 and inspect.isclass(args[0]):
+        return map(args[0])
+    return map
+
+
 def request_map(url: str = "", method: Union[str, list] = "", controller_function: Callable = None) -> Callable:
-    def map(ctrl_fun):
+    def map(ctrl):
         if isinstance(method, list):
             mths = method
         else:
             mths = [method]
         for mth in mths:
-            __logger.debug("map url %s with method[%s] to function %s. " % (url, mth, str(ctrl_fun)))
-            __request_mappings.append({
-                "url": url,
-                "method": mth,
-                "func": ctrl_fun
-            })
+            _logger.info(f"map url {url} with method[{mth}] to function {ctrl}. ")
+            __request_mappings.append(ControllerFunction(url=url, method=mth, func=ctrl))
         # return the original function, so you can use a decoration chain
-        return ctrl_fun
+        return ctrl
     if controller_function:
         map(controller_function)
     return map

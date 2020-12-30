@@ -39,7 +39,7 @@ from urllib.parse import unquote
 from urllib.parse import quote
 from typing import Dict, Tuple
 
-from simple_http_server import ModelDict, _get_session_factory
+from simple_http_server import ModelDict
 from simple_http_server import HttpError
 from simple_http_server import StaticFile
 from simple_http_server import Headers
@@ -55,7 +55,9 @@ from simple_http_server import Parameter
 from simple_http_server import MultipartFile
 from simple_http_server import Request
 from simple_http_server import Session
+from simple_http_server import ControllerFunction
 from simple_http_server import version
+from simple_http_server import _get_session_factory
 from simple_http_server._http_session_local_impl import SESSION_COOKIE_NAME
 
 from simple_http_server.logger import get_logger
@@ -124,10 +126,10 @@ class ResponseWrapper(Response):
 class FilterContex:
     """Context of a filter"""
 
-    def __init__(self, req, res, controller, filters=None):
+    def __init__(self, req, res, controller: ControllerFunction, filters=None):
         self.__request = req
         self.__response = res
-        self.__controller = controller
+        self.__controller: ControllerFunction = controller
         self.__filters = filters if filters is not None else []
 
     @property
@@ -138,17 +140,22 @@ class FilterContex:
     def response(self) -> Response:
         return self.__response
 
+    def _run_ctroller(self):
+        args = self.__prepare_args()
+        kwargs = self.__prepare_kwargs()
+
+        if kwargs is None:
+            ctr_res = self.__controller.func(*args)
+        else:
+            ctr_res = self.__controller.func(*args, **kwargs)
+        return ctr_res
+
     def do_chain(self):
         if self.response.is_sent:
             return
         if len(self.__filters) == 0:
-            args = self.__prepare_args()
-            kwargs = self.__prepare_kwargs()
 
-            if kwargs is None:
-                ctr_res = self.__controller(*args)
-            else:
-                ctr_res = self.__controller(*args, **kwargs)
+            ctr_res = self._run_ctroller()
 
             session = self.request.get_session()
             if session and session.is_valid:
@@ -218,13 +225,19 @@ class FilterContex:
         return status_code, headers, cks, body
 
     def __prepare_args(self):
-        args = _get_args_(self.__controller)
+        args = _get_args_(self.__controller.func)
         arg_vals = []
         for arg, arg_type_anno in args:
-            if arg not in self.request.parameter.keys() and arg_type_anno not in (Request, Session, Response, Headers, cookies.BaseCookie, cookies.SimpleCookie, Cookies, PathValue, JSONBody, ModelDict):
+            if arg == "self" and self.__controller.ctrl_object is not None:
+                arg_vals.append(self.__controller.ctrl_object)
+                continue
+            if arg not in self.request.parameter.keys() \
+                    and arg_type_anno not in (Request, Session, Response, Headers, cookies.BaseCookie, cookies.SimpleCookie, Cookies, PathValue, JSONBody, ModelDict):
                 raise HttpError(400, f"Parameter[{arg}] is required! ")
             param = self.__get_params_(arg, arg_type_anno)
             arg_vals.append(param)
+
+        
         return arg_vals
 
     def __get_params_(self, arg, arg_type, val=None, type_check=True):
@@ -287,7 +300,7 @@ class FilterContex:
         return mdict
 
     def __prepare_kwargs(self):
-        kwargs = _get_kwargs_(self.__controller)
+        kwargs = _get_kwargs_(self.__controller.func)
         if kwargs is None:
             return None
         kwarg_vals = {}
@@ -627,10 +640,10 @@ class _SimpleDispatcherHttpRequestHandler(http.server.BaseHTTPRequestHandler):
         else:
             params[key].append(val)
 
-    def _send_response(self, response):        
+    def _send_response(self, response):
         headers = response["headers"]
         cks = response["cookies"]
-        
+
         status_code, content_type, body = self.__prepare_res_body(response)
 
         if "Content-Type" not in headers.keys() and "content-type" not in headers.keys():
@@ -654,11 +667,11 @@ class _SimpleDispatcherHttpRequestHandler(http.server.BaseHTTPRequestHandler):
             self.send_header("Content-Length", 0)
             self.end_headers()
         elif isinstance(body, str):
-                data = body.encode("utf-8")
-                self.send_header("Content-Length", len(data))
-                self.end_headers()
-                self.wfile.write(data)
-            
+            data = body.encode("utf-8")
+            self.send_header("Content-Length", len(data))
+            self.end_headers()
+            self.wfile.write(data)
+
         elif isinstance(body, bytes):
             self.send_header("Content-Length", len(body))
             self.end_headers()
@@ -808,18 +821,19 @@ class _HttpServerWrapper(http.server.HTTPServer):
             quoted_names.append(quote(name))
         return _url, quoted_names
 
-    def map_url(self, url, func, method=""):
-        assert url is not None
-        assert func is not None and (inspect.isfunction(func) or inspect.ismethod(func))
+    def map_url(self, ctrl: ControllerFunction):
+        url = ctrl.url
+        method = ctrl.method
         assert method is None or method == "" or method.upper() in _HttpServerWrapper.HTTP_METHODS
+        _logger.debug(f"map url {url} with method[{method}] to function {ctrl}. ")
         _method = method.upper() if method is not None and method != "" else "_"
         _url = _remove_url_first_slash(url)
 
         path_pattern, path_names = self.__get_path_reg_pattern(_url)
         if path_pattern is None:
-            self.method_url_mapping[_method][_url] = func
+            self.method_url_mapping[_method][_url] = ctrl
         else:
-            self.path_val_url_mapping[_method][path_pattern] = (func, path_names)
+            self.path_val_url_mapping[_method][path_pattern] = (ctrl, path_names)
 
     def _res_(self, path, res_pre, res_dir):
         fpath = os.path.join(res_dir, path.replace(res_pre, ""))
@@ -905,8 +919,8 @@ class SimpleDispatcherHttpServer(object):
     def map_filter(self, path_pattern, filter_fun):
         self.server.map_filter(path_pattern, filter_fun)
 
-    def map_request(self, url, fun, method=""):
-        self.server.map_url(url, fun, method)
+    def map_request(self, ctrl: ControllerFunction):
+        self.server.map_url(ctrl)
 
     def __init__(self,
                  host: Tuple[str, int] = ('', 9090),

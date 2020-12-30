@@ -132,7 +132,7 @@ def start(host: str = "",
     __request_mappings = _get_request_mappings()
     # request mapping
     for ctr in __request_mappings:
-        __server.map_request(ctr["url"], ctr["func"], ctr["method"])
+        __server.map_request(ctr)
 
     # start the server
     __server.start()
