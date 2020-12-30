@@ -228,7 +228,7 @@ class FilterContex:
         return arg_vals
 
     def __get_params_(self, arg, arg_type, val=None, type_check=True):
-        if val:
+        if val is not None:
             kws = {"val": val}
         else:
             kws = {}
@@ -775,13 +775,14 @@ class _HttpServerWrapper(http.server.HTTPServer, object):
 
     def __get_path_reg_pattern(self, url):
         _url = url
-        path_names = re.findall(r"(?u)\\{\\w+\\}", _url)
+        path_names = re.findall("(?u)\\{\\w+\\}", _url)
+        _logger.debug(f"url::{url} find path values {path_names}")
         if len(path_names) == 0:
             # normal url
             return None, path_names
         for name in path_names:
-            _url = _url.replace(name, r"([\\w%.-@!\\(\\)\\[\\]\\|\\$]+)")
-        _url = "^%s$" % _url
+            _url = _url.replace(name, "([\\w%.-@!\\(\\)\\[\\]\\|\\$]+)")
+        _url = f"^{_url}$"
 
         quoted_names = []
         for name in path_names:
