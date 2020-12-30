@@ -195,9 +195,9 @@ class FilterContex:
             if not self.response.is_sent:
                 self.response.send_response()
         else:
-            fun = self.__filters[0]
+            func = self.__filters[0]
             self.__filters = self.__filters[1:]
-            fun(self)
+            func(self)
 
     def __decode_tuple_response(self, ctr_res):
         status_code = None
@@ -627,13 +627,11 @@ class _SimpleDispatcherHttpRequestHandler(http.server.BaseHTTPRequestHandler):
         else:
             params[key].append(val)
 
-    def _send_response(self, response):
-        status_code = response["status_code"]
+    def _send_response(self, response):        
         headers = response["headers"]
         cks = response["cookies"]
-        raw_body = response["body"]
-
-        content_type, body = self.__prepare_res_body(raw_body)
+        
+        status_code, content_type, body = self.__prepare_res_body(response)
 
         if "Content-Type" not in headers.keys() and "content-type" not in headers.keys():
             headers["Content-Type"] = content_type
@@ -656,16 +654,11 @@ class _SimpleDispatcherHttpRequestHandler(http.server.BaseHTTPRequestHandler):
             self.send_header("Content-Length", 0)
             self.end_headers()
         elif isinstance(body, str):
-            try:
                 data = body.encode("utf-8")
                 self.send_header("Content-Length", len(data))
                 self.end_headers()
                 self.wfile.write(data)
-            except:
-                # for python 2.7
-                self.send_header("Content-Length", len(body))
-                self.end_headers()
-                self.wfile.write(body)
+            
         elif isinstance(body, bytes):
             self.send_header("Content-Length", len(body))
             self.end_headers()
@@ -681,7 +674,9 @@ class _SimpleDispatcherHttpRequestHandler(http.server.BaseHTTPRequestHandler):
                     self.wfile.write(data)
                     data = in_file.read(buffer_size)
 
-    def __prepare_res_body(self, raw_body):
+    def __prepare_res_body(self, response: Response):
+        status_code = response["status_code"]
+        raw_body = response["body"]
         content_type = "text/plain; chartset=utf8"
         if raw_body is None:
             body = ""
@@ -699,14 +694,22 @@ class _SimpleDispatcherHttpRequestHandler(http.server.BaseHTTPRequestHandler):
             else:
                 content_type = "text/plain; charset=utf8"
         elif isinstance(raw_body, StaticFile):
-            body = raw_body
-            content_type = body.content_type
+            if not os.path.isfile(raw_body.file_path):
+                _logger.error(f"Cannot find file[{raw_body.file_path}] specified in StaticFile body.")
+                status_code = 404
+                content_type = "application/json; charset=utf8"
+                body = json.dumps({
+                    "error": "Cannot find file for this url."
+                }, ensure_ascii=False)
+            else:
+                body = raw_body
+                content_type = body.content_type
         elif isinstance(raw_body, bytes):
             body = raw_body
             content_type = "application/octet-stream"
         else:
             body = raw_body
-        return content_type, body
+        return status_code, content_type, body
 
     def do_method(self, method):
         self.__process(method)
@@ -740,7 +743,7 @@ class _SimpleDispatcherHttpRequestHandler(http.server.BaseHTTPRequestHandler):
         _logger.info(f"{self.client_address[0]} - {format % args}")
 
 
-class _HttpServerWrapper(http.server.HTTPServer, object):
+class _HttpServerWrapper(http.server.HTTPServer):
 
     HTTP_METHODS = ["OPTIONS", "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT"]
 
@@ -753,15 +756,19 @@ class _HttpServerWrapper(http.server.HTTPServer, object):
             self.path_val_url_mapping[mth] = {}
 
         self.filter_mapping = OrderedDict()
-        self._res_conf = {}
-        self.res_conf = res_conf
+        self._res_conf = []
+        self.add_res_conf(res_conf)
 
     @property
     def res_conf(self):
         return self._res_conf
 
     @res_conf.setter
-    def res_conf(self, val):
+    def res_conf(self, val: Dict[str, str]):
+        self._res_conf.clear()
+        self.add_res_conf(val)
+
+    def add_res_conf(self, val):
         if not val or not isinstance(val, dict):
             return
         for res_k, v in val.items():
@@ -782,7 +789,8 @@ class _HttpServerWrapper(http.server.HTTPServer, object):
                 val = v
             else:
                 val = v + os.path.sep
-            self._res_conf[key] = val
+            self._res_conf.append((key, val))
+        self._res_conf.sort(key=lambda it: -len(it[0]))
 
     def __get_path_reg_pattern(self, url):
         _url = url
@@ -800,25 +808,23 @@ class _HttpServerWrapper(http.server.HTTPServer, object):
             quoted_names.append(quote(name))
         return _url, quoted_names
 
-    def map_url(self, url, fun, method=""):
+    def map_url(self, url, func, method=""):
         assert url is not None
-        assert fun is not None and (inspect.isfunction(fun) or inspect.ismethod(fun))
+        assert func is not None and (inspect.isfunction(func) or inspect.ismethod(func))
         assert method is None or method == "" or method.upper() in _HttpServerWrapper.HTTP_METHODS
         _method = method.upper() if method is not None and method != "" else "_"
         _url = _remove_url_first_slash(url)
 
         path_pattern, path_names = self.__get_path_reg_pattern(_url)
         if path_pattern is None:
-            self.method_url_mapping[_method][_url] = fun
+            self.method_url_mapping[_method][_url] = func
         else:
-            self.path_val_url_mapping[_method][path_pattern] = (fun, path_names)
+            self.path_val_url_mapping[_method][path_pattern] = (func, path_names)
 
     def _res_(self, path, res_pre, res_dir):
         fpath = os.path.join(res_dir, path.replace(res_pre, ""))
         _logger.debug(f"static file. {path} :: {fpath}")
-        if not os.path.exists(fpath):
-            raise HttpError(404, "")
-        fname, fext = os.path.splitext(fpath)
+        fext = os.path.splitext(fpath)[1]
         ext = fext.lower()
         if ext in (".html", ".htm", ".xhtml"):
             content_type = "text/html"
@@ -857,20 +863,11 @@ class _HttpServerWrapper(http.server.HTTPServer, object):
             if fun_and_val is not None:
                 return fun_and_val
             else:
-                match_res_conf = []
-                for k, v in self.res_conf.items():
+                for k, v in self.res_conf:
                     if path.startswith(k):
-                        match_res_conf.append((k, v))
-                if match_res_conf:
-                    kk, vv = match_res_conf[0]
-                    for k, v in match_res_conf[1:]:
-                        if len(k) > len(kk):
-                            _logger.debug(f"path[{k}] is more detailed than [{kk}], use it for [{path}]")
-                            kk, vv = k, v
-
-                    def static_fun():
-                        return self._res_(path, kk, vv)
-                    return static_fun, {}
+                        def static_fun():
+                            return self._res_(path, k, v)
+                        return static_fun, {}
                 return None, {}
 
     def __try_get_from_path_val(self, path, method):
