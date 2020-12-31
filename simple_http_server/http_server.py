@@ -227,17 +227,18 @@ class FilterContex:
     def __prepare_args(self):
         args = _get_args_(self.__controller.func)
         arg_vals = []
-        for arg, arg_type_anno in args:
-            if arg == "self" and self.__controller.ctrl_object is not None:
+        if len(args) > 0 and args[0][0] == "self":
+            ctr_obj = self.__controller.ctrl_object
+            if ctr_obj is not None:
                 arg_vals.append(self.__controller.ctrl_object)
-                continue
+                args = args[1:]
+        for arg, arg_type_anno in args:
             if arg not in self.request.parameter.keys() \
                     and arg_type_anno not in (Request, Session, Response, Headers, cookies.BaseCookie, cookies.SimpleCookie, Cookies, PathValue, JSONBody, ModelDict):
                 raise HttpError(400, f"Parameter[{arg}] is required! ")
             param = self.__get_params_(arg, arg_type_anno)
             arg_vals.append(param)
 
-        
         return arg_vals
 
     def __get_params_(self, arg, arg_type, val=None, type_check=True):
@@ -825,7 +826,6 @@ class _HttpServerWrapper(http.server.HTTPServer):
         url = ctrl.url
         method = ctrl.method
         assert method is None or method == "" or method.upper() in _HttpServerWrapper.HTTP_METHODS
-        _logger.debug(f"map url {url} with method[{method}] to function {ctrl}. ")
         _method = method.upper() if method is not None and method != "" else "_"
         _url = _remove_url_first_slash(url)
 

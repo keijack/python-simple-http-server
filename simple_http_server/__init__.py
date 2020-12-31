@@ -391,6 +391,20 @@ def _get_class_of_method(method_defind):
         return vals
 
 
+def _create_object(clz, args=[], kwargs={}):
+
+    if clz is None:
+        return None
+    elif args and kwargs:
+        return clz(*args, **kwargs)
+    elif args:
+        return clz(*args)
+    elif kwargs:
+        return clz(**kwargs)
+    else:
+        return clz()
+
+
 class ControllerFunction:
 
     def __init__(self, url: str = "",
@@ -401,6 +415,9 @@ class ControllerFunction:
         assert func is not None and (inspect.isfunction(func) or inspect.ismethod(func))
         self.__url: str = url
         self.__method: str = method
+        self.singletion: bool = False
+        self.ctr_obj_init_args = None
+        self.ctr_obj_init_kwargs = None
         self.__ctr_obj: object = ctr_obj
         self.__func: Callable = func
         self.__clz = False
@@ -425,9 +442,20 @@ class ControllerFunction:
 
     @property
     def ctrl_object(self) -> object:
-        if self.__ctr_obj is None and self.clz is not None:
-            self.__ctr_obj = self.__clz()
+        if not self.singletion:
+            obj = self._create_ctrl_obj()
+            _logger.debug(f"singleton: create a object -> {obj}")
+            return obj
+
+        if self.__ctr_obj is None:
+            self.__ctr_obj = self._create_ctrl_obj()
+            _logger.debug(f"object does not exist, create one -> {self.__ctr_obj} ")
+        else:
+            _logger.debug(f"object[{self.__ctr_obj}] exists, return. ")
         return self.__ctr_obj
+
+    def _create_ctrl_obj(self) -> object:
+        return _create_object(self.clz, self.ctr_obj_init_args, self.ctr_obj_init_kwargs)
 
     @ctrl_object.setter
     def ctrl_object(self, val) -> None:
@@ -438,19 +466,21 @@ class ControllerFunction:
         return self.__func
 
 
-__request_mappings = []
-__filters = []
-__singletion_ctrls = {}
+_request_mappings: List[ControllerFunction] = []
+_filters = []
+_ctrls = {}
+_ctrl_singletons = {}
 
-__session_facory: SessionFactory = None
+_session_facory: SessionFactory = None
 
 
-def controller(*args):
-    def map(ctr_obj):
-        __singletion_ctrls[ctr_obj] = ctr_obj()
-        return ctr_obj
-    if len(args) == 1 and inspect.isclass(args[0]):
-        return map(args[0])
+def controller(*anno_args, singleton: bool = True, args: List[Any] = [], kwargs: Dict[str, Any] = {}):
+    def map(ctr_obj_class):
+        _logger.debug(f"map controller[{ctr_obj_class}]({singleton}) with args: {args}, and kwargs: {kwargs})")
+        _ctrls[ctr_obj_class] = (singleton, args, kwargs)
+        return ctr_obj_class
+    if len(anno_args) == 1 and inspect.isclass(anno_args[0]):
+        return map(anno_args[0])
     return map
 
 
@@ -462,7 +492,7 @@ def request_map(url: str = "", method: Union[str, list] = "", controller_functio
             mths = [method]
         for mth in mths:
             _logger.info(f"map url {url} with method[{mth}] to function {ctrl}. ")
-            __request_mappings.append(ControllerFunction(url=url, method=mth, func=ctrl))
+            _request_mappings.append(ControllerFunction(url=url, method=mth, func=ctrl))
         # return the original function, so you can use a decoration chain
         return ctrl
     if controller_function:
@@ -472,7 +502,7 @@ def request_map(url: str = "", method: Union[str, list] = "", controller_functio
 
 def filter_map(pattern: str = "", filter_function: Callable = None) -> Callable:
     def map(filter_fun):
-        __filters.append({"url_pattern": pattern, "func": filter_fun})
+        _filters.append({"url_pattern": pattern, "func": filter_fun})
         return filter_fun
     if filter_function:
         map(filter_function)
@@ -480,17 +510,31 @@ def filter_map(pattern: str = "", filter_function: Callable = None) -> Callable:
 
 
 def set_session_factory(session_factory: SessionFactory):
-    global __session_facory
-    __session_facory = session_factory
+    global _session_facory
+    _session_facory = session_factory
+
+
+def _get_singletion(clz, args, kwargs):
+    if clz not in _ctrl_singletons:
+        _ctrl_singletons[clz] = _create_object(clz, args, kwargs)
+    return _ctrl_singletons[clz]
 
 
 def _get_request_mappings():
-    return __request_mappings
+    for ctr_fun in _request_mappings:
+        if ctr_fun.clz is not None and ctr_fun.clz in _ctrls:
+            singleton, args, kwargs = _ctrls[ctr_fun.clz]
+            ctr_fun.singletion = singleton
+            ctr_fun.ctr_obj_init_args = args
+            ctr_fun.ctr_obj_init_kwargs = kwargs
+            if singleton:
+                ctr_fun.ctrl_object = _get_singletion(ctr_fun.clz, args, kwargs)
+    return _request_mappings
 
 
 def _get_filters():
-    return __filters
+    return _filters
 
 
 def _get_session_factory() -> SessionFactory:
-    return __session_facory
+    return _session_facory
