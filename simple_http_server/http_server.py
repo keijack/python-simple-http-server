@@ -825,6 +825,7 @@ class _HttpServerWrapper(http.server.HTTPServer):
     def map_url(self, ctrl: ControllerFunction):
         url = ctrl.url
         method = ctrl.method
+        _logger.debug(f"map url {url} with method[{method}] to function {ctrl.func}. ")
         assert method is None or method == "" or method.upper() in _HttpServerWrapper.HTTP_METHODS
         _method = method.upper() if method is not None and method != "" else "_"
         _url = _remove_url_first_slash(url)

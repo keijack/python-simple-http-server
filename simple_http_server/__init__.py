@@ -467,7 +467,10 @@ class ControllerFunction:
 
 
 _request_mappings: List[ControllerFunction] = []
+_request_clz_mapping: Dict[Any, Tuple[str, Union[str, list]]] = {}
+
 _filters = []
+
 _ctrls = {}
 _ctrl_singletons = {}
 
@@ -484,19 +487,21 @@ def controller(*anno_args, singleton: bool = True, args: List[Any] = [], kwargs:
     return map
 
 
-def request_map(url: str = "", method: Union[str, list] = "", controller_function: Callable = None) -> Callable:
+def request_map(url: str = "", method: Union[str, list] = "") -> Callable:
     def map(ctrl):
+        if inspect.isclass(ctrl):
+            _request_clz_mapping[ctrl] = (url, method)
+            return ctrl
+
         if isinstance(method, list):
             mths = method
         else:
             mths = [method]
         for mth in mths:
-            _logger.info(f"map url {url} with method[{mth}] to function {ctrl}. ")
+            _logger.debug(f"map url {url} with method[{mth}] to function {ctrl}. ")
             _request_mappings.append(ControllerFunction(url=url, method=mth, func=ctrl))
         # return the original function, so you can use a decoration chain
         return ctrl
-    if controller_function:
-        map(controller_function)
     return map
 
 
@@ -521,15 +526,46 @@ def _get_singletion(clz, args, kwargs):
 
 
 def _get_request_mappings():
+    mappings: List[ControllerFunction] = []
+
     for ctr_fun in _request_mappings:
-        if ctr_fun.clz is not None and ctr_fun.clz in _ctrls:
-            singleton, args, kwargs = _ctrls[ctr_fun.clz]
+        clz = ctr_fun.clz
+        if clz is not None and clz in _request_clz_mapping:
+            clz_url, method = _request_clz_mapping[clz]
+            fun_url = ctr_fun.url
+            if fun_url:
+                if not clz_url.endswith("/"):
+                    clz_url = clz_url + "/"
+                if fun_url.startswith("/"):
+                    fun_url = fun_url[1:]
+                full_url = f"{clz_url}{fun_url}"
+            else:
+                full_url = clz_url
+            if not ctr_fun.method and method:
+                if isinstance(method, list):
+                    mths = method
+                else:
+                    mths = [method]
+                for mth in mths:
+                    _logger.debug(f"map url {full_url} included [{clz_url}] with method[{mth}] to function {ctr_fun.func}. ")
+                    mappings.append(ControllerFunction(url=full_url, method=mth, func=ctr_fun.func))
+            else:
+                _logger.debug(f"map url {full_url} included [{clz_url}] with method[{ctr_fun.method}] to function {ctr_fun.func}. ")
+                mappings.append(ControllerFunction(url=full_url, method=ctr_fun.method, func=ctr_fun.func))
+        else:
+            mappings.append(ctr_fun)
+
+    for ctr_fun in mappings:
+        clz = ctr_fun.clz
+        if clz is not None and clz in _ctrls:
+            singleton, args, kwargs = _ctrls[clz]
             ctr_fun.singletion = singleton
             ctr_fun.ctr_obj_init_args = args
             ctr_fun.ctr_obj_init_kwargs = kwargs
             if singleton:
-                ctr_fun.ctrl_object = _get_singletion(ctr_fun.clz, args, kwargs)
-    return _request_mappings
+                ctr_fun.ctrl_object = _get_singletion(clz, args, kwargs)
+
+    return mappings
 
 
 def _get_filters():
