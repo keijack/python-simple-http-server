@@ -487,7 +487,7 @@ def controller(*anno_args, singleton: bool = True, args: List[Any] = [], kwargs:
     return map
 
 
-def request_map(*anno_args, url: str = "", method: Union[str, list] = "") -> Callable:
+def request_map(*anno_args, url: str = "", method: Union[str, list, tuple] = "") -> Callable:
     _url = url
     len_args = len(anno_args)
     assert len_args <= 1
@@ -501,14 +501,17 @@ def request_map(*anno_args, url: str = "", method: Union[str, list] = "") -> Cal
             arg_ctrl = anno_args[0]
 
     def map(ctrl):
-        if inspect.isclass(ctrl):
-            _request_clz_mapping[ctrl] = (_url, method)
-            return ctrl
-
         if isinstance(method, list):
             mths = method
+        elif isinstance(method, tuple):
+            mths = list(method)
         else:
-            mths = [method]
+            mths = [m.strip() for m in method.split(',')]
+
+        if inspect.isclass(ctrl):
+            _request_clz_mapping[ctrl] = (_url, mths)
+            return ctrl
+
         for mth in mths:
             _logger.debug(f"map url {_url} with method[{mth}] to function {ctrl}. ")
             _request_mappings.append(ControllerFunction(url=_url, method=mth, func=ctrl))
@@ -550,7 +553,7 @@ def _get_request_mappings():
     for ctr_fun in _request_mappings:
         clz = ctr_fun.clz
         if clz is not None and clz in _request_clz_mapping:
-            clz_url, method = _request_clz_mapping[clz]
+            clz_url, methods = _request_clz_mapping[clz]
             fun_url = ctr_fun.url
             if fun_url:
                 if not clz_url.endswith("/"):
@@ -560,12 +563,8 @@ def _get_request_mappings():
                 full_url = f"{clz_url}{fun_url}"
             else:
                 full_url = clz_url
-            if not ctr_fun.method and method:
-                if isinstance(method, list):
-                    mths = method
-                else:
-                    mths = [method]
-                for mth in mths:
+            if not ctr_fun.method and methods:
+                for mth in methods:
                     _logger.debug(f"map url {full_url} included [{clz_url}] with method[{mth}] to function {ctr_fun.func}. ")
                     mappings.append(ControllerFunction(url=full_url, method=mth, func=ctr_fun.func))
             else:
