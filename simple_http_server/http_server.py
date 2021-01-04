@@ -37,7 +37,7 @@ from collections import OrderedDict
 from socketserver import ThreadingMixIn
 from urllib.parse import unquote
 from urllib.parse import quote
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple
 
 from simple_http_server import ModelDict
 from simple_http_server import HttpError
@@ -257,7 +257,7 @@ class FilterContex:
             param = Headers(self.request.headers)
         elif arg_type == Header:
             param = self.__build_header(arg, **kws)
-        elif issubclass(arg_type, cookies.BaseCookie):
+        elif inspect.isclass(arg_type) and issubclass(arg_type, cookies.BaseCookie):
             param = self.request.cookies
         elif arg_type == Cookie:
             param = self.__build_cookie(arg, **kws)
@@ -279,11 +279,11 @@ class FilterContex:
             param = self.__build_int(arg, **kws)
         elif arg_type == float:
             param = self.__build_float(arg, **kws)
-        elif arg_type == list:
-            param = self.__build_list(arg, **kws)
+        elif arg_type in (list, List, List[str], List[Parameter], List[int], List[float], List[bool], List[dict], List[Dict]):
+            param = self.__build_list(arg, target_type=arg_type, **kws)
         elif arg_type == ModelDict:
             param = self.__build_model_dict()
-        elif arg_type == dict:
+        elif arg_type in (dict, Dict):
             param = self.__build_dict(arg, **kws)
         elif type_check:
             raise HttpError(400, f"Parameter[{arg}] with Type {arg_type} is not supported yet.")
@@ -348,15 +348,37 @@ class FilterContex:
             try:
                 return json.loads(self.request.parameter[key])
             except:
-                raise HttpError(400, f"Parameter[{key}] should be a JSON type string.")
+                raise HttpError(400, f"Parameter[{key}] should be a JSON string.")
         else:
             return val
 
-    def __build_list(self, key, val=[]):
+    def __build_list(self, key, target_type=list, val=[]):
         if key in self.request.parameters.keys():
-            return self.request.parameters[key]
+            ori_list = self.request.parameters[key]
         else:
-            return val
+            ori_list = val
+
+        if target_type == List[int]:
+            try:
+                return [int(p) for p in ori_list]
+            except:
+                raise HttpError(400, f"One of the parameter[{key}] is not int. ")
+        elif target_type == List[float]:
+            try:
+                return [float(p) for p in ori_list]
+            except:
+                raise HttpError(400, f"One of the parameter[{key}] is not float. ")
+        elif target_type == List[bool]:
+            return [p.lower() not in ("0", "false", "") for p in ori_list]
+        elif target_type in (List[dict], List[Dict]):
+            try:
+                return [json.loads(p) for p in ori_list]
+            except:
+                raise HttpError(400, f"One of the parameter[{key}] is not JSON string. ")
+        elif target_type == List[Parameter]:
+            return [Parameter(name=key, default=p, required=False) for p in ori_list]
+        else:
+            return ori_list
 
     def __build_float(self, key, val=None):
         if key in self.request.parameter.keys():
