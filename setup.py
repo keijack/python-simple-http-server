@@ -14,7 +14,7 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/keijack/python-simple-http-server",
-    packages=setuptools.find_packages(),
+    packages=["simple_http_server"],
     classifiers=[
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
