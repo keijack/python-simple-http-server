@@ -162,7 +162,7 @@ def your_ctroller_function(
     return "<html><body>Hello, World!</body></html>"
 ```
 
-We recommend using functional programing to write controller functions. but if you realy want to use Object, you should create the object, and pass the method from the object. 
+We recommend using functional programing to write controller functions. but if you realy want to use Object, you can use `@request_map` in a class method. For doing this, every time a new request comes, a new MyController object will be created.
 
 ```python
 
@@ -171,13 +171,67 @@ class MyController:
     def __init__(self) -> None:
         self._name = "ctr object"
 
+    @request_map("/obj/say_hello", method="GET")
     def my_ctrl_mth(self, name: str):
         return {"message": f"hello, {name}, {self._name} says. "}
 
+```
 
-my_ctrl_obj = MyController()
+If you want a singleton, you can add a `@controller` decorator to the class.
 
-request_map("/obj/say_hello", method="GET", controller_function=my_ctrl_obj.my_ctrl_mth)
+```python
+
+@controller
+class MyController:
+
+    def __init__(self) -> None:
+        self._name = "ctr object"
+
+    @request_map("/obj/say_hello", method="GET")
+    def my_ctrl_mth(self, name: str):
+        return {"message": f"hello, {name}, {self._name} says. "}
+
+```
+
+You can also add the `@request_map` to your class, this will be as the part of the url.
+
+```python
+
+@controller
+@request_map("/obj", method="GET")
+class MyController:
+
+    def __init__(self) -> None:
+        self._name = "ctr object"
+
+    @request_map
+    def my_ctrl_default_mth(self, name: str):
+        return {"message": f"hello, {name}, {self._name} says. "}
+
+    @request_map("/say_hello", method=("GET", "POST"))
+    def my_ctrl_mth(self, name: str):
+        return {"message": f"hello, {name}, {self._name} says. "}
+
+```
+
+You can specify the `init` variables in `@controller` decorator. 
+
+```python
+
+@controller(args=["ctr_name"], kwargs={"desc": "this is a key word argument"})
+@request_map("/obj", method="GET")
+class MyController:
+
+    def __init__(self, name, desc="") -> None:
+        self._name = f"ctr[{name}] - {desc}"
+
+    @request_map
+    def my_ctrl_default_mth(self, name: str):
+        return {"message": f"hello, {name}, {self._name} says. "}
+
+    @request_map("/say_hello", method=("GET", "POST"))
+    def my_ctrl_mth(self, name: str):
+        return {"message": f"hello, {name}, {self._name} says. "}
 
 ```
 

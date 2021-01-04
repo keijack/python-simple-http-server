@@ -249,7 +249,7 @@ def your_ctroller_function(
     return "<html><body>Hello, World!</body></html>"
 ```
 
-我们建议使用函数式编程来编写你的控制器（Controller），不过你更喜欢使用对象的话，你可以将你的对象先创建出来，然后将对象方法传入 request_map():
+我们建议使用函数式编程来编写你的控制器（Controller），不过你更喜欢使用对象的话，你可以将你的`@request_map` 用在类方法上，下面的例子中，每一个请求进来之后，系统会自动创建一个对象来调用该方法。:
 
 ```python
 
@@ -258,13 +258,67 @@ class MyController:
     def __init__(self) -> None:
         self._name = "ctr object"
 
+    @request_map("/obj/say_hello", method="GET")
     def my_ctrl_mth(self, name: str):
         return {"message": f"hello, {name}, {self._name} says. "}
 
+```
 
-my_ctrl_obj = MyController()
+如果你想使得控制类为单例的话，你可以使用 `@controller` 装饰器。
 
-request_map("/obj/say_hello", method="GET", controller_function=my_ctrl_obj.my_ctrl_mth)
+```python
+
+@controller
+class MyController:
+
+    def __init__(self) -> None:
+        self._name = "ctr object"
+
+    @request_map("/obj/say_hello", method="GET")
+    def my_ctrl_mth(self, name: str):
+        return {"message": f"hello, {name}, {self._name} says. "}
+
+```
+
+你也可以在类上使用 `@request_map`，类上的路径会作为访问路径的一部分。
+
+```python
+
+@controller
+@request_map("/obj", method="GET")
+class MyController:
+
+    def __init__(self) -> None:
+        self._name = "ctr object"
+
+    @request_map
+    def my_ctrl_default_mth(self, name: str):
+        return {"message": f"hello, {name}, {self._name} says. "}
+
+    @request_map("/say_hello", method=("GET", "POST"))
+    def my_ctrl_mth(self, name: str):
+        return {"message": f"hello, {name}, {self._name} says. "}
+
+```
+
+如果你的类有初始化变量，你也可以在 `@controller` 中设定。
+
+```python
+
+@controller(args=["ctr_name"], kwargs={"desc": "this is a key word argument"})
+@request_map("/obj", method="GET")
+class MyController:
+
+    def __init__(self, name, desc="") -> None:
+        self._name = f"ctr[{name}] - {desc}"
+
+    @request_map
+    def my_ctrl_default_mth(self, name: str):
+        return {"message": f"hello, {name}, {self._name} says. "}
+
+    @request_map("/say_hello", method=("GET", "POST"))
+    def my_ctrl_mth(self, name: str):
+        return {"message": f"hello, {name}, {self._name} says. "}
 
 ```
 
