@@ -487,10 +487,22 @@ def controller(*anno_args, singleton: bool = True, args: List[Any] = [], kwargs:
     return map
 
 
-def request_map(url: str = "", method: Union[str, list] = "") -> Callable:
+def request_map(*anno_args, url: str = "", method: Union[str, list] = "") -> Callable:
+    _url = url
+    len_args = len(anno_args)
+    assert len_args <= 1
+
+    arg_ctrl = None
+    if len_args == 1:
+        if isinstance(anno_args[0], str):
+            assert not url
+            _url = anno_args[0]
+        elif callable(anno_args[0]):
+            arg_ctrl = anno_args[0]
+
     def map(ctrl):
         if inspect.isclass(ctrl):
-            _request_clz_mapping[ctrl] = (url, method)
+            _request_clz_mapping[ctrl] = (_url, method)
             return ctrl
 
         if isinstance(method, list):
@@ -498,11 +510,18 @@ def request_map(url: str = "", method: Union[str, list] = "") -> Callable:
         else:
             mths = [method]
         for mth in mths:
-            _logger.debug(f"map url {url} with method[{mth}] to function {ctrl}. ")
-            _request_mappings.append(ControllerFunction(url=url, method=mth, func=ctrl))
+            _logger.debug(f"map url {_url} with method[{mth}] to function {ctrl}. ")
+            _request_mappings.append(ControllerFunction(url=_url, method=mth, func=ctrl))
         # return the original function, so you can use a decoration chain
         return ctrl
-    return map
+
+    if arg_ctrl:
+        return map(arg_ctrl)
+    else:
+        return map
+
+
+route = request_map
 
 
 def filter_map(pattern: str = "", filter_function: Callable = None) -> Callable:
