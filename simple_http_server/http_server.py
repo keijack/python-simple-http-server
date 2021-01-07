@@ -452,7 +452,7 @@ class FilterContex:
 
 def _get_args_(func):
     argspec = inspect.getfullargspec(func)
-    # ignore `self`
+    # ignore first argument like `self` or `clz` in object methods or class methods
     start = 1 if inspect.ismethod(func) else 0
     if argspec.defaults is None:
         args = argspec.args[start:]
