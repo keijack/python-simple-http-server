@@ -235,6 +235,36 @@ class MyController:
 
 ```
 
+From `0.7.0`, `@request_map` support regular expression mapping. 
+
+```python
+# url `/reg/abcef/aref/xxx` can map the flowing controller:
+@route(regexp="^(reg/(.+))$", method="GET")
+def my_reg_ctr(reg_groups: RegGroups, reg_group: RegGroup = RegGroup(1)):
+    print(reg_groups) # will output ("reg/abcef/aref/xxx", "abcef/aref/xxx")
+    print(reg_group) # will output "abcef/aref/xxx"
+    return f"{self._name}, {reg_group.group},{reg_group}"
+```
+Regular expression mapping a class:
+
+```python
+@controller(args=["ctr_name"], kwargs={"desc": "this is a key word argument"})
+@request_map("/obj", method="GET") # regexp do not work here, method will still available
+class MyController:
+
+    def __init__(self, name, desc="") -> None:
+        self._name = f"ctr[{name}] - {desc}"
+
+    @request_map
+    def my_ctrl_default_mth(self, name: str):
+        return {"message": f"hello, {name}, {self._name} says. "}
+
+    @route(regexp="^(reg/(.+))$") # prefix `/obj`  from class decorator will be ignored, but `method`(GET in this example) from class decorator will still work.
+    def my_ctrl_mth(self, name: str):
+        return {"message": f"hello, {name}, {self._name} says. "}
+
+```
+
 ### Session
 
 Defaultly, the session is stored in local, you can extend `SessionFactory` and `Session` classes to implement your own session storage requirement (like store all data in redis or memcache)

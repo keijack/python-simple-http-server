@@ -37,27 +37,11 @@ from collections import OrderedDict
 from socketserver import ThreadingMixIn
 from urllib.parse import unquote
 from urllib.parse import quote
-from typing import Dict, List, Tuple
+from typing import Callable, Dict, List, Tuple
 
-from simple_http_server import ModelDict
-from simple_http_server import HttpError
-from simple_http_server import StaticFile
-from simple_http_server import Headers
-from simple_http_server import Redirect
-from simple_http_server import Response
-from simple_http_server import Cookies
-from simple_http_server import Cookie
-from simple_http_server import JSONBody
-from simple_http_server import Header
-from simple_http_server import Parameters
-from simple_http_server import PathValue
-from simple_http_server import Parameter
-from simple_http_server import MultipartFile
-from simple_http_server import Request
-from simple_http_server import Session
-from simple_http_server import ControllerFunction
-from simple_http_server import version
-from simple_http_server import _get_session_factory
+from simple_http_server import ModelDict, RegGroup, RegGroups, HttpError, StaticFile, \
+    Headers, Redirect, Response, Cookies, Cookie, JSONBody, Header, Parameters, PathValue, \
+    Parameter, MultipartFile, Request, Session, ControllerFunction, version, _get_session_factory
 from simple_http_server._http_session_local_impl import SESSION_COOKIE_NAME
 
 from simple_http_server.logger import get_logger
@@ -227,14 +211,14 @@ class FilterContex:
     def __prepare_args(self):
         args = _get_args_(self.__controller.func)
         arg_vals = []
-        if len(args) > 0 and args[0][0] == "self":
+        if len(args) > 0:
             ctr_obj = self.__controller.ctrl_object
             if ctr_obj is not None:
                 arg_vals.append(self.__controller.ctrl_object)
                 args = args[1:]
         for arg, arg_type_anno in args:
             if arg not in self.request.parameter.keys() \
-                    and arg_type_anno not in (Request, Session, Response, Headers, cookies.BaseCookie, cookies.SimpleCookie, Cookies, PathValue, JSONBody, ModelDict):
+                    and arg_type_anno not in (Request, Session, Response, RegGroups, RegGroup, Headers, cookies.BaseCookie, cookies.SimpleCookie, Cookies, PathValue, JSONBody, ModelDict):
                 raise HttpError(400, f"Parameter[{arg}] is required! ")
             param = self.__get_params_(arg, arg_type_anno)
             arg_vals.append(param)
@@ -255,6 +239,8 @@ class FilterContex:
             param = self.response
         elif arg_type == Headers:
             param = Headers(self.request.headers)
+        elif arg_type == RegGroups:
+            param = RegGroups(self.request.reg_groups)
         elif arg_type == Header:
             param = self.__build_header(arg, **kws)
         elif inspect.isclass(arg_type) and issubclass(arg_type, cookies.BaseCookie):
@@ -269,6 +255,8 @@ class FilterContex:
             param = self.__build_path_value(arg, **kws)
         elif arg_type == Parameters:
             param = self.__build_params(arg, **kws)
+        elif arg_type == RegGroup:
+            param = self.__build_reg_group(**kws)
         elif arg_type == JSONBody:
             param = self.__build_json_body()
         elif arg_type == str:
@@ -290,6 +278,11 @@ class FilterContex:
         else:
             param = val
         return param
+
+    def __build_reg_group(self, val: RegGroup = RegGroup(group=0)):
+        if val.group >= len(self.request.reg_groups):
+            raise HttpError(400, f"RegGroup required an element at {val.group}, but the reg length is only {len(self.request.reg_groups)}")
+        return RegGroup(group=val.group, _value=self.request.reg_groups[val.group])
 
     def __build_model_dict(self):
         mdict = ModelDict()
@@ -505,7 +498,7 @@ class _SimpleDispatcherHttpRequestHandler(http.server.BaseHTTPRequestHandler):
         req = self.__prepare_request(mth)
         path = req._path
 
-        ctrl, req.path_values = self.server.get_url_controller(path, mth)
+        ctrl, req.path_values, req.reg_groups = self.server.get_url_controller(path, mth)
 
         res = ResponseWrapper(self)
         if ctrl is None:
@@ -527,7 +520,7 @@ class _SimpleDispatcherHttpRequestHandler(http.server.BaseHTTPRequestHandler):
                 res.body = {"error":  str(e)}
                 res.send_response()
 
-    def __prepare_request(self, method):
+    def __prepare_request(self, method) -> RequestWrapper:
         path = self.__get_path(self.path)
         req = RequestWrapper()
         req.path = "/" + path
@@ -785,11 +778,13 @@ class _HttpServerWrapper(http.server.HTTPServer):
 
     def __init__(self, addr, res_conf={}):
         super(_HttpServerWrapper, self).__init__(addr, _SimpleDispatcherHttpRequestHandler)
-        self.method_url_mapping = {"_": {}}
-        self.path_val_url_mapping = {"_": {}}
+        self.method_url_mapping: Dict[str, Dict[str, ControllerFunction]] = {"_": {}}
+        self.path_val_url_mapping: Dict[str, Dict[str, ControllerFunction]] = {"_": OrderedDict()}
+        self.method_regexp_mapping: Dict[str, Dict[str, ControllerFunction]] = {"_": OrderedDict()}
         for mth in _HttpServerWrapper.HTTP_METHODS:
             self.method_url_mapping[mth] = {}
-            self.path_val_url_mapping[mth] = {}
+            self.path_val_url_mapping[mth] = OrderedDict()
+            self.method_regexp_mapping[mth] = OrderedDict()
 
         self.filter_mapping = OrderedDict()
         self._res_conf = []
@@ -829,7 +824,7 @@ class _HttpServerWrapper(http.server.HTTPServer):
         self._res_conf.sort(key=lambda it: -len(it[0]))
 
     def __get_path_reg_pattern(self, url):
-        _url = url
+        _url: str = url
         path_names = re.findall("(?u)\\{\\w+\\}", _url)
         if len(path_names) == 0:
             # normal url
@@ -846,17 +841,21 @@ class _HttpServerWrapper(http.server.HTTPServer):
 
     def map_url(self, ctrl: ControllerFunction):
         url = ctrl.url
+        regexp = ctrl.regexp
         method = ctrl.method
-        _logger.debug(f"map url {url} with method[{method}] to function {ctrl.func}. ")
+        _logger.debug(f"map url {url}|{regexp} with method[{method}] to function {ctrl.func}. ")
         assert method is None or method == "" or method.upper() in _HttpServerWrapper.HTTP_METHODS
         _method = method.upper() if method is not None and method != "" else "_"
-        _url = _remove_url_first_slash(url)
-
-        path_pattern, path_names = self.__get_path_reg_pattern(_url)
-        if path_pattern is None:
-            self.method_url_mapping[_method][_url] = ctrl
+        if regexp:
+            self.method_regexp_mapping[_method][regexp] = ctrl
         else:
-            self.path_val_url_mapping[_method][path_pattern] = (ctrl, path_names)
+            _url = _remove_url_first_slash(url)
+
+            path_pattern, path_names = self.__get_path_reg_pattern(_url)
+            if path_pattern is None:
+                self.method_url_mapping[_method][_url] = ctrl
+            else:
+                self.path_val_url_mapping[_method][path_pattern] = (ctrl, path_names)
 
     def _res_(self, path, res_pre, res_dir):
         fpath = os.path.join(res_dir, path.replace(res_pre, ""))
@@ -888,36 +887,52 @@ class _HttpServerWrapper(http.server.HTTPServer):
 
         return StaticFile(fpath, content_type)
 
-    def get_url_controller(self, path="", method=""):
+    def get_url_controller(self, path="", method="") -> Tuple[Callable, Dict, List]:
+        # explicitly url matching
         if path in self.method_url_mapping[method]:
-            return self.method_url_mapping[method][path], {}
+            return self.method_url_mapping[method][path], {}, ()
         elif path in self.method_url_mapping["_"]:
-            return self.method_url_mapping["_"][path], {}
-        else:
-            fun_and_val = self.__try_get_from_path_val(path, method)
-            if fun_and_val is None:
-                fun_and_val = self.__try_get_from_path_val(path, "_")
-            if fun_and_val is not None:
-                return fun_and_val
-            else:
-                for k, v in self.res_conf:
-                    if path.startswith(k):
-                        def static_fun():
-                            return self._res_(path, k, v)
-                        return static_fun, {}
-                return None, {}
+            return self.method_url_mapping["_"][path], {}, ()
+
+        # url with path value matching
+        fun_and_val = self.__try_get_from_path_val(path, method)
+        if fun_and_val is None:
+            fun_and_val = self.__try_get_from_path_val(path, "_")
+        if fun_and_val is not None:
+            return fun_and_val[0], fun_and_val[1], ()
+
+        # regexp
+        func_and_groups = self.__try_get_from_regexp(path, method)
+        if func_and_groups is None:
+            func_and_groups = self.__try_get_from_regexp(path, "_")
+        if func_and_groups is not None:
+            return func_and_groups[0], {}, func_and_groups[1]
+        # static files
+        for k, v in self.res_conf:
+            if path.startswith(k):
+                def static_fun():
+                    return self._res_(path, k, v)
+                return static_fun, {}, ()
+        return None, {}, ()
+
+    def __try_get_from_regexp(self, path, method):
+        for regex, ctrl in self.method_regexp_mapping[method].items():
+            m = re.match(regex, path)
+            _logger.debug(f"regexp::pattern::[{regex}] => path::[{path}] match? {m is not None}")
+            if m:
+                return ctrl, tuple([unquote(v) for v in m.groups()])
+        return None
 
     def __try_get_from_path_val(self, path, method):
         for patterns, val in self.path_val_url_mapping[method].items():
             m = re.match(patterns, path)
-            is_match = m is not None
-            _logger.debug(f"pattern::[{patterns}] => path::[{path}] match? {is_match}")
-            if is_match:
+            _logger.debug(f"url with path value::pattern::[{patterns}] => path::[{path}] match? {m is not None}")
+            if m:
                 fun, path_names = val
                 path_values = {}
                 for idx in range(len(path_names)):
-                    key = unquote(str(path_names[idx]))
-                    path_values[key] = unquote(str(m.groups()[idx]))
+                    key = unquote(path_names[idx])
+                    path_values[key] = unquote(m.groups()[idx])
                 return fun, path_values
         return None
 

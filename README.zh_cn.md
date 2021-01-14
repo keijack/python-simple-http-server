@@ -322,6 +322,35 @@ class MyController:
 
 ```
 
+从 `0.7.0` 开始 `@request_map` 还支持正则表达式。
+
+```python
+# url `/reg/abcef/aref/xxx` 能匹配到以下控制器:
+@route(regexp="^(reg/(.+))$", method="GET")
+def my_reg_ctr(reg_groups: RegGroups, reg_group: RegGroup = RegGroup(1)):
+    print(reg_groups) # 输出 ("reg/abcef/aref/xxx", "abcef/aref/xxx")
+    print(reg_group) # 输出 "abcef/aref/xxx"
+    return f"{self._name}, {reg_group.group},{reg_group}"
+```
+Regular expression mapping a class:
+
+```python
+@controller(args=["ctr_name"], kwargs={"desc": "this is a key word argument"})
+@request_map("/obj", method="GET") # 请不要在这里配置 regexp，因为不工作
+class MyController:
+
+    def __init__(self, name, desc="") -> None:
+        self._name = f"ctr[{name}] - {desc}"
+
+    @request_map
+    def my_ctrl_default_mth(self, name: str):
+        return {"message": f"hello, {name}, {self._name} says. "}
+
+    @route(regexp="^(reg/(.+))$") # 从类装饰器来的 `/obj` 会被无视, 但 `method`(GET) 则依然有用
+    def my_ctrl_mth(self, name: str):
+        return {"message": f"hello, {name}, {self._name} says. "}
+```
+
 ### Session
 
 默认情况下，Session 中的数据会存储到本地，如果你需要做分布式 Session，例如将 Session内容存储在 Redis 或者 Memcache，你可以自定义自己的 `Session` 和 `SessionFactory`，然后创建一个你定义的 SessionFactory 对象通过 `simple_http_server.set_session_factory` 设置到框架中。

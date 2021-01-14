@@ -21,6 +21,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
+from abc import abstractmethod
 import sys
 import http.cookies
 import inspect
@@ -29,7 +30,7 @@ from typing import Any, Dict, List, Tuple, Union, Callable
 from simple_http_server.logger import get_logger
 
 name = "simple_http_server"
-version = "0.6.0"
+version = "0.7.0"
 
 _logger = get_logger("simple_http_server.__init__")
 
@@ -95,6 +96,7 @@ class Request:
         self.__cookies = Cookies()
         self.query_string: str = ""  # Query String
         self.path_values: Dict[str, str] = {}
+        self.reg_groups = ()  # If controller is matched via regexp, then ,all groups are save here
         self.path: str = ""  # Path
         self.__parameters = {}  # Parameters, key-value array, merged by query string and request body if the `Content-Type` in request header is `application/x-www-form-urlencoded` or `multipart/form-data`
         self.__parameter = {}  # Parameters, key-value, if more than one parameters with the same key, only the first one will be stored.
@@ -126,6 +128,7 @@ class Request:
         else:
             return self.parameter[key]
 
+    @abstractmethod
     def get_session(self, create: bool = False) -> Session:
         # This is abstract method
         return None
@@ -238,6 +241,28 @@ class Parameters(list):
 
 class ModelDict(dict):
     pass
+
+
+class RegGroups(tuple):
+    pass
+
+
+class RegGroup(str):
+
+    def __init__(self, group=0, **kwargs):
+        self._group = group
+
+    @property
+    def group(self) -> int:
+        return self._group
+
+    def __new__(cls, group=0, **kwargs):
+        if "_value" not in kwargs:
+            val = ""
+        else:
+            val = kwargs["_value"]
+        obj = super().__new__(cls, val)
+        return obj
 
 
 class Header(ParamStringValue):
@@ -408,12 +433,12 @@ def _create_object(clz, args=[], kwargs={}):
 class ControllerFunction:
 
     def __init__(self, url: str = "",
+                 regexp: str = "",
                  method: str = "",
                  ctr_obj: object = None,
                  func: Callable = None) -> None:
-        assert url is not None
-        assert func is not None and (inspect.isfunction(func) or inspect.ismethod(func))
         self.__url: str = url
+        self.__regexp = regexp
         self.__method: str = method
         self.singletion: bool = False
         self.ctr_obj_init_args = None
@@ -423,8 +448,23 @@ class ControllerFunction:
         self.__clz = False
 
     @property
+    def _is_config_ok(self):
+        try:
+            assert self.url or self.regexp, "you should set one of url and regexp"
+            assert not (self.url and self.regexp), "you can only set one of url and regexp, not both"
+            assert self.func is not None and (inspect.isfunction(self.func) or inspect.ismethod(self.func))
+            return True
+        except AssertionError as ae:
+            _logger.warn(f"[{self._url}|{self.regexp}] => {self.func} configurate error: {ae}")
+            return False
+
+    @property
     def url(self) -> str:
         return self.__url
+
+    @property
+    def regexp(self) -> str:
+        return self.__regexp
 
     @property
     def method(self) -> str:
@@ -487,7 +527,7 @@ def controller(*anno_args, singleton: bool = True, args: List[Any] = [], kwargs:
     return map
 
 
-def request_map(*anno_args, url: str = "", method: Union[str, list, tuple] = "") -> Callable:
+def request_map(*anno_args, url: str = "", regexp: str = "", method: Union[str, list, tuple] = "") -> Callable:
     _url = url
     len_args = len(anno_args)
     assert len_args <= 1
@@ -495,7 +535,7 @@ def request_map(*anno_args, url: str = "", method: Union[str, list, tuple] = "")
     arg_ctrl = None
     if len_args == 1:
         if isinstance(anno_args[0], str):
-            assert not url
+            assert not url and not regexp
             _url = anno_args[0]
         elif callable(anno_args[0]):
             arg_ctrl = anno_args[0]
@@ -514,7 +554,7 @@ def request_map(*anno_args, url: str = "", method: Union[str, list, tuple] = "")
 
         for mth in mths:
             _logger.debug(f"map url {_url} with method[{mth}] to function {ctrl}. ")
-            _request_mappings.append(ControllerFunction(url=_url, method=mth, func=ctrl))
+            _request_mappings.append(ControllerFunction(url=_url, regexp=regexp, method=mth, func=ctrl))
         # return the original function, so you can use a decoration chain
         return ctrl
 
@@ -527,9 +567,9 @@ def request_map(*anno_args, url: str = "", method: Union[str, list, tuple] = "")
 route = request_map
 
 
-def filter_map(pattern: str = "", filter_function: Callable = None) -> Callable:
+def filter_map(regexp: str = "", filter_function: Callable = None) -> Callable:
     def map(filter_fun):
-        _filters.append({"url_pattern": pattern, "func": filter_fun})
+        _filters.append({"url_pattern": regexp, "func": filter_fun})
         return filter_fun
     if filter_function:
         map(filter_function)
@@ -554,26 +594,33 @@ def _get_request_mappings():
         clz = ctr_fun.clz
         if clz is not None and clz in _request_clz_mapping:
             clz_url, methods = _request_clz_mapping[clz]
-            fun_url = ctr_fun.url
-            if fun_url:
-                if not clz_url.endswith("/"):
-                    clz_url = clz_url + "/"
-                if fun_url.startswith("/"):
-                    fun_url = fun_url[1:]
-                full_url = f"{clz_url}{fun_url}"
+
+            if ctr_fun.regexp:
+                full_url = ctr_fun.url
             else:
-                full_url = clz_url
+                fun_url = ctr_fun.url
+                if fun_url:
+                    if not clz_url.endswith("/"):
+                        clz_url = clz_url + "/"
+                    if fun_url.startswith("/"):
+                        fun_url = fun_url[1:]
+                    full_url = f"{clz_url}{fun_url}"
+                else:
+                    full_url = clz_url
+
             if not ctr_fun.method and methods:
                 for mth in methods:
                     _logger.debug(f"map url {full_url} included [{clz_url}] with method[{mth}] to function {ctr_fun.func}. ")
-                    mappings.append(ControllerFunction(url=full_url, method=mth, func=ctr_fun.func))
+                    mappings.append(ControllerFunction(url=full_url, regexp=ctr_fun.regexp, method=mth, func=ctr_fun.func))
             else:
                 _logger.debug(f"map url {full_url} included [{clz_url}] with method[{ctr_fun.method}] to function {ctr_fun.func}. ")
-                mappings.append(ControllerFunction(url=full_url, method=ctr_fun.method, func=ctr_fun.func))
+                mappings.append(ControllerFunction(url=full_url, regexp=ctr_fun.regexp, method=ctr_fun.method, func=ctr_fun.func))
         else:
             mappings.append(ctr_fun)
 
     for ctr_fun in mappings:
+        if not ctr_fun._is_config_ok:
+            continue
         clz = ctr_fun.clz
         if clz is not None and clz in _ctrls:
             singleton, args, kwargs = _ctrls[clz]
