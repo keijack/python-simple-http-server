@@ -26,11 +26,11 @@ import sys
 import http.cookies
 import inspect
 import time
-from typing import Any, Dict, List, Tuple, Union, Callable
+from typing import Any, Dict, List, Tuple, Type, Union, Callable
 from simple_http_server.logger import get_logger
 
 name = "simple_http_server"
-version = "0.7.0"
+version = "0.8.0"
 
 _logger = get_logger("simple_http_server.__init__")
 
@@ -514,6 +514,8 @@ _filters = []
 _ctrls = {}
 _ctrl_singletons = {}
 
+_ws_handlers = {}
+
 _session_facory: SessionFactory = None
 
 
@@ -587,6 +589,14 @@ def _get_singletion(clz, args, kwargs):
     return _ctrl_singletons[clz]
 
 
+def websocket_handler(endpoint=""):
+    def map(ws_class):
+        _ws_handlers[endpoint] = ws_class
+        return ws_class
+
+    return map
+
+
 def _get_request_mappings():
     mappings: List[ControllerFunction] = []
 
@@ -639,3 +649,7 @@ def _get_filters():
 
 def _get_session_factory() -> SessionFactory:
     return _session_facory
+
+
+def _get_websocket_handlers() -> Dict[str, Type]:
+    return _ws_handlers
