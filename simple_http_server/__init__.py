@@ -407,6 +407,38 @@ class Cookie(http.cookies.Morsel):
         return self.__required
 
 
+class WebsocketSession:
+
+    @property
+    def id(self):
+        return ""
+
+    @property
+    def is_closed(self):
+        return False
+
+    @property
+    def path(self):
+        return ""
+
+    @property
+    def query_string(self):
+        return ""
+
+    @property
+    def query_parameters(self):
+        return {}
+
+    def send(self, message: str):
+        pass
+
+    def send_pone(self, message: str):
+        pass
+
+    def close(self, reason: str):
+        pass
+
+
 def _get_class_of_method(method_defind):
     vals = vars(sys.modules[method_defind.__module__])
     for attr in method_defind.__qualname__.split('.')[:-1]:

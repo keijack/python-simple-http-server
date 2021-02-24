@@ -7,7 +7,9 @@ from uuid import uuid4
 from socket import error as SocketError
 import errno
 
+
 from .logger import get_logger
+from simple_http_server import WebsocketSession
 
 _logger = get_logger("http_request_handler")
 
@@ -80,7 +82,7 @@ class WebsocketRequestHandler:
         _logger.debug(f"request path:: {self.request_path}")
         handler_class = self.server.get_matched_websocket_handler(self.request_path)
         self.handler = handler_class() if handler_class else None
-        self.session = WebsocketSession(self)
+        self.session = WebsocketSessionImpl(self)
         self.close_reason = ""
 
     @property
@@ -287,7 +289,7 @@ class WebsocketRequestHandler:
             raise(e)
 
 
-class WebsocketSession:
+class WebsocketSessionImpl(WebsocketSession):
 
     def __init__(self, handler: WebsocketRequestHandler) -> None:
         self.__id = uuid4().hex
