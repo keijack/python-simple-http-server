@@ -21,6 +21,7 @@ Python 3.7
 * Spring MVC 风格的请求映射配置
 * 简单易用
 * 支持 SSL
+* 支持 websocket（从 0.9.0 开始）
 * 编写风格自由
 
 ## 安装
@@ -522,6 +523,62 @@ def say_hello(res=Response()):
 @request_map("/")
 def redirect(res=Response()):
     res.send_redirect("/index")
+```
+
+### Websocket
+
+
+```python
+from simple_http_server import WebsocketHandler, WebsocketRequest,WebsocketSession, websocket_handler
+
+@websocket_handler(endpoint="/ws/{path_val}")
+class WSHandler(WebsocketHandler):
+    
+    """
+    " 继承 WebsocketHandler 为非必须，以下的事件方法也不是所有都需要实现提供，但是实现提供了，方法的参数必须按照以下签名提供。
+    """
+
+    def on_handshake(self, request: WebsocketRequest):
+        """
+        "
+        " 你可以从 request 中取得 path/headers/path_values/cookies/query_string/query_parameters。
+        " 
+        " 你需要返回一个元祖 (http_status_code, headers)
+        "
+        " 当元祖中的 http_status_code 在 (0, None, 101) 时， websocket 会继续链接，否则会返回指定的状态码并且断开链接。 
+        "
+        " 如果需要额外增加响应的头，可以在元祖中增加 headers 参数。
+        "
+        " 元祖中的数据如无特殊，均可忽略。
+        "
+        """
+        _logger.info(f">>{session.id}<< open! {request.path_values}")
+        return 0, {}
+
+    def on_open(self, session: WebsocketSession):
+        """
+        " 
+        " 成功建立链接时调用
+        "
+        """
+        _logger.info(f">>{session.id}<< open! {session.request.path_values}")
+
+    def on_text_message(self, session: WebsocketSession, message: str):
+        """
+        "
+        " 收到文本消息时调用
+        "
+        """
+        _logger.info(f">>{session.id}<< on text message: {message}")
+        session.send(message)
+
+    def on_close(self, session: WebsocketSession, reason: str):
+        """
+        "
+        " 关闭时调用
+        "
+        """
+        _logger.info(f">>{session.id}<< close::{reason}")
 ```
 
 ## 编写过滤器

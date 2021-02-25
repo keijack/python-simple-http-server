@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
 
 
-import http
-import socket
-import socketserver
 """
 Copyright (c) 2018 Keijack Wu
 
@@ -26,14 +23,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-
+import socket
 import os
 import re
 import ssl as _ssl
 import threading
 
 from collections import OrderedDict
-from socketserver import ThreadingMixIn
+from socketserver import ThreadingMixIn, TCPServer
 from urllib.parse import unquote
 from urllib.parse import quote
 
@@ -48,7 +45,7 @@ from .logger import get_logger
 _logger = get_logger("simple_http_server.http_server")
 
 
-class HTTPServer(socketserver.TCPServer, ThreadingMixIn):
+class HTTPServer(ThreadingMixIn, TCPServer):
 
     allow_reuse_address = 1    # Seems to make sense in testing environment
 
@@ -56,7 +53,7 @@ class HTTPServer(socketserver.TCPServer, ThreadingMixIn):
 
     def server_bind(self):
         """Override server_bind to store the server name."""
-        socketserver.TCPServer.server_bind(self)
+        TCPServer.server_bind(self)
         host, port = self.server_address[:2]
         self.server_name = socket.getfqdn(host)
         self.server_port = port

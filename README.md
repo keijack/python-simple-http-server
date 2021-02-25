@@ -20,6 +20,7 @@ from `0.4.0`, python 2.7 is no longer supported, if you are using python 2.7, pl
 * Session support, and even, you can apply your own session implementation.
 * Spring MVC like request mapping.
 * SSL support.
+* Websocket support (from 0.9.0).
 * Easy to use.
 * Free style controller writing.
 
@@ -322,6 +323,55 @@ class MySessionFacImpl(SessionFactory):
 
 set_session_factory(MySessionFacImpl())
 
+```
+
+### Websocket
+
+```python
+from simple_http_server import WebsocketHandler, WebsocketRequest,WebsocketSession, websocket_handler
+
+@websocket_handler(endpoint="/ws/{path_val}")
+class WSHandler(WebsocketHandler):
+
+    def on_handshake(self, request: WebsocketRequest):
+        """
+        "
+        " You can get path/headers/path_values/cookies/query_string/query_parameters from request.
+        " 
+        " You should return a tuple means (http_status_code, headers)
+        "
+        " If status code in (0, None, 101), the websocket will be connected, or will return the status you return. 
+        "
+        " All headers will be send to client
+        "
+        """
+        _logger.info(f">>{session.id}<< open! {request.path_values}")
+        return 0, {}
+
+    def on_open(self, session: WebsocketSession):
+        """
+        " 
+        " Will be called when the connection opened.
+        "
+        """
+        _logger.info(f">>{session.id}<< open! {session.request.path_values}")
+
+    def on_text_message(self, session: WebsocketSession, message: str):
+        """
+        "
+        " Will be called when receive a text message.
+        "
+        """
+        _logger.info(f">>{session.id}<< on text message: {message}")
+        session.send(message)
+
+    def on_close(self, session: WebsocketSession, reason: str):
+        """
+        "
+        " Will be called when the connection closed.
+        "
+        """
+        _logger.info(f">>{session.id}<< close::{reason}")
 ```
 
 ### Write filters

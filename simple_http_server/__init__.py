@@ -30,7 +30,7 @@ from typing import Any, Dict, List, Tuple, Type, Union, Callable
 from simple_http_server.logger import get_logger
 
 name = "simple_http_server"
-version = "0.8.0"
+version = "0.9.0"
 
 _logger = get_logger("simple_http_server.__init__")
 

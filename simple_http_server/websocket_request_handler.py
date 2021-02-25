@@ -104,7 +104,9 @@ class WebsocketRequestHandler:
         res = self.handler.on_handshake(self.ws_request)
         http_status_code = None
         headers = {}
-        if isinstance(res, int):
+        if not res:
+            pass
+        elif isinstance(res, int):
             http_status_code = res
         elif isinstance(res, dict) or isinstance(res, Headers):
             headers = res
