@@ -3,13 +3,14 @@
 import struct
 from base64 import b64encode
 from hashlib import sha1
+from typing import Dict, Tuple
 from uuid import uuid4
 from socket import error as SocketError
 import errno
 
 
 from .logger import get_logger
-from simple_http_server import WebsocketSession
+from simple_http_server import Headers, WebsocketRequest, WebsocketSession
 
 _logger = get_logger("http_request_handler")
 
@@ -69,20 +70,25 @@ class WebsocketRequestHandler:
         self.base_http_quest_handler = base_http_quest_handler
         self.request = base_http_quest_handler.request
         self.server = base_http_quest_handler.server
-        self.path = base_http_quest_handler.path
-        self.request_path = base_http_quest_handler.request_path
-        self.query_string = base_http_quest_handler.query_string
-        self.query_parameters = base_http_quest_handler.query_parameters
         self.send_response = base_http_quest_handler.send_response_only
         self.send_header = base_http_quest_handler.send_header
-        self.headers = base_http_quest_handler.headers
         self.rfile = base_http_quest_handler.rfile
         self.keep_alive = True
         self.handshake_done = False
-        _logger.debug(f"request path:: {self.request_path}")
-        handler_class = self.server.get_matched_websocket_handler(self.request_path)
+
+        handler_class, path_values = self.server.get_websocket_handler(base_http_quest_handler.request_path)
         self.handler = handler_class() if handler_class else None
-        self.session = WebsocketSessionImpl(self)
+        self.ws_request = WebsocketRequest()
+        self.ws_request.headers = base_http_quest_handler.headers
+        self.ws_request.path = base_http_quest_handler.request_path
+        self.ws_request.query_string = base_http_quest_handler.query_string
+        self.ws_request.parameters = base_http_quest_handler.query_parameters
+        self.ws_request.path_values = path_values
+        if "cookie" in self.ws_request.headers:
+            self.ws_request.cookies.load(self.ws_request.headers["cookie"])
+        elif "Cookie" in self.ws_request.headers:
+            self.ws_request.cookies.load(self.ws_request.headers["Cookie"])
+        self.session = WebsocketSessionImpl(self, self.ws_request)
         self.close_reason = ""
 
     @property
@@ -92,23 +98,39 @@ class WebsocketRequestHandler:
         else:
             return []
 
-    def on_handshake(self):
-        if hasattr(self.handler, "on_handshake") and callable(self.handler.on_handshake):
-            return self.handler.on_handshake(self.path, self.headers)
-
-    def on_message(self, optcode, message):
-        if hasattr(self.handler, "on_message") and callable(self.handler.on_message):
-            self.handler.on_message(self.session, OPTYPES[optcode], message)
+    def on_handshake(self) -> Tuple[int, Dict[str, str]]:
+        if not hasattr(self.handler, "on_handshake") or not callable(self.handler.on_handshake):
+            return None, {}
+        res = self.handler.on_handshake(self.ws_request)
+        http_status_code = None
+        headers = {}
+        if isinstance(res, int):
+            http_status_code = res
+        elif isinstance(res, dict) or isinstance(res, Headers):
+            headers = res
+        elif isinstance(res, tuple):
+            for item in res:
+                if isinstance(item, int) and not http_status_code:
+                    http_status_code = item
+                elif isinstance(item, dict) or isinstance(item, Headers):
+                    headers.update(item)
         else:
-            if optcode == OPCODE_TEXT and hasattr(self.handler, "on_text_message") and callable(self.handler.on_text_message):
+            _logger.warn(f"Endpoint[{self.ws_request.path}]")
+        return http_status_code, headers
+
+    def on_message(self, op_code, message):
+        if hasattr(self.handler, "on_message") and callable(self.handler.on_message):
+            self.handler.on_message(self.session, OPTYPES[op_code], message)
+        else:
+            if op_code == OPCODE_TEXT and hasattr(self.handler, "on_text_message") and callable(self.handler.on_text_message):
                 self.handler.on_text_message(self.session, message)
-            elif optcode == OPCODE_PING and hasattr(self.handler, "on_ping_message") and callable(self.handler.on_ping_message):
+            elif op_code == OPCODE_PING and hasattr(self.handler, "on_ping_message") and callable(self.handler.on_ping_message):
                 self.handler.on_ping_message(self.session, message)
-            elif optcode == OPCODE_PONG and hasattr(self.handler, "on_pong_message") and callable(self.handler.on_pong_message):
+            elif op_code == OPCODE_PONG and hasattr(self.handler, "on_pong_message") and callable(self.handler.on_pong_message):
                 self.handler.on_pong_message(self.session, message)
 
     def on_open(self):
-         if hasattr(self.handler, "on_open") and callable(self.handler.on_open):
+        if hasattr(self.handler, "on_open") and callable(self.handler.on_open):
             self.handler.on_open(self.session)
 
     def on_close(self):
@@ -126,8 +148,8 @@ class WebsocketRequestHandler:
 
     def handshake(self):
         if self.handler:
-            code = self.on_handshake()
-            if code:
+            code, headers = self.on_handshake()
+            if code and code != 101:
                 self.keep_alive = False
                 self.send_response(code)
             else:
@@ -135,6 +157,9 @@ class WebsocketRequestHandler:
                 self.send_header("Upgrade", "websocket")
                 self.send_header("Connection", "Upgrade")
                 self.send_header("Sec-WebSocket-Accept", self.calculate_response_key())
+            if headers:
+                for h_name, h_val in headers.items():
+                    self.send_header(h_name, h_val)
         else:
             self.keep_alive = False
             self.send_response(404)
@@ -147,8 +172,8 @@ class WebsocketRequestHandler:
             self.on_open()
 
     def calculate_response_key(self):
-        _logger.debug(f"Sec-WebSocket-Key: {self.headers['Sec-WebSocket-Key']}")
-        key: str = self.headers["Sec-WebSocket-Key"]
+        _logger.debug(f"Sec-WebSocket-Key: {self.ws_request.headers['Sec-WebSocket-Key']}")
+        key: str = self.ws_request.headers["Sec-WebSocket-Key"]
         hash = sha1(key.encode() + self.GUID.encode())
         response_key = b64encode(hash.digest()).strip()
         return response_key.decode('ASCII')
@@ -217,6 +242,9 @@ class WebsocketRequestHandler:
 
     def send_message(self, message):
         self.send_text(message)
+
+    def send_ping(self, message):
+        self.send_text(message, OPCODE_PING)
 
     def send_pong(self, message):
         self.send_text(message, OPCODE_PONG)
@@ -291,29 +319,25 @@ class WebsocketRequestHandler:
 
 class WebsocketSessionImpl(WebsocketSession):
 
-    def __init__(self, handler: WebsocketRequestHandler) -> None:
+    def __init__(self, handler: WebsocketRequestHandler, request: WebsocketRequest) -> None:
         self.__id = uuid4().hex
         self.__handler = handler
+        self.__request = request
 
     @property
     def id(self):
         return self.__id
 
     @property
+    def request(self):
+        return self.__request
+
+    @property
     def is_closed(self):
         return not self.__handler.keep_alive
 
-    @property
-    def path(self):
-        return self.__handler.request_path
-
-    @property
-    def query_string(self):
-        return self.__handler.query_string
-
-    @property
-    def query_parameters(self):
-        return self.__handler.query_parameters
+    def send_ping(self, message: str):
+        self.__handler.send_ping(message)
 
     def send(self, message: str):
         self.__handler.send_message(message)

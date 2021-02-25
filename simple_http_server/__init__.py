@@ -407,27 +407,56 @@ class Cookie(http.cookies.Morsel):
         return self.__required
 
 
+class WebsocketRequest:
+
+    def __init__(self):
+        self.headers: Dict[str, str] = {}  # Request headers
+        self.__cookies = Cookies()
+        self.query_string: str = ""  # Query String
+        self.path_values: Dict[str, str] = {}
+        self.path: str = ""  # Path
+        self.__parameters = {}  # Parameters, key-value array, merged by query string and request body if the `Content-Type` in request header is `application/x-www-form-urlencoded` or `multipart/form-data`
+        self.__parameter = {}  # Parameters, key-value, if more than one parameters with the same key, only the first one will be stored.
+
+    @property
+    def cookies(self) -> Cookies:
+        return self.__cookies
+
+    @property
+    def parameters(self) -> Dict[str, List[str]]:
+        return self.__parameters
+
+    @parameters.setter
+    def parameters(self, val: Dict[str, List[str]]):
+        self.__parameters = val
+        self.__parameter = {}
+        for k, v in self.__parameters.items():
+            self.__parameter[k] = v[0]
+
+    @property
+    def parameter(self) -> Dict[str, str]:
+        return self.__parameter
+
+    def get_parameter(self, key: str, default: str = None) -> str:
+        if key not in self.parameters.keys():
+            return default
+        else:
+            return self.parameter[key]
+
+
 class WebsocketSession:
 
     @property
-    def id(self):
+    def id(self) -> str:
         return ""
 
     @property
-    def is_closed(self):
+    def request(self) -> WebsocketRequest:
+        return None
+
+    @property
+    def is_closed(self) -> bool:
         return False
-
-    @property
-    def path(self):
-        return ""
-
-    @property
-    def query_string(self):
-        return ""
-
-    @property
-    def query_parameters(self):
-        return {}
 
     def send(self, message: str):
         pass
@@ -435,7 +464,28 @@ class WebsocketSession:
     def send_pone(self, message: str):
         pass
 
+    def send_ping(self, message: str):
+        pass
+
     def close(self, reason: str):
+        pass
+
+
+class WebsocketHandler:
+
+    def on_handshake(self, request: WebsocketRequest = None):
+        return None
+
+    def on_open(self, session: WebsocketSession = None):
+        pass
+
+    def on_message(self, session: WebsocketSession = None, message_type: str = "", message: Any = None):
+        pass
+
+    def on_text_message(self, session: WebsocketSession = None, message: str = ""):
+        pass
+
+    def on_close(self, session: WebsocketSession = None, reason: str = ""):
         pass
 
 

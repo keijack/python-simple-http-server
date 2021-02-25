@@ -73,7 +73,10 @@ class HTTPServer(socketserver.TCPServer, ThreadingMixIn):
 
         self.filter_mapping = OrderedDict()
         self._res_conf = []
-        self.websocket_handler_mapping = OrderedDict()
+
+        self.ws_mapping = OrderedDict()
+        self.ws_path_val_mapping = OrderedDict()
+
         self.add_res_conf(res_conf)
 
     @property
@@ -233,12 +236,30 @@ class HTTPServer(socketserver.TCPServer, ThreadingMixIn):
         return available_filters
 
     def map_websocket_hanlder(self, endpoint, handler_class):
-        self.websocket_handler_mapping[remove_url_first_slash(endpoint)] = handler_class
+        url = remove_url_first_slash(endpoint)
+        path_pattern, path_names = self.__get_path_reg_pattern(url)
+        if path_pattern is None:
+            self.ws_mapping[url] = handler_class
+        else:
+            self.ws_path_val_mapping[path_pattern] = (handler_class, path_names)
 
-    def get_matched_websocket_handler(self, path):
-        if path not in self.websocket_handler_mapping:
-            return None
-        return self.websocket_handler_mapping[path]
+    def get_websocket_handler(self, path):
+        if path in self.ws_mapping:
+            return self.ws_mapping[path], {}
+        return self.__try_get_ws_handler_from_path_val(path)
+
+    def __try_get_ws_handler_from_path_val(self, path):
+        for patterns, val in self.ws_path_val_mapping.items():
+            m = re.match(patterns, path)
+            _logger.debug(f"websocket endpoint with path value::pattern::[{patterns}] => path::[{path}] match? {m is not None}")
+            if m:
+                clz, path_names = val
+                path_values = {}
+                for idx in range(len(path_names)):
+                    key = unquote(path_names[idx])
+                    path_values[key] = unquote(m.groups()[idx])
+                return clz, path_values
+        return None, {}
 
 
 class SimpleDispatcherHttpServer:
