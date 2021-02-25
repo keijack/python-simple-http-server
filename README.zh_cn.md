@@ -4,7 +4,7 @@
 
 ## 简介
 
-这是一个轻量级的基于 Python http.server 编写的服务器，你可以非常容易的搭建一个 Restful API。其中一些请求的转发等参考了 SpringMVC 的设计。
+这是一个轻量级编写的 HTTP 服务器，源生支持 websocket，你可以非常容易的搭建一个 Restful API。其中一些请求的转发等参考了 SpringMVC 的设计。
 
 ## 支持的 Python 的版本
 
@@ -698,3 +698,7 @@ logger.set_level("DEBUG")
 ```
 
 这个日志使用了一个背景线程来输出日志，因此其非常适合使用在多线程的场景，特别你是你有多个 logger 共用一个 `TimedRotatingFileHandler` 的时候。在多线程的场景下，这个日志控制器经常不能正常地按时切割文件。
+
+## 感谢
+
+部分处理 websocket 的代码参考自开源库： https://github.com/Pithikos/python-websocket-server

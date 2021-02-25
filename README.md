@@ -472,3 +472,7 @@ logger.set_level("DEBUG")
 ```
 
 This logger will first save all the log record to a global queue, and then output them in a background thread, so it is very suitable for getting several logger with a same handler, especialy the `TimedRotatingFileHandler` which may slice the log files not quite well in a mutiple thread environment. 
+
+## Thanks
+
+The code that process websocket comes from the following project: https://github.com/Pithikos/python-websocket-server
