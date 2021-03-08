@@ -123,13 +123,13 @@ class WebsocketRequestHandler:
     def on_message(self, op_code, message):
         if hasattr(self.handler, "on_message") and callable(self.handler.on_message):
             self.handler.on_message(self.session, OPTYPES[op_code], message)
-        else:
-            if op_code == OPCODE_TEXT and hasattr(self.handler, "on_text_message") and callable(self.handler.on_text_message):
-                self.handler.on_text_message(self.session, message)
-            elif op_code == OPCODE_PING and hasattr(self.handler, "on_ping_message") and callable(self.handler.on_ping_message):
-                self.handler.on_ping_message(self.session, message)
-            elif op_code == OPCODE_PONG and hasattr(self.handler, "on_pong_message") and callable(self.handler.on_pong_message):
-                self.handler.on_pong_message(self.session, message)
+        
+        if op_code == OPCODE_TEXT and hasattr(self.handler, "on_text_message") and callable(self.handler.on_text_message):
+            self.handler.on_text_message(self.session, message)
+        elif op_code == OPCODE_PING and hasattr(self.handler, "on_ping_message") and callable(self.handler.on_ping_message):
+            self.handler.on_ping_message(self.session, message)
+        elif op_code == OPCODE_PONG and hasattr(self.handler, "on_pong_message") and callable(self.handler.on_pong_message):
+            self.handler.on_pong_message(self.session, message)
 
     def on_open(self):
         if hasattr(self.handler, "on_open") and callable(self.handler.on_open):
