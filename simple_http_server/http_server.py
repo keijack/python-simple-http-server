@@ -173,7 +173,7 @@ class HTTPServer(ThreadingMixIn, TCPServer):
 
         return StaticFile(fpath, content_type)
 
-    def get_url_controller(self, path="", method="") -> Tuple[Callable, Dict, List]:
+    def get_url_controller(self, path="", method="") -> Tuple[ControllerFunction, Dict, List]:
         # explicitly url matching
         if path in self.method_url_mapping[method]:
             return self.method_url_mapping[method][path], {}, ()
@@ -198,7 +198,7 @@ class HTTPServer(ThreadingMixIn, TCPServer):
             if path.startswith(k):
                 def static_fun():
                     return self._res_(path, k, v)
-                return static_fun, {}, ()
+                return ControllerFunction(func=static_fun), {}, ()
         return None, {}, ()
 
     def __try_get_from_regexp(self, path, method):
