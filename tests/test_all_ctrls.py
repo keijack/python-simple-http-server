@@ -1,7 +1,6 @@
 # coding: utf-8
 
 import os
-from sys import path
 import websocket
 import unittest
 from threading import Thread
