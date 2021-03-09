@@ -24,12 +24,20 @@ from `0.4.0`, python 2.7 is no longer supported, if you are using python 2.7, pl
 * Easy to use.
 * Free style controller writing.
 
+## Dependencies
+
+There are no other dependencies needed to run this project. However, if you want to run the unitests in the `tests` folder, you need to install `websocket` via pip:
+
+```shell
+python3 -m pip install websocket
+```
+
 ## How to use
 
 ### Install
 
 ```shell
-pip install simple_http_server
+python3 -m pip install simple_http_server
 ```
 
 ### Write Controllers
@@ -472,6 +480,7 @@ logger.set_level("DEBUG")
 ```
 
 This logger will first save all the log record to a global queue, and then output them in a background thread, so it is very suitable for getting several logger with a same handler, especialy the `TimedRotatingFileHandler` which may slice the log files not quite well in a mutiple thread environment. 
+
 
 ## Thanks
 

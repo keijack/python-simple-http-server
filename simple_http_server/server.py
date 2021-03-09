@@ -43,7 +43,7 @@ from simple_http_server.logger import get_logger
 
 __logger = get_logger("simple_http_server.server")
 __lock = threading.Lock()
-__server = None
+_server = None
 
 
 def _is_match(string="", regx=r""):
@@ -86,14 +86,17 @@ def _import_module(mname):
     try:
         importlib.import_module(mname)
     except:
-        __logger.warn(f"Import moudle [{mname}] error!")
+        __logger.warning(f"Import moudle [{mname}] error!")
 
 
-def scan(base_dir: str = "", regx: str = r"") -> None:
-    ft = inspect.currentframe()
-    fts = inspect.getouterframes(ft)
-    entrance = fts[-1]
-    work_dir = os.path.dirname(inspect.getabsfile(entrance[0]))
+def scan(base_dir: str = "", regx: str = r"", project_dir: str = "") -> None:
+    if project_dir:
+        work_dir = project_dir
+    else:
+        ft = inspect.currentframe()
+        fts = inspect.getouterframes(ft)
+        entrance = fts[-1]
+        work_dir = os.path.dirname(inspect.getabsfile(entrance[0]))
     modules = _load_all_modules(work_dir, base_dir, regx)
 
     for mname in modules:
@@ -112,45 +115,49 @@ def start(host: str = "",
           ssl_context: _ssl.SSLContext = None,
           resources: Dict[str, str] = {}) -> None:
     with __lock:
-        global __server
-        if __server is not None:
-            __server.shutdown()
-        __server = http_server.SimpleDispatcherHttpServer(host=(host, port),
-                                                          ssl=ssl,
-                                                          ssl_protocol=ssl_protocol,
-                                                          ssl_check_hostname=ssl_check_hostname,
-                                                          keyfile=keyfile,
-                                                          certfile=certfile,
-                                                          keypass=keypass,
-                                                          ssl_context=ssl_context,
-                                                          resources=resources)
+        global _server
+        if _server is not None:
+            _server.shutdown()
+        _server = http_server.SimpleDispatcherHttpServer(host=(host, port),
+                                                         ssl=ssl,
+                                                         ssl_protocol=ssl_protocol,
+                                                         ssl_check_hostname=ssl_check_hostname,
+                                                         keyfile=keyfile,
+                                                         certfile=certfile,
+                                                         keypass=keypass,
+                                                         ssl_context=ssl_context,
+                                                         resources=resources)
 
     filters = _get_filters()
     # filter configuration
     for ft in filters:
-        __server.map_filter(ft["url_pattern"], ft["func"])
+        _server.map_filter(ft["url_pattern"], ft["func"])
 
     request_mappings = _get_request_mappings()
     # request mapping
     for ctr in request_mappings:
-        __server.map_request(ctr)
+        _server.map_request(ctr)
 
     ws_handlers = _get_websocket_handlers()
 
     for endpoint, clz in ws_handlers.items():
-        __server.map_websocket_handler(endpoint, clz)
+        _server.map_websocket_handler(endpoint, clz)
 
     # start the server
-    __server.start()
+    _server.start()
+
+
+def is_ready() -> bool:
+    return _server and _server.ready
 
 
 def stop() -> None:
     with __lock:
-        global __server
-        if __server is not None:
+        global _server
+        if _server is not None:
             __logger.info("shutting down server...")
-            __server.shutdown()
-            __server = None
+            _server.shutdown()
+            _server = None
 
 
 @request_map("/favicon.ico")

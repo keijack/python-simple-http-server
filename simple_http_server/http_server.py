@@ -282,6 +282,7 @@ class SimpleDispatcherHttpServer:
                  ssl_context: _ssl.SSLContext = None,
                  resources: Dict[str, str] = {}):
         self.host = host
+        self.__ready = False
 
         self.ssl = ssl
         self.server = HTTPServer(self.host, res_conf=resources)
@@ -299,6 +300,10 @@ class SimpleDispatcherHttpServer:
                 server_side=True
             )
 
+    @property
+    def ready(self):
+        return self.__ready
+
     def resources(self, res={}):
         self.server.res_conf = res
 
@@ -308,7 +313,12 @@ class SimpleDispatcherHttpServer:
         else:
             ssl_hint = ""
         _logger.info(f"Dispatcher Http Server starts. Listen to port [{self.host[1]}]{ssl_hint}.")
-        self.server.serve_forever()
+        try:
+            self.__ready = True
+            self.server.serve_forever()
+        except:
+            self.__ready = False
+            raise
 
     def shutdown(self):
         # server must shutdown in a separate thread, or it will be deadlocking...WTF!

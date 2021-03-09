@@ -24,10 +24,18 @@ Python 3.7
 * 支持 websocket（从 0.9.0 开始）
 * 编写风格自由
 
+## 依赖
+
+这个工程本身并不依赖任何其他的库，但是如果你需要运行在 `tests` 目录下的单元测试，那么，你需要安装 `websocket` 库：
+
+```shell
+python3 -m pip install websocket
+```
+
 ## 安装
 
 ```shell
-pip install simple_http_server
+python3 -m pip install simple_http_server
 ```
 
 ## 编写控制器
