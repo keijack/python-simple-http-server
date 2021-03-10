@@ -6,6 +6,7 @@ import http.client
 import socket  # For gethostbyaddr()
 import socketserver
 import time
+from typing import Dict
 from urllib.parse import unquote
 
 
@@ -19,23 +20,7 @@ from .websocket_request_handler import WebsocketRequestHandler
 
 _logger = get_logger("base_server")
 
-# Default error message template
-DEFAULT_ERROR_MESSAGE = """\
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
-        "http://www.w3.org/TR/html4/strict.dtd">
-<html>
-    <head>
-        <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
-        <title>Error response</title>
-    </head>
-    <body>
-        <h1>Error response</h1>
-        <p>Error code: %(code)d</p>
-        <p>Message: %(message)s.</p>
-        <p>Error code explanation: %(code)s - %(explain)s.</p>
-    </body>
-</html>
-"""
+
 DEFAULT_ERROR_CONTENT_TYPE = "text/html;charset=utf-8"
 
 
@@ -43,7 +28,6 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
 
     server_version = "simple-http-server/" + __version__
 
-    error_message_format = DEFAULT_ERROR_MESSAGE
     error_content_type = DEFAULT_ERROR_CONTENT_TYPE
 
     default_request_version = "HTTP/0.9"
@@ -251,7 +235,7 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
                 return
             self.handle_http_request()
 
-    def send_error(self, code, message=None, explain=None):
+    def send_error(self, code: int, message: str = None, explain: str = None, headers: Dict[str, str] = {}):
         """Send and log an error reply.
 
         Arguments are
@@ -291,14 +275,13 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
                          HTTPStatus.NOT_MODIFIED)):
             # HTML encode to prevent Cross Site Scripting attacks
             # (see bug #1100201)
-            content = (self.error_message_format % {
-                'code': code,
-                'message': html.escape(message, quote=False),
-                'explain': html.escape(explain, quote=False)
-            })
+            content: str = self.server.error_page(code, html.escape(message, quote=False), html.escape(explain, quote=False))
             body = content.encode('UTF-8', 'replace')
             self.send_header("Content-Type", self.error_content_type)
             self.send_header('Content-Length', str(len(body)))
+        if headers:
+            for h_name, h_val in headers.items():
+                self.send_header(h_name, h_val)
         self.end_headers()
 
         if self.command != 'HEAD' and body:

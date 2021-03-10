@@ -6,6 +6,7 @@ import unittest
 from threading import Thread
 from time import sleep
 import urllib.request
+import urllib.error
 import http.client
 
 from simple_http_server.logger import get_logger, set_level
@@ -73,6 +74,24 @@ class HttpRequestTest(unittest.TestCase):
         path_val = "xyz"
         txt = self.visit(f"path_values/{pval}/{path_val}/x")
         assert txt == f"<html><body>{pval}, {path_val}</body></html>"
+
+    def test_error(self):
+        try:
+            self.visit("error")
+        except urllib.error.HTTPError as err:
+            assert err.code == 400
+            error_msg = err.read().decode("utf-8")    
+            _logger.info(error_msg)        
+            assert error_msg == "code：400, message: Parameter Error!, explain: Test Parameter Error!"
+
+    def test_exception(self):
+        try:
+            self.visit("exception")
+        except urllib.error.HTTPError as err:
+            assert err.code == 500
+            error_msg = err.read().decode("utf-8")
+            _logger.info(error_msg)
+            assert error_msg == '500-Internal Server Error-some error occurs!'
 
     def test_ws(self):
         ws = websocket.WebSocket()

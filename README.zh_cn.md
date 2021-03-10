@@ -589,6 +589,29 @@ class WSHandler(WebsocketHandler):
         _logger.info(f">>{session.id}<< close::{reason}")
 ```
 
+### 自定义错误信息
+
+You can use `@error_message` to specify your own error page. See:
+
+```python
+from simple_http_server import error_message
+# 具体的错误码
+@error_message("403", "404")
+def my_40x_page(message: str, explain=""):
+    return f"message: {message}, explain: {explain}"
+
+# 范围错误码
+@error_message("50x")
+def my_error_message(code, message, explain=""):
+    return f"{code}-{message}-{explain}"
+
+# 所有错误信号
+@error_message
+def my_error_message(code, message, explain=""):
+    return f"{code}-{message}-{explain}"
+```
+
+
 ## 编写过滤器
 
 参考 Java 的设计，我们增加了过滤器链式的设计，这个给了你一定的面向切面编码的能力，虽然比较弱，但是做一些权限验证，日志记录等也是够用的。

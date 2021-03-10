@@ -20,6 +20,7 @@ from simple_http_server import Session
 from simple_http_server import filter_map
 from simple_http_server import request_map, route
 from simple_http_server import controller
+from simple_http_server import error_message
 import os
 import simple_http_server.logger as logger
 import simple_http_server.server as server
@@ -45,12 +46,12 @@ def my_ctrl2(name, name2=Parameter("name", default="KEIJACK")):
 
 @request_map("/error")
 def my_ctrl3():
-    return Response(status_code=500)
+    raise HttpError(400, "Parameter Error!", "Test Parameter Error!")
 
 
 @request_map("/exception")
 def exception_ctrl():
-    raise HttpError(400, "Exception")
+    raise Exception("some error occurs!")
 
 
 @request_map("/upload", method="POST")
@@ -191,7 +192,6 @@ def my_path_val_ctr(pval: PathValue, path_val=PathValue()):
     return f"<html><body>{pval}, {path_val}</body></html>"
 
 
-
 @controller(args=["my-ctr"], kwargs={"desc": "desc"})
 @route("/obj")
 class MyController:
@@ -208,7 +208,16 @@ class MyController:
     def my_ctr_mth2(self, name: str, i: List[int]):
         return f"<html><head><title>{self._name}</title></head><body>{self._name}: {name}, {i}</body></html>"
 
-
     @route(regexp="^(reg/(.+))$", method="GET")
     def my_reg_ctr(self, reg_group: RegGroup = RegGroup(1)):
         return f"{self._name}, {reg_group.group},{reg_group}"
+
+
+@error_message("400")
+def my_40x_page(message: str, explain=""):
+    return f"code：400, message: {message}, explain: {explain}"
+
+
+@error_message
+def my_other_error_page(code, message, explain=""):
+    return f"{code}-{message}-{explain}"

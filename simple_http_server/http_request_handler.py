@@ -32,9 +32,6 @@ import threading
 import http.cookies as cookies
 import datetime
 
-from collections import OrderedDict
-
-from urllib.parse import unquote
 from typing import Dict, List
 
 from simple_http_server import ModelDict, RegGroup, RegGroups, HttpError, StaticFile, \
@@ -43,6 +40,7 @@ from simple_http_server import ModelDict, RegGroup, RegGroups, HttpError, Static
 from simple_http_server._http_session_local_impl import SESSION_COOKIE_NAME
 
 from .logger import get_logger
+from simple_http_server.__utils import get_function_args, get_function_kwargs
 
 _logger = get_logger("http_request_handler")
 
@@ -78,11 +76,11 @@ class ResponseWrapper(Response):
     def is_sent(self) -> bool:
         return self.__is_sent
 
-    def send_error(self, status_code: int, message: str = "") -> None:
-        self.status_code = status_code
-        msg = message if message is not None else ""
-        self.body = {"error": msg}
-        self.send_response()
+    def send_error(self, status_code: int, message: str = "", explain: str = "") -> None:
+        with self.__send_lock__:
+            self.__is_sent = True
+            self.status_code = status_code
+            self.__req_handler.send_error(self.status_code, message=message, explain=explain, headers=self.headers)
 
     def send_redirect(self, url: str) -> None:
         self.status_code = 302
@@ -207,7 +205,7 @@ class FilterContex:
         return status_code, headers, cks, body
 
     def __prepare_args(self):
-        args = _get_args_(self.__controller.func)
+        args = get_function_args(self.__controller.func)
         arg_vals = []
         if len(args) > 0:
             ctr_obj = self.__controller.ctrl_object
@@ -217,7 +215,7 @@ class FilterContex:
         for arg, arg_type_anno in args:
             if arg not in self.request.parameter.keys() \
                     and arg_type_anno not in (Request, Session, Response, RegGroups, RegGroup, Headers, cookies.BaseCookie, cookies.SimpleCookie, Cookies, PathValue, JSONBody, ModelDict):
-                raise HttpError(400, f"Parameter[{arg}] is required! ")
+                raise HttpError(400, "Missing Paramter", f"Parameter[{arg}] is required! ")
             param = self.__get_params_(arg, arg_type_anno)
             arg_vals.append(param)
 
@@ -272,14 +270,14 @@ class FilterContex:
         elif arg_type in (dict, Dict):
             param = self.__build_dict(arg, **kws)
         elif type_check:
-            raise HttpError(400, f"Parameter[{arg}] with Type {arg_type} is not supported yet.")
+            raise HttpError(400, None, f"Parameter[{arg}] with Type {arg_type} is not supported yet.")
         else:
             param = val
         return param
 
     def __build_reg_group(self, val: RegGroup = RegGroup(group=0)):
         if val.group >= len(self.request.reg_groups):
-            raise HttpError(400, f"RegGroup required an element at {val.group}, but the reg length is only {len(self.request.reg_groups)}")
+            raise HttpError(400, None, f"RegGroup required an element at {val.group}, but the reg length is only {len(self.request.reg_groups)}")
         return RegGroup(group=val.group, _value=self.request.reg_groups[val.group])
 
     def __build_model_dict(self):
@@ -292,7 +290,7 @@ class FilterContex:
         return mdict
 
     def __prepare_kwargs(self):
-        kwargs = _get_kwargs_(self.__controller.func)
+        kwargs = get_function_kwargs(self.__controller.func)
         if kwargs is None:
             return None
         kwarg_vals = {}
@@ -306,12 +304,12 @@ class FilterContex:
         if name in self.request.path_values:
             return PathValue(name=name, _value=self.request.path_values[name])
         else:
-            raise HttpError(500, f"path name[{name}] not in your url mapping!")
+            raise HttpError(500, None, f"path name[{name}] not in your url mapping!")
 
     def __build_cookie(self, key, val=None):
         name = val.name if val.name is not None and val.name != "" else key
         if val._required and name not in self.request.cookies:
-            raise HttpError(400, f"Cookie[{name}] is required.")
+            raise HttpError(400, "Missing Cookie", f"Cookie[{name}] is required.")
         if name in self.request.cookies:
             morsel = self.request.cookies[name]
             cookie = Cookie()
@@ -324,13 +322,13 @@ class FilterContex:
     def __build_multipart(self, key, val=MultipartFile()):
         name = val.name if val.name is not None and val.name != "" else key
         if val._required and name not in self.request.parameter.keys():
-            raise HttpError(400, f"Parameter[{name}] is required.")
+            raise HttpError(400, "Missing Parameter", f"Parameter[{name}] is required.")
         if name in self.request.parameter.keys():
             v = self.request.parameter[key]
             if isinstance(v, MultipartFile):
                 return v
             else:
-                raise HttpError(400, f"Parameter[{name}] should be a file.")
+                raise HttpError(400, None, f"Parameter[{name}] should be a file.")
         else:
             return val
 
@@ -339,7 +337,7 @@ class FilterContex:
             try:
                 return json.loads(self.request.parameter[key])
             except:
-                raise HttpError(400, f"Parameter[{key}] should be a JSON string.")
+                raise HttpError(400, None, f"Parameter[{key}] should be a JSON string.")
         else:
             return val
 
@@ -353,19 +351,19 @@ class FilterContex:
             try:
                 return [int(p) for p in ori_list]
             except:
-                raise HttpError(400, f"One of the parameter[{key}] is not int. ")
+                raise HttpError(400, None, f"One of the parameter[{key}] is not int. ")
         elif target_type == List[float]:
             try:
                 return [float(p) for p in ori_list]
             except:
-                raise HttpError(400, f"One of the parameter[{key}] is not float. ")
+                raise HttpError(400, None, f"One of the parameter[{key}] is not float. ")
         elif target_type == List[bool]:
             return [p.lower() not in ("0", "false", "") for p in ori_list]
         elif target_type in (List[dict], List[Dict]):
             try:
                 return [json.loads(p) for p in ori_list]
             except:
-                raise HttpError(400, f"One of the parameter[{key}] is not JSON string. ")
+                raise HttpError(400, None, f"One of the parameter[{key}] is not JSON string. ")
         elif target_type == List[Parameter]:
             return [Parameter(name=key, default=p, required=False) for p in ori_list]
         else:
@@ -376,7 +374,7 @@ class FilterContex:
             try:
                 return float(self.request.parameter[key])
             except:
-                raise HttpError(400, f"Parameter[{key}] should be an float. ")
+                raise HttpError(400, None, f"Parameter[{key}] should be an float. ")
         else:
             return val
 
@@ -385,7 +383,7 @@ class FilterContex:
             try:
                 return int(self.request.parameter[key])
             except:
-                raise HttpError(400, f"Parameter[{key}] should be an int. ")
+                raise HttpError(400, None, f"Parameter[{key}] should be an int. ")
         else:
             return val
 
@@ -407,13 +405,13 @@ class FilterContex:
     def __build_json_body(self):
         if "content-type" not in self.request._headers_keys_in_lowcase.keys() or \
                 not self.request._headers_keys_in_lowcase["content-type"].lower().startswith("application/json"):
-            raise HttpError(400, 'The content type of this request must be "application/json"')
+            raise HttpError(400, None, 'The content type of this request must be "application/json"')
         return JSONBody(self.request.json)
 
     def __build_header(self, key, val=Header()):
         name = val.name if val.name is not None and val.name != "" else key
         if val._required and name not in self.request.headers:
-            raise HttpError(400, f"Header[{name}] is required.")
+            raise HttpError(400, "Missing Header", f"Header[{name}] is required.")
         if name in self.request.headers:
             v = self.request.headers[name]
             return Header(name=name, default=v, required=val._required)
@@ -423,7 +421,7 @@ class FilterContex:
     def __build_params(self, key, val=Parameters()):
         name = val.name if val.name is not None and val.name != "" else key
         if val._required and name not in self.request.parameters:
-            raise HttpError(400, f"Parameter[{name}] is required.")
+            raise HttpError(400, "Missing Parameter", f"Parameter[{name}] is required.")
         if name in self.request.parameters:
             v = self.request.parameters[name]
             return Parameters(name=name, default=v, required=val._required)
@@ -433,46 +431,12 @@ class FilterContex:
     def __build_param(self, key, val=Parameter()):
         name = val.name if val.name is not None and val.name != "" else key
         if val._required and name not in self.request.parameter:
-            raise HttpError(400, f"Parameter[{name}] is required.")
+            raise HttpError(400, "Missing Parameter", f"Parameter[{name}] is required.")
         if name in self.request.parameter:
             v = self.request.parameter[name]
             return Parameter(name=name, default=v, required=val._required)
         else:
             return val
-
-
-def _get_args_(func):
-    argspec = inspect.getfullargspec(func)
-    # ignore first argument like `self` or `clz` in object methods or class methods
-    start = 1 if inspect.ismethod(func) else 0
-    if argspec.defaults is None:
-        args = argspec.args[start:]
-    else:
-        args = argspec.args[start: len(argspec.args) - len(argspec.defaults)]
-    arg_turples = []
-    for arg in args:
-        if arg in argspec.annotations:
-            ty = argspec.annotations[arg]
-        else:
-            ty = str
-        arg_turples.append((arg, ty))
-    return arg_turples
-
-
-def _get_kwargs_(func):
-    argspec = inspect.getfullargspec(func)
-    if argspec.defaults is None:
-        return None
-
-    kwargs = OrderedDict(zip(argspec.args[-len(argspec.defaults):], argspec.defaults))
-    kwarg_turples = []
-    for k, v in kwargs.items():
-        if k in argspec.annotations:
-            k_anno = argspec.annotations[k]
-        else:
-            k_anno = str
-        kwarg_turples.append((k, v, k_anno))
-    return kwarg_turples
 
 
 class HTTPRequestHandler:
@@ -485,6 +449,7 @@ class HTTPRequestHandler:
         self.rfile = base_http_quest_handler.rfile
         self.send_header = base_http_quest_handler.send_header
         self.send_response = base_http_quest_handler.send_response
+        self.send_error = base_http_quest_handler.send_error
         self.date_time_string = base_http_quest_handler.date_time_string
         self.end_headers = base_http_quest_handler.end_headers
         self.wfile = base_http_quest_handler.wfile
@@ -505,23 +470,17 @@ class HTTPRequestHandler:
 
         res = ResponseWrapper(self)
         if ctrl is None:
-            res.status_code = 404
-            res.body = {"error": "Cannot find a controller for your path"}
-            res.send_response()
+            res.send_error(404, "Controller Not Found", "Cannot find a controller for your path")
         else:
             filters = self.server.get_matched_filters(req.path)
             ctx = FilterContex(req, res, ctrl, filters)
             try:
                 ctx.do_chain()
             except HttpError as e:
-                res.status_code = e.code
-                res.body = {"error": e.message}
-                res.send_response()
+                res.send_error(e.code, e.message, e.explain)
             except Exception as e:
                 _logger.exception("error occurs! returning 500")
-                res.status_code = 500
-                res.body = {"error":  str(e)}
-                res.send_response()
+                res.send_error(500, None, str(e))
 
     def __prepare_request(self, method) -> RequestWrapper:
         path = self.request_path

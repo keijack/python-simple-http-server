@@ -382,6 +382,28 @@ class WSHandler(WebsocketHandler):
         _logger.info(f">>{session.id}<< close::{reason}")
 ```
 
+### Error pages
+
+You can use `@error_message` to specify your own error page. See:
+
+```python
+from simple_http_server import error_message
+# map specified codes
+@error_message("403", "404")
+def my_40x_page(message: str, explain=""):
+    return f"message: {message}, explain: {explain}"
+
+# map specified code rangs
+@error_message("40x", "50x")
+def my_error_message(code, message, explain=""):
+    return f"{code}-{message}-{explain}"
+
+# map all error page
+@error_message
+def my_error_message(code, message, explain=""):
+    return f"{code}-{message}-{explain}"
+```
+
 ### Write filters
 
 ```python

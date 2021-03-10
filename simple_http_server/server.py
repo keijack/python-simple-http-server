@@ -33,9 +33,7 @@ from typing import Dict
 
 import simple_http_server.http_server as http_server
 
-from simple_http_server import _get_filters
-from simple_http_server import _get_request_mappings
-from simple_http_server import _get_websocket_handlers
+from simple_http_server import _get_filters, _get_request_mappings, _get_websocket_handlers, _get_error_pages
 from simple_http_server import request_map
 from simple_http_server import StaticFile
 from simple_http_server.logger import get_logger
@@ -142,6 +140,10 @@ def start(host: str = "",
 
     for endpoint, clz in ws_handlers.items():
         _server.map_websocket_handler(endpoint, clz)
+
+    err_pages = _get_error_pages()
+    for code, func in err_pages.items():
+        _server.map_error_page(code, func)
 
     # start the server
     _server.start()

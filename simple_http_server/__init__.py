@@ -22,6 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 from abc import abstractmethod
+from collections import OrderedDict
 import sys
 import http.cookies
 import inspect
@@ -30,7 +31,7 @@ from typing import Any, Dict, List, Tuple, Type, Union, Callable
 from simple_http_server.logger import get_logger
 
 name = "simple_http_server"
-version = "0.9.3"
+version = "0.10.0"
 
 _logger = get_logger("simple_http_server.__init__")
 
@@ -357,10 +358,11 @@ class Response:
 
 class HttpError(Exception):
 
-    def __init__(self, code: int = 400, message: str = ""):
+    def __init__(self, code: int = 400, message: str = "", explain: str = ""):
         super().__init__("HTTP_ERROR[%d] %s" % (code, message))
         self.code: int = code
         self.message: str = message
+        self.explain: str = explain
 
 
 class Redirect:
@@ -598,6 +600,8 @@ _ctrl_singletons = {}
 
 _ws_handlers = {}
 
+_error_page = OrderedDict()
+
 _session_facory: SessionFactory = None
 
 
@@ -679,6 +683,33 @@ def websocket_handler(endpoint=""):
     return map
 
 
+def error_message(*anno_args):
+    len_args = len(anno_args)
+    arg_func = None
+
+    if len_args == 1:
+        if callable(anno_args[0]):
+            arg_func = anno_args[0]
+
+    if not arg_func:
+        if anno_args:
+            args = [it for it in anno_args]
+        else:
+            args = [""]
+    else:
+        args = [""]
+
+    def map(func):
+        for arg in args:
+            _error_page[arg] = func
+        return func
+    
+    if arg_func:
+        return map(arg_func)
+    else:
+        return map
+
+
 def _get_request_mappings():
     mappings: List[ControllerFunction] = []
 
@@ -735,3 +766,7 @@ def _get_session_factory() -> SessionFactory:
 
 def _get_websocket_handlers() -> Dict[str, Type]:
     return _ws_handlers
+
+def _get_error_pages() -> Dict[str, Callable]:
+    _logger.debug(f"error pages:: {_error_page}")
+    return _error_page

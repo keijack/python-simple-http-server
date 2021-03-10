@@ -102,9 +102,6 @@ def _log_msg_from_queue():
 
 
 def _log_msg_in_backgrond():
-    log_thread = Thread(target=_log_msg_from_queue, name="logging-thread")
-    log_thread.daemon = True
-    log_thread.start()
-
+    Thread(target=_log_msg_from_queue, name="logging-thread", daemon=True).start()
 
 _log_msg_in_backgrond()

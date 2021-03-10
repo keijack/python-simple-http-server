@@ -23,6 +23,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+import json
+import inspect
 import socket
 import os
 import re
@@ -39,7 +41,7 @@ from typing import Callable, Dict, List, Tuple
 from simple_http_server import ControllerFunction, StaticFile
 
 from .base_http_request_handler import BaseHTTPRequestHandler
-from .__utils import remove_url_first_slash
+from .__utils import remove_url_first_slash, get_function_args, get_function_kwargs
 from .logger import get_logger
 
 _logger = get_logger("simple_http_server.http_server")
@@ -70,11 +72,12 @@ class HTTPServer(ThreadingMixIn, TCPServer):
 
         self.filter_mapping = OrderedDict()
         self._res_conf = []
+        self.add_res_conf(res_conf)
 
         self.ws_mapping = OrderedDict()
         self.ws_path_val_mapping = OrderedDict()
 
-        self.add_res_conf(res_conf)
+        self.error_page_mapping = {}
 
     @property
     def res_conf(self):
@@ -258,6 +261,91 @@ class HTTPServer(ThreadingMixIn, TCPServer):
                 return clz, path_values
         return None, {}
 
+    def map_error_page(self, code: str, error_page_fun: Callable):
+        if not code:
+            c = "_"
+        else:
+            c = str(code).lower()
+        self.error_page_mapping[c] = error_page_fun
+
+    def _default_error_page(self, code: int, message: str = "", explain: str = ""):
+        return json.dumps({
+            "code": code,
+            "message": message,
+            "explain": explain
+        })
+
+    def error_page(self, code: int, message: str = "", explain: str = ""):
+        c = str(code)
+        func = None
+        if c in self.error_page_mapping:
+            func = self.error_page_mapping[c]
+        elif code > 200:
+            c0x = c[0:2] + "x"
+            if c0x in self.error_page_mapping:
+                func = self.error_page_mapping[c0x]
+            elif "_" in self.error_page_mapping:
+                func = self.error_page_mapping["_"]
+
+        if not func:
+            func = self._default_error_page
+        _logger.debug(f"error page function:: {func}")
+
+        co = code
+        msg = message
+        exp = explain
+
+        args_def = get_function_args(func, None)
+        kwargs_def = get_function_kwargs(func, None)
+
+        args = []
+        for n, t in args_def:
+            _logger.debug(f"set value to error_page function -> {n}")
+            if co is not None:
+                if t is None or t == int:
+                    args.append(co)
+                    co = None
+                    continue
+            if msg is not None:
+                if t is None or t == str:
+                    args.append(msg)
+                    msg = None
+                    continue
+            if exp is not None:
+                if t is None or t == str:
+                    args.append(exp)
+                    exp = None
+                    continue
+            args.append(None)
+
+        kwargs = {}
+        for n, v, t in kwargs_def:
+            if co is not None:
+                if (t is None and isinstance(v, int)) or t == int:
+                    kwargs[n] = co
+                    co = None
+                    continue
+            if msg is not None:
+                if (t is None and isinstance(v, str)) or t == str:
+                    kwargs[n] = msg
+                    msg = None
+                    continue
+            if exp is not None:
+                if (t is None and isinstance(v, str)) or t == str:
+                    kwargs[n] = exp
+                    exp = None
+                    continue
+            kwargs[n] = v
+
+        if args and kwargs:
+            return func(*args, **kwargs)
+        elif args:
+            return func(*args)
+        elif kwargs:
+            return func(**kwargs)
+        else:
+            return func()
+
 
 class SimpleDispatcherHttpServer:
     """Dispatcher Http server"""
@@ -270,6 +358,9 @@ class SimpleDispatcherHttpServer:
 
     def map_websocket_handler(self, endpoint, handler_class):
         self.server.map_websocket_hanlder(endpoint, handler_class)
+
+    def map_error_page(self, code, func):
+        self.server.map_error_page(code, func)
 
     def __init__(self,
                  host: Tuple[str, int] = ('', 9090),
@@ -322,6 +413,4 @@ class SimpleDispatcherHttpServer:
 
     def shutdown(self):
         # server must shutdown in a separate thread, or it will be deadlocking...WTF!
-        t = threading.Thread(target=self.server.shutdown)
-        t.daemon = True
-        t.start()
+        threading.Thread(target=self.server.shutdown, daemon=True).start()
