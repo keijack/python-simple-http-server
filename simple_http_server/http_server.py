@@ -24,7 +24,6 @@ SOFTWARE.
 """
 
 import json
-import inspect
 import socket
 import os
 import re
