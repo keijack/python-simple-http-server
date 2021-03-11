@@ -391,7 +391,16 @@ from simple_http_server import error_message
 # map specified codes
 @error_message("403", "404")
 def my_40x_page(message: str, explain=""):
-    return f"message: {message}, explain: {explain}"
+    return f"""
+    <html>
+        <head>
+            <title>发生错误！</title>
+        <head>
+        <body>
+            message: {message}, explain: {explain}
+        </body>
+    </html>
+    """
 
 # map specified code rangs
 @error_message("40x", "50x")

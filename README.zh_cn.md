@@ -591,14 +591,23 @@ class WSHandler(WebsocketHandler):
 
 ### 自定义错误信息
 
-You can use `@error_message` to specify your own error page. See:
+你可以通过 `@error_message` 来设定错误时返回特定的错误信息。
 
 ```python
 from simple_http_server import error_message
 # 具体的错误码
 @error_message("403", "404")
 def my_40x_page(message: str, explain=""):
-    return f"message: {message}, explain: {explain}"
+    return f"""
+    <html>
+        <head>
+            <title>发生错误！</title>
+        <head>
+        <body>
+            message: {message}, explain: {explain}
+        </body>
+    </html>
+    """
 
 # 范围错误码
 @error_message("50x")
