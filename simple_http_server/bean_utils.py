@@ -1,11 +1,14 @@
 # coding: utf-8
 
-from collections import OrderedDict
+
 import json
 import copy
 import inspect
-from typing import Any, Dict, Type
+from typing import Any, Dict, List, Type
+from simple_http_server.__utils import get_function_args
+from simple_http_server.logger import get_logger
 
+_logger = get_logger("bean_utils")
 
 class ObjectProperties:
 
@@ -20,7 +23,13 @@ class ObjectProperties:
         self.__property_values: Dict[str, Any] = {}
         self.__vars = {}
         self.__val_dict = None
-        self.__class_property_values: Dict[str, Any] = dict([(name, val) for name, val in vars(self.__clz).items() if not name.startswith("_")])
+        self.__class_property_values: Dict[str, Any] = {}
+        clzs: List = self.__clz.mro()
+        clzs.reverse()
+        # after reverse, the firest parent class is always `object`
+        for clz in clzs[1:]:
+            clz_values = dict([(name, val) for name, val in vars(clz).items() if not name.startswith("_")])
+            self.__class_property_values.update(clz_values)
         self.__object_property_values: Dict[str, Any] = dict([(name, val) for name, val in vars(self.__obj).items() if not name.startswith("_")])
         pros = inspect.getmembers(self.__clz, predicate=inspect.isdatadescriptor)
 
@@ -109,40 +118,6 @@ class ObjectProperties:
             setattr(self.__obj, name, value)
         except:
             print(f"Cannot set value to property {name} which may be read only")
-
-
-def get_function_args(func, default_type=str):
-    argspec = inspect.getfullargspec(func)
-    # ignore first argument like `self` or `clz` in object methods or class methods
-    start = 1 if inspect.ismethod(func) else 0
-    if argspec.defaults is None:
-        args = argspec.args[start:]
-    else:
-        args = argspec.args[start: len(argspec.args) - len(argspec.defaults)]
-    arg_turples = []
-    for arg in args:
-        if arg in argspec.annotations:
-            ty = argspec.annotations[arg]
-        else:
-            ty = default_type
-        arg_turples.append((arg, ty))
-    return arg_turples
-
-
-def get_function_kwargs(func, default_type=str):
-    argspec = inspect.getfullargspec(func)
-    if argspec.defaults is None:
-        return []
-
-    kwargs = OrderedDict(zip(argspec.args[-len(argspec.defaults):], argspec.defaults))
-    kwarg_turples = []
-    for k, v in kwargs.items():
-        if k in argspec.annotations:
-            k_anno = argspec.annotations[k]
-        else:
-            k_anno = default_type
-        kwarg_turples.append((k, v, k_anno))
-    return kwarg_turples
 
 
 def new_instance(bean_type: Type):

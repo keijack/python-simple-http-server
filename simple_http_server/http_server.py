@@ -39,7 +39,7 @@ from typing import Callable, Dict, List, Tuple
 
 from simple_http_server import ControllerFunction, StaticFile
 
-from .base_http_request_handler import BaseHTTPRequestHandler
+from .base_request_handler import BaseHTTPRequestHandler
 from .__utils import remove_url_first_slash, get_function_args, get_function_kwargs
 from .logger import get_logger
 
