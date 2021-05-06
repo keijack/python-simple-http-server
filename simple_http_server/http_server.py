@@ -40,31 +40,22 @@ from typing import Callable, Dict, List, Tuple
 from simple_http_server import ControllerFunction, StaticFile
 
 from .base_request_handler import BaseHTTPRequestHandler
+from .wsgi_request_handler import WSGIRequestHandler
 from .__utils import remove_url_first_slash, get_function_args, get_function_kwargs
 from .logger import get_logger
 
 _logger = get_logger("simple_http_server.http_server")
 
 
-class HTTPServer(ThreadingMixIn, TCPServer):
-
-    allow_reuse_address = 1    # Seems to make sense in testing environment
+class RoutingConf:
 
     HTTP_METHODS = ["OPTIONS", "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT"]
 
-    def server_bind(self):
-        """Override server_bind to store the server name."""
-        TCPServer.server_bind(self)
-        host, port = self.server_address[:2]
-        self.server_name = socket.getfqdn(host)
-        self.server_port = port
-
-    def __init__(self, addr, res_conf={}):
-        super().__init__(addr, BaseHTTPRequestHandler)
+    def __init__(self, res_conf={}):
         self.method_url_mapping: Dict[str, Dict[str, ControllerFunction]] = {"_": {}}
         self.path_val_url_mapping: Dict[str, Dict[str, ControllerFunction]] = {"_": OrderedDict()}
         self.method_regexp_mapping: Dict[str, Dict[str, ControllerFunction]] = {"_": OrderedDict()}
-        for mth in HTTPServer.HTTP_METHODS:
+        for mth in self.HTTP_METHODS:
             self.method_url_mapping[mth] = {}
             self.path_val_url_mapping[mth] = OrderedDict()
             self.method_regexp_mapping[mth] = OrderedDict()
@@ -132,7 +123,7 @@ class HTTPServer(ThreadingMixIn, TCPServer):
         regexp = ctrl.regexp
         method = ctrl.method
         _logger.debug(f"map url {url}|{regexp} with method[{method}] to function {ctrl.func}. ")
-        assert method is None or method == "" or method.upper() in HTTPServer.HTTP_METHODS
+        assert method is None or method == "" or method.upper() in self.HTTP_METHODS
         _method = method.upper() if method is not None and method != "" else "_"
         if regexp:
             self.method_regexp_mapping[_method][regexp] = ctrl
@@ -234,7 +225,7 @@ class HTTPServer(ThreadingMixIn, TCPServer):
                 available_filters.append(val)
         return available_filters
 
-    def map_websocket_hanlder(self, endpoint, handler_class):
+    def map_websocket_handler(self, endpoint, handler_class):
         url = remove_url_first_slash(endpoint)
         path_pattern, path_names = self.__get_path_reg_pattern(url)
         if path_pattern is None:
@@ -346,17 +337,33 @@ class HTTPServer(ThreadingMixIn, TCPServer):
             return func()
 
 
+class HTTPServer(ThreadingMixIn, TCPServer, RoutingConf):
+
+    allow_reuse_address = 1    # Seems to make sense in testing environment
+
+    def server_bind(self):
+        """Override server_bind to store the server name."""
+        TCPServer.server_bind(self)
+        host, port = self.server_address[:2]
+        self.server_name = socket.getfqdn(host)
+        self.server_port = port
+
+    def __init__(self, addr, res_conf={}):
+        TCPServer.__init__(self, addr, BaseHTTPRequestHandler)
+        RoutingConf.__init__(self, res_conf)
+
+
 class SimpleDispatcherHttpServer:
     """Dispatcher Http server"""
 
     def map_filter(self, path_pattern, filter_fun):
         self.server.map_filter(path_pattern, filter_fun)
 
-    def map_request(self, ctrl: ControllerFunction):
+    def map_controller(self, ctrl: ControllerFunction):
         self.server.map_controller(ctrl)
 
     def map_websocket_handler(self, endpoint, handler_class):
-        self.server.map_websocket_hanlder(endpoint, handler_class)
+        self.server.map_websocket_handler(endpoint, handler_class)
 
     def map_error_page(self, code, func):
         self.server.map_error_page(code, func)
@@ -413,3 +420,13 @@ class SimpleDispatcherHttpServer:
     def shutdown(self):
         # server must shutdown in a separate thread, or it will be deadlocking...WTF!
         threading.Thread(target=self.server.shutdown, daemon=True).start()
+
+
+class WSGIProxy(RoutingConf):
+
+    def __init__(self, res_conf):
+        super().__init__(res_conf=res_conf)
+
+    def app_proxy(self, environment, start_response):
+        requestHandler = WSGIRequestHandler(self, environment, start_response)
+        return requestHandler.handle()

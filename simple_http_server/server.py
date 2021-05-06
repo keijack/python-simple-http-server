@@ -134,7 +134,7 @@ def start(host: str = "",
     request_mappings = _get_request_mappings()
     # request mapping
     for ctr in request_mappings:
-        _server.map_request(ctr)
+        _server.map_controller(ctr)
 
     ws_handlers = _get_websocket_handlers()
 
@@ -166,3 +166,27 @@ def stop() -> None:
 def _favicon():
     root = os.path.dirname(os.path.abspath(__file__))
     return StaticFile(f"{root}/favicon.ico", "image/x-icon")
+
+
+def init_wsgi_proxy(resources: Dict[str, str] = {}) -> http_server.WSGIProxy:
+    proxy = http_server.WSGIProxy(res_conf=resources)
+    filters = _get_filters()
+    # filter configuration
+    for ft in filters:
+        proxy.map_filter(ft["url_pattern"], ft["func"])
+
+    request_mappings = _get_request_mappings()
+    # request mapping
+    for ctr in request_mappings:
+        proxy.map_controller(ctr)
+
+    ws_handlers = _get_websocket_handlers()
+
+    for endpoint, clz in ws_handlers.items():
+        proxy.map_websocket_handler(endpoint, clz)
+
+    err_pages = _get_error_pages()
+    for code, func in err_pages.items():
+        proxy.map_error_page(code, func)
+        
+    return proxy

@@ -2,42 +2,52 @@
 
 import os
 from typing import Dict
-import websocket
 import unittest
 from threading import Thread
 from time import sleep
+from unittest.case import skip
 import urllib.request
 import urllib.error
 import http.client
 
+from wsgiref.simple_server import WSGIServer, make_server
 from simple_http_server.logger import get_logger, set_level
 import simple_http_server.server as server
+
 
 set_level("DEBUG")
 
 _logger = get_logger("http_test")
 
 
-class HttpRequestTest(unittest.TestCase):
+class WSGIHttpRequestTest(unittest.TestCase):
 
     PORT = 9090
 
     WAIT_COUNT = 10
+
+    httpd: WSGIServer = None
+
+    server_ready = False
 
     @classmethod
     def start_server(clz):
         _logger.info("start server in background. ")
         root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         server.scan(project_dir=root, base_dir="tests/ctrls", regx=r'.*controllers.*')
-        server.start(
-            port=clz.PORT,
-            resources={"/public/*": f"{root}/tests/static"})
+        wsgi_proxy = server.init_wsgi_proxy(resources={"/public/*": f"{root}/tests/static"})
+
+        def wsgi_simple_app(environment, start_response):
+            return wsgi_proxy.app_proxy(environment, start_response)
+        clz.httpd = make_server("", clz.PORT, wsgi_simple_app)
+        clz.server_ready = True
+        clz.httpd.serve_forever()
 
     @classmethod
     def setUpClass(clz):
         Thread(target=clz.start_server, daemon=False, name="t").start()
         retry = 0
-        while not server.is_ready():
+        while not clz.server_ready:
             sleep(1)
             retry = retry + 1
             _logger.info(f"server is not ready wait. {retry}/{clz.WAIT_COUNT} ")
@@ -47,7 +57,7 @@ class HttpRequestTest(unittest.TestCase):
     @classmethod
     def tearDownClass(clz):
         try:
-            server.stop()
+            clz.httpd.shutdown()
         except:
             pass
 
@@ -89,8 +99,8 @@ class HttpRequestTest(unittest.TestCase):
             self.visit("error")
         except urllib.error.HTTPError as err:
             assert err.code == 400
-            error_msg = err.read().decode("utf-8")    
-            _logger.info(error_msg)        
+            error_msg = err.read().decode("utf-8")
+            _logger.info(error_msg)
             assert error_msg == "code：400, message: Parameter Error!, explain: Test Parameter Error!"
 
     def test_exception(self):
@@ -101,13 +111,3 @@ class HttpRequestTest(unittest.TestCase):
             error_msg = err.read().decode("utf-8")
             _logger.info(error_msg)
             assert error_msg == '500-Internal Server Error-some error occurs!'
-
-    def test_ws(self):
-        ws = websocket.WebSocket()
-        path_val = "test"
-        msg = "hello websocket!"
-        ws.connect(f"ws://127.0.0.1:{self.PORT}/ws/{path_val}")
-        ws.send(msg)
-        txt = ws.recv()
-        ws.close()
-        assert txt == f"{path_val}-{msg}"

@@ -1,12 +1,35 @@
 # -*- coding: utf-8 -*-
 
+"""
+Copyright (c) 2018 Keijack Wu
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+"""
+
+
 import email.utils
 import html
 import http.client
 import socket  # For gethostbyaddr()
 import socketserver
 import time
-from typing import Dict
+from typing import Any, Dict
 from urllib.parse import unquote
 
 
@@ -21,14 +44,9 @@ from .websocket_request_handler import WebsocketRequestHandler
 _logger = get_logger("base_server")
 
 
-DEFAULT_ERROR_CONTENT_TYPE = "text/html;charset=utf-8"
-
-
 class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
 
     server_version = "simple-http-server/" + __version__
-
-    error_content_type = DEFAULT_ERROR_CONTENT_TYPE
 
     default_request_version = "HTTP/0.9"
 
@@ -148,30 +166,13 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
         return True
 
     def _decode_query_string(self, query_string: str):
-        params = {}
-        if not query_string:
-            return params
-        pairs = query_string.split("&")
-        for item in pairs:
-            key, val = self._break(item, "=")
-            if val is None:
-                val = ""
-            self._put_to(params, unquote(key), unquote(val))
-
-        return params
+        return utils.decode_query_string(query_string)
 
     def _break(self, txt: str, separator: str):
-        try:
-            idx = txt.index(separator)
-            return txt[0: idx], txt[idx + len(separator):]
-        except ValueError:
-            return txt, None
+        return utils.break_into(txt, separator)
 
     def _put_to(self, params, key, val):
-        if key not in params.keys():
-            params[key] = [val]
-        else:
-            params[key].append(val)
+        utils.put_to(params, key, val)
 
     def __get_query_string(self, ori_path):
         parts = ori_path.split('?')
@@ -261,7 +262,7 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
             message = shortmsg
         if explain is None:
             explain = longmsg
-        self.log_error("code %d, message %s", code, message)
+        self.log_error(f"code {code}, message {message}")
         self.send_response(code, message)
         self.send_header('Connection', 'close')
 
@@ -273,11 +274,13 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
             code not in (HTTPStatus.NO_CONTENT,
                          HTTPStatus.RESET_CONTENT,
                          HTTPStatus.NOT_MODIFIED)):
-            # HTML encode to prevent Cross Site Scripting attacks
-            # (see bug #1100201)
-            content: str = self.server.error_page(code, html.escape(message, quote=False), html.escape(explain, quote=False))
-            body = content.encode('UTF-8', 'replace')
-            self.send_header("Content-Type", self.error_content_type)
+            try:
+                content: Any = self.server.error_page(code, html.escape(message, quote=False), html.escape(explain, quote=False))
+            except:
+                content: str = ""
+            content_type, body = utils.decode_response_body_to_bytes(content)
+
+            self.send_header("Content-Type", content_type)
             self.send_header('Content-Length', str(len(body)))
         if headers:
             for h_name, h_val in headers.items():
@@ -356,10 +359,7 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
         return self.server_version
 
     def date_time_string(self, timestamp=None):
-        """Return the current date and time formatted for a message header."""
-        if timestamp is None:
-            timestamp = time.time()
-        return email.utils.formatdate(timestamp, usegmt=True)
+        return utils.date_time_string(timestamp=timestamp)
 
     def log_date_time_string(self):
         """Return the current time formatted for logging."""

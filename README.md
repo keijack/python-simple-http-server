@@ -23,6 +23,7 @@ from `0.4.0`, python 2.7 is no longer supported, if you are using python 2.7, pl
 * Websocket support (from 0.9.0).
 * Easy to use.
 * Free style controller writing.
+* Easily integraded with WSGI servers. 
 
 ## Dependencies
 
@@ -512,6 +513,30 @@ logger.set_level("DEBUG")
 
 This logger will first save all the log record to a global queue, and then output them in a background thread, so it is very suitable for getting several logger with a same handler, especialy the `TimedRotatingFileHandler` which may slice the log files not quite well in a mutiple thread environment. 
 
+
+## WSGI Support
+
+You can use this module in WSGI apps. 
+
+```python
+import simple_http_server.server as server
+import os
+from simple_http_server import request_map
+
+
+# scan all your controllers
+server.scan("tests/ctrls", r'.*controllers.*')
+# or define a new controller function here
+@request_map("/hello_wsgi")
+def my_controller(name: str):
+    return 200, "Hello, WSGI!"
+# resources is optional
+wsgi_proxy = server.init_wsgi_proxy(resources={"/public/*": f"/you/static/files/path"})
+
+# wsgi app entrance. 
+def simple_app(environ, start_response):
+    return wsgi_proxy.app_proxy(environ, start_response)
+```
 
 ## Thanks
 

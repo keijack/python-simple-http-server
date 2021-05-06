@@ -23,8 +23,20 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from collections import OrderedDict
 import inspect
+import time
+import os
+import email
+import json
+from collections import OrderedDict
+from typing import Any, Tuple, Union
+from urllib.parse import unquote
+from simple_http_server import HttpError, StaticFile
+
+from .logger import get_logger
+
+
+_logger = get_logger("utils")
 
 
 def remove_url_first_slash(url: str):
@@ -66,3 +78,86 @@ def get_function_kwargs(func, default_type=str):
             k_anno = default_type
         kwarg_turples.append((k, v, k_anno))
     return kwarg_turples
+
+
+def break_into(txt: str, separator: str):
+    try:
+        idx = txt.index(separator)
+        return txt[0: idx], txt[idx + len(separator):]
+    except ValueError:
+        return txt, None
+
+
+def put_to(params, key, val):
+    if key not in params.keys():
+        params[key] = [val]
+    else:
+        params[key].append(val)
+
+
+def decode_query_string(query_string: str):
+    params = {}
+    if not query_string:
+        return params
+    pairs = query_string.split("&")
+    for item in pairs:
+        key, val = break_into(item, "=")
+        if val is None:
+            val = ""
+        put_to(params, unquote(key), unquote(val))
+
+    return params
+
+
+def date_time_string(timestamp=None):
+    if timestamp is None:
+        timestamp = time.time()
+    return email.utils.formatdate(timestamp, usegmt=True)
+
+
+def decode_response_body(raw_body: Any) -> Tuple[str, Union[str,  bytes, StaticFile]]:
+    content_type = "text/plain; chartset=utf8"
+    if raw_body is None:
+        body = ""
+    elif isinstance(raw_body, dict):
+        content_type = "application/json; charset=utf8"
+        body = json.dumps(raw_body, ensure_ascii=False)
+    elif isinstance(raw_body, str):
+        body = raw_body.strip()
+        if body.startswith("<?xml") and body.endswith(">"):
+            content_type = "text/xml; charset=utf8"
+        elif body.lower().startswith("<!doctype html") and body.endswith(">"):
+            content_type = "text/html; charset=utf8"
+        elif body.lower().startswith("<html") and body.endswith(">"):
+            content_type = "text/html; charset=utf8"
+        else:
+            content_type = "text/plain; charset=utf8"
+    elif isinstance(raw_body, StaticFile):
+        if not os.path.isfile(raw_body.file_path):
+            _logger.error(f"Cannot find file[{raw_body.file_path}] specified in StaticFile body.")
+            raise HttpError(404, explain="Cannot find file for this url.")
+        else:
+            body = raw_body
+            content_type = body.content_type
+    elif isinstance(raw_body, bytes):
+        body = raw_body
+        content_type = "application/octet-stream"
+    else:
+        body = raw_body
+    return content_type, body
+
+
+def decode_response_body_to_bytes(raw_body: Any) -> Tuple[str, bytes]:
+    content_type, body = decode_response_body(raw_body)
+    if body is None:
+        byte_body = b''
+    elif isinstance(body, str):
+        byte_body = body.encode("utf-8", 'replace')
+    elif isinstance(body, bytes):
+        byte_body = body
+    elif isinstance(body, StaticFile):
+        with open(body.file_path, "rb") as in_file:
+            byte_body = in_file.read()
+    else:
+        raise HttpError(400, explain="Cannot read body into bytes!")
+    return content_type, byte_body

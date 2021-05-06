@@ -23,6 +23,7 @@ Python 3.7
 * 支持 SSL
 * 支持 websocket（从 0.9.0 开始）
 * 编写风格自由
+* 可嵌入到 WSGI 标准当中
 
 ## 依赖
 
@@ -738,6 +739,30 @@ logger.set_level("DEBUG")
 ```
 
 这个日志使用了一个背景线程来输出日志，因此其非常适合使用在多线程的场景，特别你是你有多个 logger 共用一个 `TimedRotatingFileHandler` 的时候。在多线程的场景下，这个日志控制器经常不能正常地按时切割文件。
+
+## WSGI 支持
+
+你可以在 WSGI 的框架下（例如在阿里云的函数计算的 HTTP 入口中）引入本框架。
+
+```python
+import simple_http_server.server as server
+import os
+from simple_http_server import request_map
+
+
+# 扫描你的控制器函数
+server.scan("tests/ctrls", r'.*controllers.*')
+# 或者在这里定义一个controller
+@request_map("/hello_wsgi")
+def my_controller(name: str):
+    return 200, "Hello, WSGI!"
+# 初始化一个 wsgi 代理，入参 resources 为可选参数。
+wsgi_proxy = server.init_wsgi_proxy(resources={"/public/*": f"/you/static/files/path"})
+
+# WSGI 标准入口
+def simple_app(environ, start_response):
+    return wsgi_proxy.app_proxy(environ, start_response)
+```
 
 ## 感谢
 

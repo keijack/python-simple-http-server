@@ -128,6 +128,11 @@ def tuple_with_cookies(headers=Headers(), all_cookies=Cookies(), cookie_sc=Cooki
     return 200, Header({"xx": "yyy"}), cks, "<html><body>OK</body></html>"
 
 
+@request_map("header_echo")
+def header_echo(headers: Headers):
+    return 200, headers, ""
+
+
 @filter_map("^/tuple")
 def filter_tuple(ctx):
     print("---------- through filter ---------------")

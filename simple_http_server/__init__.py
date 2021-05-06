@@ -31,7 +31,7 @@ from typing import Any, Dict, List, Tuple, Type, Union, Callable
 from simple_http_server.logger import get_logger
 
 name = "simple_http_server"
-version = "0.10.0"
+version = "0.11.0"
 
 _logger = get_logger("simple_http_server.__init__")
 
@@ -103,6 +103,7 @@ class Request:
         self.__parameter = {}  # Parameters, key-value, if more than one parameters with the same key, only the first one will be stored.
         self.body: bytes = b""  # Request body
         self.json: Dict[str, Any] = None  # A dictionary if the `Content-Type` in request header is `application/json`
+        self.environment = {}
 
     @property
     def cookies(self) -> Cookies:
@@ -243,6 +244,8 @@ class Parameters(list):
 class ModelDict(dict):
     pass
 
+class Environment(dict):
+    pass
 
 class RegGroups(tuple):
     pass

@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 
-# -*- coding: utf-8 -*-
-
 """
 Copyright (c) 2018 Keijack Wu
 
@@ -32,12 +30,13 @@ import threading
 import http.cookies as cookies
 import datetime
 
-from typing import Dict, List
+from typing import Dict, List, Union
 
-from simple_http_server import ModelDict, RegGroup, RegGroups, HttpError, StaticFile, \
+from simple_http_server import ModelDict, Environment, RegGroup, RegGroups, HttpError, StaticFile, \
     Headers, Redirect, Response, Cookies, Cookie, JSONBody, Header, Parameters, PathValue, \
     Parameter, MultipartFile, Request, Session, ControllerFunction, _get_session_factory
 from simple_http_server._http_session_local_impl import SESSION_COOKIE_NAME
+import simple_http_server.__utils as utils
 
 from .logger import get_logger
 from simple_http_server.__utils import get_function_args, get_function_kwargs
@@ -237,6 +236,8 @@ class FilterContex:
             param = Headers(self.request.headers)
         elif arg_type == RegGroups:
             param = RegGroups(self.request.reg_groups)
+        elif arg_type == Environment:
+            param = Environment(self.request.environment)
         elif arg_type == Header:
             param = self.__build_header(arg, **kws)
         elif inspect.isclass(arg_type) and issubclass(arg_type, cookies.BaseCookie):
@@ -441,24 +442,26 @@ class FilterContex:
 
 class HTTPRequestHandler:
 
-    def __init__(self, base_http_quest_handler) -> None:
+    def __init__(self, base_http_quest_handler, environment = {}) -> None:
         self.base_http_quest_handler = base_http_quest_handler
         self.method = base_http_quest_handler.command
+        self.request_path = base_http_quest_handler.request_path
+        self.query_string = base_http_quest_handler.query_string
+        self.query_parameters = base_http_quest_handler.query_parameters
         self.server = base_http_quest_handler.server
         self.headers = base_http_quest_handler.headers
         self.rfile = base_http_quest_handler.rfile
         self.send_header = base_http_quest_handler.send_header
+        self.end_headers = base_http_quest_handler.end_headers
         self.send_response = base_http_quest_handler.send_response
         self.send_error = base_http_quest_handler.send_error
-        self.date_time_string = base_http_quest_handler.date_time_string
-        self.end_headers = base_http_quest_handler.end_headers
         self.wfile = base_http_quest_handler.wfile
-        self.__decode_query_string = base_http_quest_handler._decode_query_string
-        self.__put_to = base_http_quest_handler._put_to
-        self.__break = base_http_quest_handler._break
-        self.query_string = base_http_quest_handler.query_string
-        self.query_parameters = base_http_quest_handler.query_parameters
-        self.request_path = base_http_quest_handler.request_path
+        self.environment = environment
+
+        self.__decode_query_string = utils.decode_query_string
+        self.__put_to = utils.put_to
+        self.__break = utils.break_into
+        self.date_time_string = utils.date_time_string
 
     def handle(self):
         mth = self.method.upper()
@@ -485,8 +488,8 @@ class HTTPRequestHandler:
     def __prepare_request(self, method) -> RequestWrapper:
         path = self.request_path
         req = RequestWrapper()
+        req.environment = self.environment or {}
         req.path = "/" + path
-
         req._path = path
         headers = {}
         _headers_keys_in_lowers = {}
@@ -579,11 +582,19 @@ class HTTPRequestHandler:
         return self.__break(txt, "\r\n")
 
     def _send_response(self, response):
-        headers = response["headers"]
-        cks = response["cookies"]
+        try:
+            headers = response["headers"]
+            cks = response["cookies"]
+            raw_body = response["body"]
+            status_code = response["status_code"]
+            content_type, body = utils.decode_response_body(raw_body)
 
-        status_code, content_type, body = self.__prepare_res_body(response)
+            self._send_res(status_code, headers, content_type, cks, body)
 
+        except HttpError as e:
+            self.send_error(e.code, e.message, e.explain)
+
+    def _send_res(self, status_code: int, headers: Dict[str, str] = {}, content_type: str = "", cks: Cookies = Cookies(), body: Union[str, bytes, StaticFile] = None):
         if "Content-Type" not in headers.keys() and "content-type" not in headers.keys():
             headers["Content-Type"] = content_type
 
@@ -624,40 +635,3 @@ class HTTPRequestHandler:
                 while data:
                     self.wfile.write(data)
                     data = in_file.read(buffer_size)
-
-    def __prepare_res_body(self, response: Response):
-        status_code = response["status_code"]
-        raw_body = response["body"]
-        content_type = "text/plain; chartset=utf8"
-        if raw_body is None:
-            body = ""
-        elif isinstance(raw_body, dict):
-            content_type = "application/json; charset=utf8"
-            body = json.dumps(raw_body, ensure_ascii=False)
-        elif isinstance(raw_body, str):
-            body = raw_body.strip()
-            if body.startswith("<?xml") and body.endswith(">"):
-                content_type = "text/xml; charset=utf8"
-            elif body.lower().startswith("<!doctype html") and body.endswith(">"):
-                content_type = "text/html; charset=utf8"
-            elif body.lower().startswith("<html") and body.endswith(">"):
-                content_type = "text/html; charset=utf8"
-            else:
-                content_type = "text/plain; charset=utf8"
-        elif isinstance(raw_body, StaticFile):
-            if not os.path.isfile(raw_body.file_path):
-                _logger.error(f"Cannot find file[{raw_body.file_path}] specified in StaticFile body.")
-                status_code = 404
-                content_type = "application/json; charset=utf8"
-                body = json.dumps({
-                    "error": "Cannot find file for this url."
-                }, ensure_ascii=False)
-            else:
-                body = raw_body
-                content_type = body.content_type
-        elif isinstance(raw_body, bytes):
-            body = raw_body
-            content_type = "application/octet-stream"
-        else:
-            body = raw_body
-        return status_code, content_type, body
