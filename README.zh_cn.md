@@ -760,7 +760,7 @@ def my_controller(name: str):
 wsgi_proxy = server.init_wsgi_proxy(resources={"/public/*": f"/you/static/files/path"})
 
 # WSGI 标准入口
-def simple_app(environ, start_response):
+def handler(environ, start_response):
     return wsgi_proxy.app_proxy(environ, start_response)
 ```
 
