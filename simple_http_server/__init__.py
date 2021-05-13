@@ -31,7 +31,7 @@ from typing import Any, Dict, List, Tuple, Type, Union, Callable
 from simple_http_server.logger import get_logger
 
 name = "simple_http_server"
-version = "0.11.2"
+version = "0.11.3"
 
 DEFAULT_ENCODING = "UTF-8"
 
@@ -52,7 +52,7 @@ class Session:
         return 0
 
     @property
-    def last_acessed_time(self) -> float:
+    def last_accessed_time(self) -> float:
         return 0
 
     @property
@@ -65,7 +65,7 @@ class Session:
 
     @property
     def is_valid(self) -> bool:
-        return time.time() - self.last_acessed_time < self.max_inactive_interval
+        return time.time() - self.last_accessed_time < self.max_inactive_interval
 
     def get_attribute(self, name: str) -> Any:
         return None

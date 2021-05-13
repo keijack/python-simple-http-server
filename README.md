@@ -297,7 +297,7 @@ class MySessionImpl(Session):
         # your own implementation
 
     @property
-    def last_acessed_time(self) -> float:
+    def last_accessed_time(self) -> float:
         # your own implementation
 
     @property

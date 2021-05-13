@@ -138,7 +138,7 @@ class FilterContex:
 
             session = self.request.get_session()
             if session and session.is_valid:
-                exp = datetime.datetime.utcfromtimestamp(session.last_acessed_time + session.max_inactive_interval)
+                exp = datetime.datetime.utcfromtimestamp(session.last_accessed_time + session.max_inactive_interval)
                 sck = Cookies()
                 sck[SESSION_COOKIE_NAME] = session.id
                 sck[SESSION_COOKIE_NAME]["httponly"] = True

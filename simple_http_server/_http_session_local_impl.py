@@ -115,7 +115,7 @@ class LocalSessionImpl(Session):
         super().__init__()
         self.__id = id
         self.__creation_time = creation_time
-        self.__last_acessed_time = creation_time
+        self.__last_accessed_time = creation_time
         self.__is_new = True
         self.__attr_lock = RLock()
         self.__attrs = {}
@@ -130,15 +130,15 @@ class LocalSessionImpl(Session):
         return self.__creation_time
 
     @property
-    def last_acessed_time(self) -> float:
-        return self.__last_acessed_time
+    def last_accessed_time(self) -> float:
+        return self.__last_accessed_time
 
     @property
     def is_new(self) -> bool:
         return self.__is_new
 
-    def _set_last_acessed_time(self, last_acessed_time: float):
-        self.__last_acessed_time = last_acessed_time
+    def _set_last_accessed_time(self, last_acessed_time: float):
+        self.__last_accessed_time = last_acessed_time
         self.__is_new = False
 
     @property
@@ -153,7 +153,7 @@ class LocalSessionImpl(Session):
             self.__attrs[name] = value
 
     def invalidate(self) -> None:
-        self._set_last_acessed_time(0)
+        self._set_last_accessed_time(0)
         self.__session_holder.clean_session(session_id=self.id)
 
 
@@ -173,7 +173,7 @@ class LocalSessionFactory(SessionFactory):
     def get_session(self, session_id: str, create: bool = False) -> Session:
         sess: LocalSessionImpl = self.__session_holder.get_session(session_id)
         if sess:
-            sess._set_last_acessed_time(time.time())
+            sess._set_last_accessed_time(time.time())
             return sess
         if not create:
             return None
