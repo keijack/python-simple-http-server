@@ -31,7 +31,7 @@ import json
 from collections import OrderedDict
 from typing import Any, Tuple, Union
 from urllib.parse import unquote
-from simple_http_server import HttpError, StaticFile
+from simple_http_server import HttpError, StaticFile, DEFAULT_ENCODING
 
 from .logger import get_logger
 
@@ -152,7 +152,7 @@ def decode_response_body_to_bytes(raw_body: Any) -> Tuple[str, bytes]:
     if body is None:
         byte_body = b''
     elif isinstance(body, str):
-        byte_body = body.encode("utf-8", 'replace')
+        byte_body = body.encode(DEFAULT_ENCODING, 'replace')
     elif isinstance(body, bytes):
         byte_body = body
     elif isinstance(body, StaticFile):

@@ -34,7 +34,7 @@ from typing import Dict, List, Union
 
 from simple_http_server import ModelDict, Environment, RegGroup, RegGroups, HttpError, StaticFile, \
     Headers, Redirect, Response, Cookies, Cookie, JSONBody, Header, Parameters, PathValue, \
-    Parameter, MultipartFile, Request, Session, ControllerFunction, _get_session_factory
+    Parameter, MultipartFile, Request, Session, ControllerFunction, _get_session_factory, DEFAULT_ENCODING
 from simple_http_server._http_session_local_impl import SESSION_COOKIE_NAME
 import simple_http_server.__utils as utils
 
@@ -512,11 +512,11 @@ class HTTPRequestHandler:
             self.rfile.close()
             content_type = _headers_keys_in_lowers["content-type"]
             if content_type.lower().startswith("application/x-www-form-urlencoded"):
-                data_params = self.__decode_query_string(req.body.decode("UTF-8"))
+                data_params = self.__decode_query_string(req.body.decode(DEFAULT_ENCODING))
             elif content_type.lower().startswith("multipart/form-data"):
                 data_params = self.__decode_multipart(content_type, req.body.decode("ISO-8859-1"))
             elif content_type.lower().startswith("application/json"):
-                req.json = json.loads(req.body.decode("UTF-8"))
+                req.json = json.loads(req.body.decode(DEFAULT_ENCODING))
                 data_params = {}
             else:
                 data_params = {}
@@ -552,12 +552,12 @@ class HTTPRequestHandler:
         line, rest = self.__read_line(field)
 
         kvs = self.__decode_content_disposition(line)
-        kname = kvs["name"].encode("ISO-8859-1").decode("UTF-8")
+        kname = kvs["name"].encode("ISO-8859-1").decode(DEFAULT_ENCODING)
         if len(kvs) == 1:
             # this is a string field, the second line is an empty line, the rest is the value
-            val = self.__read_line(rest)[1].encode("ISO-8859-1").decode("UTF-8")
+            val = self.__read_line(rest)[1].encode("ISO-8859-1").decode(DEFAULT_ENCODING)
         elif len(kvs) == 2:
-            filename = kvs["filename"].encode("ISO-8859-1").decode("UTF-8")
+            filename = kvs["filename"].encode("ISO-8859-1").decode(DEFAULT_ENCODING)
             # the second line is Content-Type line
             ct_line, rest = self.__read_line(rest)
             content_type = ct_line.split(":")[1].strip()
@@ -616,7 +616,7 @@ class HTTPRequestHandler:
             self.send_header("Content-Length", 0)
             self.end_headers()
         elif isinstance(body, str):
-            data = body.encode("utf-8")
+            data = body.encode(DEFAULT_ENCODING)
             self.send_header("Content-Length", len(data))
             self.end_headers()
             self.wfile.write(data)
