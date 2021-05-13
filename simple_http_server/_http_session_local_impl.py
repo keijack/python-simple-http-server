@@ -26,7 +26,7 @@ import threading
 import uuid
 import time
 
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, List, Tuple
 from threading import RLock
 from simple_http_server import Session, SessionFactory, set_session_factory
 from simple_http_server.logger import get_logger
@@ -48,9 +48,70 @@ def _get_from_dict(adict: Dict[str, Any], key: str) -> Any:
         return None
 
 
+class LocalSessionHolder:
+
+    def __init__(self):
+        self.__sessions: Dict[str, Session] = {}
+        self.__session_lock = RLock()
+        self.__started = False
+        self.__clearing_thread = threading.Thread(target=self._clear_time_out_session_in_bg, daemon=True)
+
+    def _start_cleaning(self):
+        if not self.__started:
+            self.__started = True
+            self.__clearing_thread.start()
+
+    def _clear_time_out_session_in_bg(self):
+        while True:
+            time.sleep(_SESSION_TIME_CLEANING_INTERVAL)
+            self._clear_time_out_session()
+
+    def _clear_time_out_session(self):
+        timeout_sessions: List[Session] = []
+        for v in self.__sessions.values():
+            if not v.is_valid:
+                timeout_sessions.append(v)
+        for session in timeout_sessions:
+            session.invalidate()
+
+    def clean_session(self, session_id: str):
+        if session_id in self.__sessions:
+            try:
+                _logger.debug("session[#%s] is being cleaned" % session_id)
+                sess = self.__sessions[session_id]
+                if not sess.is_valid:
+                    del self.__sessions[session_id]
+            except KeyError:
+                _logger.debug("Session[#%s] in session cache is already deleted. " % session_id)
+
+    def get_session(self, session_id: str) -> Session:
+        if not session_id:
+            return None
+        sess: Session = _get_from_dict(self.__sessions, session_id)
+        if sess and sess.is_valid:
+            return sess
+        else:
+            return None
+
+    def cache_session(self,  session: Session):
+        if not session:
+            return None
+        sess: Session = _get_from_dict(self.__sessions, session.id)
+
+        if sess:
+            if session is sess:
+                return
+            sess.invalidate()
+        with self.__session_lock:
+            self.__sessions[session.id] = session
+            self._start_cleaning()
+
+            return session
+
+
 class LocalSessionImpl(Session):
 
-    def __init__(self, id: str, creation_time: float, session_fac: SessionFactory):
+    def __init__(self, id: str, creation_time: float, session_holder: LocalSessionHolder):
         super().__init__()
         self.__id = id
         self.__creation_time = creation_time
@@ -58,7 +119,7 @@ class LocalSessionImpl(Session):
         self.__is_new = True
         self.__attr_lock = RLock()
         self.__attrs = {}
-        self.__ses_fac = session_fac
+        self.__session_holder = session_holder
 
     @property
     def id(self) -> str:
@@ -93,21 +154,14 @@ class LocalSessionImpl(Session):
 
     def invalidate(self) -> None:
         self._set_last_acessed_time(0)
-        self.__ses_fac.clean_session(session_id=self.id)
+        self.__session_holder.clean_session(session_id=self.id)
 
 
 class LocalSessionFactory(SessionFactory):
 
     def __init__(self):
-        self.__sessions: Dict[str, LocalSessionImpl] = {}
+        self.__session_holder = LocalSessionHolder()
         self.__session_lock = RLock()
-        self.__started = False
-        self.__clearing_thread = threading.Thread(target=self._clear_time_out_session_in_bg, daemon=True)
-
-    def _start_cleaning(self):
-        if not self.__started:
-            self.__started = True
-            self.__clearing_thread.start()
 
     def _create_local_session(self, session_id: str) -> Session:
         if session_id:
@@ -116,49 +170,16 @@ class LocalSessionFactory(SessionFactory):
             sid = uuid.uuid4().hex
         return LocalSessionImpl(sid, time.time(), self)
 
-    def _clear_time_out_session_in_bg(self):
-        while True:
-            time.sleep(_SESSION_TIME_CLEANING_INTERVAL)
-            self._clear_time_out_session()
-
-    def _clear_time_out_session(self):
-        cl_ids = []
-        for k, v in self.__sessions.items():
-            if not v.is_valid:
-                cl_ids.append(k)
-        for k in cl_ids:
-            self.clean_session(k)
-
-    def clean_session(self, session_id: str):
-        if session_id in self.__sessions:
-            try:
-                _logger.debug("session[#%s] is being cleaned" % session_id)
-                sess = self.__sessions[session_id]
-                if not sess.is_valid:
-                    del self.__sessions[session_id]
-            except KeyError:
-                _logger.debug("Session[#%s] in session cache is already deleted. " % session_id)
-
-    def _get_session(self, session_id: str) -> LocalSessionImpl:
-        if not session_id:
-            return None
-        sess: LocalSessionImpl = _get_from_dict(self.__sessions, session_id)
-        if sess and sess.is_valid:
-            return sess
-        else:
-            return None
-
     def get_session(self, session_id: str, create: bool = False) -> Session:
-        sess = self._get_session(session_id)
+        sess: LocalSessionImpl = self.__session_holder.get_session(session_id)
         if sess:
             sess._set_last_acessed_time(time.time())
             return sess
+        if not create:
+            return None
         with self.__session_lock:
             session = self._create_local_session(session_id)
-            self.__sessions[session.id] = session
-
-            self._start_cleaning()
-
+            self.__session_holder.cache_session(session)
             return session
 
 

@@ -323,9 +323,7 @@ class MySessionFacImpl(SessionFactory):
         super().__init__()
         # your own implementation
 
-    def clean_session(self, session_id: str):
-        # your own implementation
-
+    
     def get_session(self, session_id: str, create: bool = False) -> Session:
         # your own implementation
         return MySessionImpl()

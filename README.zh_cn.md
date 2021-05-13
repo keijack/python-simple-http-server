@@ -342,7 +342,8 @@ def my_reg_ctr(reg_groups: RegGroups, reg_group: RegGroup = RegGroup(1)):
     print(reg_group) # 输出 "abcef/aref/xxx"
     return f"{self._name}, {reg_group.group},{reg_group}"
 ```
-Regular expression mapping a class:
+
+在控制器类中使用正则表达式的 request_map:
 
 ```python
 @controller(args=["ctr_name"], kwargs={"desc": "this is a key word argument"})
@@ -407,9 +408,6 @@ class MySessionFacImpl(SessionFactory):
 
     def __init__(self):
         super().__init__()
-        # your own implementation
-
-    def clean_session(self, session_id: str):
         # your own implementation
 
     def get_session(self, session_id: str, create: bool = False) -> Session:

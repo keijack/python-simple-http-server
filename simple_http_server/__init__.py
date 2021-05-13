@@ -31,7 +31,7 @@ from typing import Any, Dict, List, Tuple, Type, Union, Callable
 from simple_http_server.logger import get_logger
 
 name = "simple_http_server"
-version = "0.11.0"
+version = "0.11.1"
 
 _logger = get_logger("simple_http_server.__init__")
 
@@ -76,9 +76,6 @@ class Session:
 
 
 class SessionFactory:
-
-    def clean_session(self, session_id: str):
-        pass
 
     def get_session(self, session_id: str, create: bool = False) -> Session:
         return None
@@ -244,8 +241,10 @@ class Parameters(list):
 class ModelDict(dict):
     pass
 
+
 class Environment(dict):
     pass
+
 
 class RegGroups(tuple):
     pass
@@ -706,7 +705,7 @@ def error_message(*anno_args):
         for arg in args:
             _error_page[arg] = func
         return func
-    
+
     if arg_func:
         return map(arg_func)
     else:
@@ -769,6 +768,7 @@ def _get_session_factory() -> SessionFactory:
 
 def _get_websocket_handlers() -> Dict[str, Type]:
     return _ws_handlers
+
 
 def _get_error_pages() -> Dict[str, Callable]:
     _logger.debug(f"error pages:: {_error_page}")
