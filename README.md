@@ -332,6 +332,8 @@ set_session_factory(MySessionFacImpl())
 
 ```
 
+There is an offical Redis implementation here: https://github.com/keijack/python-simple-http-server-redis-session.git
+
 ### Websocket
 
 ```python

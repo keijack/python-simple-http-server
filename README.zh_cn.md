@@ -418,6 +418,9 @@ set_session_factory(MySessionFacImpl())
 
 ```
 
+你可以使用以下的 redis session 实现：https://gitee.com/keijack/python-simple-http-server-redis-session
+
+
 ### 响应请求
 
 从上述的例子中可以看出，取得请求中的参数我们有许多方式，这个给了开发者很高的自由度来编写这些信息。而响应的方法一样具有各种方法。
