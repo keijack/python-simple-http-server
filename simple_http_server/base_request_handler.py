@@ -28,8 +28,6 @@ import socket  # For gethostbyaddr()
 import socketserver
 import time
 from typing import Any, Dict
-from urllib.parse import unquote
-
 
 from http import HTTPStatus
 
@@ -39,7 +37,7 @@ from .logger import get_logger
 from .http_request_handler import HTTPRequestHandler
 from .websocket_request_handler import WebsocketRequestHandler
 
-_logger = get_logger("base_server")
+_logger = get_logger("simple_http_server.base_request_handler")
 
 
 class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):

@@ -36,7 +36,7 @@ from simple_http_server import HttpError, StaticFile, DEFAULT_ENCODING
 from .logger import get_logger
 
 
-_logger = get_logger("utils")
+_logger = get_logger("simple_http_server.utils")
 
 
 def remove_url_first_slash(url: str):

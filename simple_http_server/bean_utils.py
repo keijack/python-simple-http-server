@@ -30,7 +30,7 @@ from typing import Any, Dict, List, Type
 from simple_http_server.__utils import get_function_args
 from simple_http_server.logger import get_logger
 
-_logger = get_logger("bean_utils")
+_logger = get_logger("simple_http_server.bean_utils")
 
 
 class ObjectProperties:

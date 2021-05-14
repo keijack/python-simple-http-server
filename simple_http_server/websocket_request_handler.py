@@ -36,7 +36,7 @@ import errno
 from .logger import get_logger
 from simple_http_server import Headers, WebsocketRequest, WebsocketSession
 
-_logger = get_logger("http_request_handler")
+_logger = get_logger("simple_http_server.websocket_request_handler")
 
 
 '''
@@ -75,15 +75,6 @@ OPTYPES = {
     OPCODE_PONG: "PONE",
     OPCODE_BINARY: "BINARY"
 }
-
-
-def _msg_received(session, msg):
-    if msg == "close":
-        _logger.info("close session!")
-        session.close("close session!")
-    else:
-        session.send(msg)
-        _logger.info(f"receive message {msg}")
 
 
 class WebsocketRequestHandler:

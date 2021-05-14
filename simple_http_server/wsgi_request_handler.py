@@ -31,7 +31,7 @@ from http import HTTPStatus
 from .http_request_handler import HTTPRequestHandler
 from .logger import get_logger
 
-_logger = get_logger("base_server")
+_logger = get_logger("simple_http_server.wsgi_request_server")
 
 
 class WSGIRequestHandler:

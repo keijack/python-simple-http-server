@@ -35,7 +35,6 @@ import simple_http_server.http_server as http_server
 
 from simple_http_server import _get_filters, _get_request_mappings, _get_websocket_handlers, _get_error_pages
 from simple_http_server import request_map
-from simple_http_server import StaticFile
 from simple_http_server.logger import get_logger
 
 

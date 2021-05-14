@@ -41,7 +41,7 @@ import simple_http_server.__utils as utils
 from .logger import get_logger
 from simple_http_server.__utils import get_function_args, get_function_kwargs
 
-_logger = get_logger("http_request_handler")
+_logger = get_logger("simple_http_server.http_request_handler")
 
 
 class RequestWrapper(Request):

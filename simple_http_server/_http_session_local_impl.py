@@ -31,7 +31,7 @@ from threading import RLock
 from simple_http_server import Session, SessionFactory, set_session_factory
 from simple_http_server.logger import get_logger
 
-_logger = get_logger("http_session")
+_logger = get_logger("simple_http_server.http_session_local")
 
 _SESSION_TIME_CLEANING_INTERVAL = 60
 
