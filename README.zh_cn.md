@@ -16,7 +16,7 @@ Python 3.7
 
 * 轻量级
 * 函数化编程
-* 支持 Session 会话，你甚至可以自定义自己的 Session 实现
+* 支持 Session 会话，并且可以通过[这个扩展](https://gitee.com/keijack/python-simple-http-server-redis-session)支持分布式会话。
 * 支持过滤器链
 * Spring MVC 风格的请求映射配置
 * 简单易用

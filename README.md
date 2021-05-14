@@ -17,7 +17,7 @@ from `0.4.0`, python 2.7 is no longer supported, if you are using python 2.7, pl
 * Lightway.
 * Functional programing.
 * Filter chain support.
-* Session support, and even, you can apply your own session implementation.
+* Session support, and can support distributed session by [this extention](https://gitee.com/keijack/python-simple-http-server-redis-session).
 * Spring MVC like request mapping.
 * SSL support.
 * Websocket support (from 0.9.0).
