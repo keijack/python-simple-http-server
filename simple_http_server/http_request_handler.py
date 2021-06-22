@@ -34,8 +34,8 @@ from typing import Dict, List, Union
 
 from simple_http_server import ModelDict, Environment, RegGroup, RegGroups, HttpError, StaticFile, \
     Headers, Redirect, Response, Cookies, Cookie, JSONBody, Header, Parameters, PathValue, \
-    Parameter, MultipartFile, Request, Session, ControllerFunction, _get_session_factory, DEFAULT_ENCODING
-from simple_http_server._http_session_local_impl import SESSION_COOKIE_NAME
+    Parameter, MultipartFile, Request, Session, ControllerFunction, _get_session_factory, \
+    DEFAULT_ENCODING, SESSION_COOKIE_NAME
 import simple_http_server.__utils as utils
 
 from .logger import get_logger
@@ -442,7 +442,7 @@ class FilterContex:
 
 class HTTPRequestHandler:
 
-    def __init__(self, base_http_quest_handler, environment = {}) -> None:
+    def __init__(self, base_http_quest_handler, environment={}) -> None:
         self.base_http_quest_handler = base_http_quest_handler
         self.method = base_http_quest_handler.command
         self.request_path = base_http_quest_handler.request_path

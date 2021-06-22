@@ -28,14 +28,12 @@ import time
 
 from typing import Any, Dict, List, Tuple
 from threading import RLock
-from simple_http_server import Session, SessionFactory, set_session_factory
+from simple_http_server import Session, SessionFactory
 from simple_http_server.logger import get_logger
 
 _logger = get_logger("simple_http_server.http_session_local")
 
 _SESSION_TIME_CLEANING_INTERVAL = 60
-
-SESSION_COOKIE_NAME: str = "PY_SIM_HTTP_SER_SESSION_ID"
 
 
 def _get_from_dict(adict: Dict[str, Any], key: str) -> Any:
@@ -168,7 +166,7 @@ class LocalSessionFactory(SessionFactory):
             sid = session_id
         else:
             sid = uuid.uuid4().hex
-        return LocalSessionImpl(sid, time.time(), self)
+        return LocalSessionImpl(sid, time.time(), self.__session_holder)
 
     def get_session(self, session_id: str, create: bool = False) -> Session:
         sess: LocalSessionImpl = self.__session_holder.get_session(session_id)
@@ -182,5 +180,3 @@ class LocalSessionFactory(SessionFactory):
             self.__session_holder.cache_session(session)
             return session
 
-
-set_session_factory(LocalSessionFactory())

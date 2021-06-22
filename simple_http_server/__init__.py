@@ -31,9 +31,11 @@ from typing import Any, Dict, List, Tuple, Type, Union, Callable
 from simple_http_server.logger import get_logger
 
 name = "simple_http_server"
-version = "0.11.4"
+version = "0.11.5"
 
-DEFAULT_ENCODING = "UTF-8"
+DEFAULT_ENCODING: str = "UTF-8"
+
+SESSION_COOKIE_NAME: str = "PY_SIM_HTTP_SER_SESSION_ID"
 
 _logger = get_logger("simple_http_server.__init__")
 

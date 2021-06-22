@@ -33,7 +33,8 @@ from typing import Dict
 
 import simple_http_server.http_server as http_server
 
-from simple_http_server import _get_filters, _get_request_mappings, _get_websocket_handlers, _get_error_pages
+from simple_http_server import _get_filters, _get_request_mappings, _get_websocket_handlers, _get_error_pages, set_session_factory, _get_session_factory
+from simple_http_server._http_session_local_impl import LocalSessionFactory
 from simple_http_server import request_map
 from simple_http_server.logger import get_logger
 
@@ -115,6 +116,8 @@ def start(host: str = "",
         global _server
         if _server is not None:
             _server.shutdown()
+        if not _get_session_factory():
+            set_session_factory(LocalSessionFactory())
         _server = http_server.SimpleDispatcherHttpServer(host=(host, port),
                                                          ssl=ssl,
                                                          ssl_protocol=ssl_protocol,
