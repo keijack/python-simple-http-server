@@ -32,6 +32,25 @@ __logger = logger.get_logger("my_test_main")
 __logger = logger.get_logger("controller")
 
 
+def cors(origin="*", methods="*", headers="*"):
+    def add_cors_headers(ctrl):
+        def ctrl_warpper(*args, **kwargs):
+            cors_header = Headers({
+                "Access-Control-Allow-Origin": origin,
+                "Access-Control-Allow-Methods": methods,
+                "Access-Control-Allow-Headers": headers
+            })
+            res = ctrl(*args, **kwargs)
+            if isinstance(res, tuple):
+                l = list(res)
+                l.insert(0, cors_header)
+                return tuple(l)
+            else:
+                return cors_header, res
+        return ctrl_warpper
+    return add_cors_headers
+
+
 @request_map("/")
 @request_map("/index")
 def my_ctrl():
@@ -39,6 +58,7 @@ def my_ctrl():
 
 
 @request_map("/say_hello", method=["GET", "POST"])
+@cors()
 def my_ctrl2(name, name2=Parameter("name", default="KEIJACK")):
     """name and name2 is the same"""
     return f"<!DOCTYPE html><html><body>hello, {name}, {name2}</body></html>"
@@ -146,6 +166,11 @@ def filter_tuple(ctx):
         # raise HttpError(400, "pass should be passed")
     else:
         # you should always use do_chain method to go to the next
+        res: Response = ctx.response
+        print("add headers to response!")
+        res.add_header("Access-Control-Allow-Origin", "*")
+        res.add_header("Access-Control-Allow-Methods", "*")
+        res.add_header("Access-Control-Allow-Headers", "*")
         ctx.do_chain()
 
 

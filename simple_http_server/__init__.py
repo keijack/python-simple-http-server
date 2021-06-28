@@ -31,7 +31,7 @@ from typing import Any, Dict, List, Tuple, Type, Union, Callable
 from simple_http_server.logger import get_logger
 
 name = "simple_http_server"
-version = "0.11.5"
+version = "0.11.6"
 
 DEFAULT_ENCODING: str = "UTF-8"
 
@@ -502,6 +502,8 @@ def _get_class_of_method(method_defind):
     for attr in method_defind.__qualname__.split('.')[:-1]:
         if attr in vals:
             vals = vals[attr]
+            if not isinstance(vals, dict):
+                break
     if inspect.isclass(vals):
         return vals
 
