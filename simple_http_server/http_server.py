@@ -29,6 +29,8 @@ import os
 import re
 import ssl as _ssl
 import threading
+import queue
+import asyncio
 
 from collections import OrderedDict
 from socketserver import ThreadingMixIn, TCPServer
@@ -337,7 +339,7 @@ class RoutingConf:
             return func()
 
 
-class HTTPServer(ThreadingMixIn, TCPServer, RoutingConf):
+class HTTPServer(TCPServer, RoutingConf):
 
     allow_reuse_address = 1    # Seems to make sense in testing environment
 
@@ -351,6 +353,60 @@ class HTTPServer(ThreadingMixIn, TCPServer, RoutingConf):
     def __init__(self, addr, res_conf={}):
         TCPServer.__init__(self, addr, BaseHTTPRequestHandler)
         RoutingConf.__init__(self, res_conf)
+
+
+class ThreadingMixInHTTPServer(ThreadingMixIn, HTTPServer):
+    pass
+
+
+class AsyncioMixin:
+
+    DEFAULT_QUEUE_SIZE = 100
+
+    def __init__(self) -> None:
+        self.__queue = queue.Queue(self.DEFAULT_QUEUE_SIZE)
+        threading.Thread(target=self.asyncio_main, name="asyncio-thread", daemon=True).start()
+
+    def asyncio_main(self):
+        _logger.info("Use coroutine mode to process request. ")
+        asyncio.run(self.listen_to_queue())
+
+    async def listen_to_queue(self):
+        while True:
+            request, client_address = self.__queue.get()
+            if not request:
+                break
+            _logger.debug("A request is comming in, create an coroutine task for it. ")
+            asyncio.create_task(self.process_request_async(request, client_address))
+            await asyncio.sleep(0)
+            
+    async def process_request_async(self, request, client_address):
+        """Same as in BaseServer but as async.
+
+        In addition, exception handling is done here.
+
+        """
+        _logger.debug("do request in a coroutine task!")
+        try:
+            self.finish_request(request, client_address)
+        except Exception:
+            self.handle_error(request, client_address)
+        finally:
+            self.shutdown_request(request)
+
+    def process_request(self, request, client_address):
+        self.__queue.put((request, client_address))
+
+    def server_close(self):
+        super().server_close()
+        self.__queue.put((None, None))
+
+
+class AsyncioMixInHTTPServer(AsyncioMixin, HTTPServer):
+
+    def __init__(self, addr, res_conf={}):
+        HTTPServer.__init__(self, addr, res_conf=res_conf)
+        AsyncioMixin.__init__(self)
 
 
 class SimpleDispatcherHttpServer:
@@ -377,12 +433,16 @@ class SimpleDispatcherHttpServer:
                  certfile: str = "",
                  keypass: str = "",
                  ssl_context: _ssl.SSLContext = None,
-                 resources: Dict[str, str] = {}):
+                 resources: Dict[str, str] = {},
+                 prefer_corountine=False):
         self.host = host
         self.__ready = False
 
         self.ssl = ssl
-        self.server = HTTPServer(self.host, res_conf=resources)
+        if prefer_corountine:
+            self.server = AsyncioMixInHTTPServer(self.host, res_conf=resources)
+        else:
+            self.server = ThreadingMixInHTTPServer(self.host, res_conf=resources)
 
         if ssl:
             if ssl_context:

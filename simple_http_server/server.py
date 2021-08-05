@@ -111,7 +111,8 @@ def start(host: str = "",
           certfile: str = "",
           keypass: str = "",
           ssl_context: _ssl.SSLContext = None,
-          resources: Dict[str, str] = {}) -> None:
+          resources: Dict[str, str] = {},
+          prefer_coroutine=True) -> None:
     with __lock:
         global _server
         if _server is not None:
@@ -126,7 +127,8 @@ def start(host: str = "",
                                                          certfile=certfile,
                                                          keypass=keypass,
                                                          ssl_context=ssl_context,
-                                                         resources=resources)
+                                                         resources=resources,
+                                                         prefer_corountine=prefer_coroutine)
 
     filters = _get_filters()
     # filter configuration
