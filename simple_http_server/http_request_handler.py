@@ -111,7 +111,7 @@ class CoroutineControllerRunner:
     DEFAULT_TIMEOUT = 30
 
     def __init__(self) -> None:        
-        self.__coroutine_thread: threading.Thread = threading.Thread(target=self.coroutine_main, name="coroutine-controllers-thread", daemon=False)
+        self.__coroutine_thread: threading.Thread = threading.Thread(target=self.coroutine_main, name="coroutine-controllers-thread", daemon=True)
         self.__loop = None
         self.__is_live = False
 
