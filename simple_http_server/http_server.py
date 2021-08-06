@@ -29,7 +29,7 @@ import os
 import re
 import ssl as _ssl
 import threading
-import queue
+import time
 import asyncio
 
 from collections import OrderedDict
@@ -364,24 +364,19 @@ class AsyncioMixin:
     DEFAULT_QUEUE_SIZE = 100
 
     def __init__(self) -> None:
-        self.__queue = queue.Queue(self.DEFAULT_QUEUE_SIZE)
         # All the coroutine tasks will run in this thread.
-        self.__coroutine_thread: threading.Thread = threading.Thread(target=self.coroutine_main, name="coroutine-thread", daemon=False)
+        self.__coroutine_thread: threading.Thread = threading.Thread(target=self.coroutine_main, name="coroutine-thread", daemon=True)
         self.__coroutine_thread.start()
+        self.__loop = None
 
     def coroutine_main(self):
-        _logger.info("Use coroutine mode to process requests. ")
-        asyncio.run(self.listen_to_queue())
-
-    async def listen_to_queue(self):
-        while True:
-            request, client_address = self.__queue.get()
-            if not request:
-                break
-            _logger.debug("A request is comming in, create an coroutine task for it. ")
-            asyncio.create_task(self.process_request_async(request, client_address))
-            # Setting the delay to 0 provides an optimized path to allow other tasks to run.
-            await asyncio.sleep(0)
+        self.__loop = loop = asyncio.new_event_loop()
+        try:
+            loop.run_forever()
+        finally:
+            loop.run_until_complete(loop.shutdown_asyncgens())
+            loop.close()
+            _logger.info("End of the coroutine....")
 
     async def process_request_async(self, request, client_address):
         """Same as in BaseServer but as async.
@@ -398,17 +393,18 @@ class AsyncioMixin:
             self.shutdown_request(request)
 
     def process_request(self, request, client_address):
-        self.__queue.put((request, client_address))
+        asyncio.run_coroutine_threadsafe(self.process_request_async(request, client_address), self.__loop)
 
     def server_close(self):
         super().server_close()
-        self.__queue.put((None, None))
+        self.__loop.stop()
         self.__coroutine_thread.join()
 
     def shutdown(self):
         super().shutdown()
-        self.__queue.put((None, None))
+        self.__loop.stop()
         self.__coroutine_thread.join()
+        _logger.debug("shutdown....join thread...")
 
 
 class AsyncioMixInHTTPServer(AsyncioMixin, HTTPServer):
@@ -487,8 +483,12 @@ class SimpleDispatcherHttpServer:
             raise
 
     def shutdown(self):
-        # server must shutdown in a separate thread, or it will be deadlocking...WTF!
-        threading.Thread(target=self.server.shutdown, daemon=True).start()
+        def shut():
+            for i in (3, 2, 1, 0):
+                _logger.info(f"server receives a shutdown signal, will shut the server in {i} second(s). ")
+                time.sleep(1)
+            self.server.shutdown()
+        threading.Thread(target=shut, daemon=True).start()
 
 
 class WSGIProxy(RoutingConf):
