@@ -365,10 +365,12 @@ class AsyncioMixin:
 
     def __init__(self) -> None:
         self.__queue = queue.Queue(self.DEFAULT_QUEUE_SIZE)
-        threading.Thread(target=self.asyncio_main, name="asyncio-thread", daemon=True).start()
+        # All the coroutine tasks will run in this thread.
+        self.__coroutine_thread: threading.Thread = threading.Thread(target=self.coroutine_main, name="coroutine-thread", daemon=False)
+        self.__coroutine_thread.start()
 
-    def asyncio_main(self):
-        _logger.info("Use coroutine mode to process request. ")
+    def coroutine_main(self):
+        _logger.info("Use coroutine mode to process requests. ")
         asyncio.run(self.listen_to_queue())
 
     async def listen_to_queue(self):
@@ -378,8 +380,9 @@ class AsyncioMixin:
                 break
             _logger.debug("A request is comming in, create an coroutine task for it. ")
             asyncio.create_task(self.process_request_async(request, client_address))
+            # Setting the delay to 0 provides an optimized path to allow other tasks to run.
             await asyncio.sleep(0)
-            
+
     async def process_request_async(self, request, client_address):
         """Same as in BaseServer but as async.
 
@@ -400,6 +403,12 @@ class AsyncioMixin:
     def server_close(self):
         super().server_close()
         self.__queue.put((None, None))
+        self.__coroutine_thread.join()
+
+    def shutdown(self):
+        super().shutdown()
+        self.__queue.put((None, None))
+        self.__coroutine_thread.join()
 
 
 class AsyncioMixInHTTPServer(AsyncioMixin, HTTPServer):

@@ -24,6 +24,7 @@ from `0.4.0`, python 2.7 is no longer supported, if you are using python 2.7, pl
 * Easy to use.
 * Free style controller writing.
 * Easily integraded with WSGI servers. 
+* Coroutine mode support.
 
 ## Dependencies
 
@@ -481,6 +482,14 @@ If you want to use ssl:
                  certfile="/path/to/your/certfile.cert",
                  keypass="", # Optional, your private key's password
                  )
+```
+
+### Coroutine
+
+From `0.12.0`, you can use coroutine tasks than threads to handle requests, you can set the `prefer_coroutine` parameter in start method to enable the coroutine mode. 
+
+```python
+    server.start(prefer_coroutine=True)
 ```
 
 ## Logger

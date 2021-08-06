@@ -31,7 +31,8 @@ class HttpRequestTest(unittest.TestCase):
         server.scan(project_dir=root, base_dir="tests/ctrls", regx=r'.*controllers.*')
         server.start(
             port=clz.PORT,
-            resources={"/public/*": f"{root}/tests/static"})
+            resources={"/public/*": f"{root}/tests/static"},
+            prefer_coroutine=True)
 
     @classmethod
     def setUpClass(clz):

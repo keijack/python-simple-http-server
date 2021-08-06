@@ -112,7 +112,7 @@ def start(host: str = "",
           keypass: str = "",
           ssl_context: _ssl.SSLContext = None,
           resources: Dict[str, str] = {},
-          prefer_coroutine=True) -> None:
+          prefer_coroutine=False) -> None:
     with __lock:
         global _server
         if _server is not None:

@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+import asyncio
+import queue
 from typing import List
 import uuid
 from simple_http_server import ModelDict, Redirect, RegGroup, RegGroups
@@ -24,12 +26,13 @@ from simple_http_server import error_message
 import os
 import simple_http_server.logger as logger
 import simple_http_server.server as server
+import functools
 
 
-__logger = logger.get_logger("my_test_main")
+_logger = logger.get_logger("my_test_main")
 
 
-__logger = logger.get_logger("controller")
+_logger = logger.get_logger("controller")
 
 
 def cors(origin="*", methods="*", headers="*"):
@@ -67,6 +70,17 @@ def my_ctrl2(name, name2=Parameter("name", default="KEIJACK")):
 @request_map("/error")
 def my_ctrl3():
     raise HttpError(400, "Parameter Error!", "Test Parameter Error!")
+
+
+async def say(sth: str = ""):
+    _logger.info(f"Say: {sth}")
+    return f"Success! {sth}"
+
+
+@request_map("/coroutine")
+async def coroutine_ctrl(hey: str = "Hey!"):
+
+    return await say(hey)
 
 
 @request_map("/exception")
@@ -120,9 +134,9 @@ def test_session(session: Session, invalid=False):
     if not ins:
         session.set_attribute("in-session", "Hello, Session!")
 
-    __logger.info("session id: %s" % session.id)
+    _logger.info("session id: %s" % session.id)
     if invalid:
-        __logger.info("session[%s] is being invalidated. " % session.id)
+        _logger.info("session[%s] is being invalidated. " % session.id)
         session.invalidate()
     return "<!DOCTYPE html><html><body>%s</body></html>" % str(ins)
 

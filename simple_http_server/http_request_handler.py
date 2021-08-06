@@ -23,14 +23,17 @@ SOFTWARE.
 """
 
 
+import asyncio
+from asyncio.futures import Future
 import os
 import json
 import inspect
+import queue
 import threading
 import http.cookies as cookies
 import datetime
 
-from typing import Dict, List, Union
+from typing import Callable, Dict, List, Union
 
 from simple_http_server import ModelDict, Environment, RegGroup, RegGroups, HttpError, StaticFile, \
     Headers, Redirect, Response, Cookies, Cookie, JSONBody, Header, Parameters, PathValue, \
@@ -102,8 +105,59 @@ class ResponseWrapper(Response):
         })
 
 
+class CoroutineControllerRunner:
+
+    DEFAULT_QUEUE_SIZE = 100
+
+    def __init__(self) -> None:
+        self.__queue = queue.Queue(self.DEFAULT_QUEUE_SIZE)
+        # All the coroutine tasks will run in this thread.
+        self.__coroutine_thread: threading.Thread = threading.Thread(target=self.coroutine_main, name="coroutine-controllers-thread", daemon=False)
+        self.is_alive = False
+
+    def coroutine_main(self):
+        _logger.info("Start to run a thread for coroutine controllers. ")
+        asyncio.run(self.listen_to_queue())
+
+    async def listen_to_queue(self):
+        while True:
+            ctrl, args, kwargs, res_queue = self.__queue.get()
+            if not ctrl:
+                break
+            if kwargs is None:
+                coro = ctrl(*args)
+            else:
+                coro = ctrl(*args, **kwargs)
+
+            async_task = asyncio.create_task(coro)
+            _logger.debug(f"task {async_task} is created for controller!")
+
+            def callback(future: Future):
+                _logger.debug("start to call back....")
+                res = future.result()
+                _logger.info(f"coroutine controller result -> {res}")
+                res_queue.put(res)
+            # Setting the delay to 0 provides an optimized path to allow other tasks to run: from async_task
+            await asyncio.sleep(0)
+
+            async_task.add_done_callback(callback)
+            # for callback
+            await asyncio.sleep(0)
+
+    def call_func(self, ctrl, args, kwargs, res_queue):
+        if not self.is_alive:
+            self.__coroutine_thread.start()
+            self.is_alive = True
+        self.__queue.put((ctrl, args, kwargs, res_queue))
+
+
+_coroutine_ctrl_runner = CoroutineControllerRunner()
+
+
 class FilterContex:
     """Context of a filter"""
+
+    DEFAULT_TIME_OUT = 10
 
     def __init__(self, req, res, controller: ControllerFunction, filters=None):
         self.__request = req
@@ -123,11 +177,16 @@ class FilterContex:
         args = self.__prepare_args()
         kwargs = self.__prepare_kwargs()
 
-        if kwargs is None:
-            ctr_res = self.__controller.func(*args)
+        if asyncio.iscoroutinefunction(self.__controller.func):
+            res_queue = queue.Queue(1)
+            _coroutine_ctrl_runner.call_func(self.__controller.func, args, kwargs, res_queue)
+            return res_queue.get(timeout=self.DEFAULT_TIME_OUT)
         else:
-            ctr_res = self.__controller.func(*args, **kwargs)
-        return ctr_res
+            if kwargs is None:
+                ctr_res = self.__controller.func(*args)
+            else:
+                ctr_res = self.__controller.func(*args, **kwargs)
+            return ctr_res
 
     def do_chain(self):
         if self.response.is_sent:
