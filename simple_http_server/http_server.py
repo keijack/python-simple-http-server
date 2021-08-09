@@ -170,30 +170,31 @@ class RoutingConf:
         return StaticFile(fpath, content_type)
 
     def get_url_controller(self, path="", method="") -> Tuple[ControllerFunction, Dict, List]:
+        decoded_path = unquote(path)
         # explicitly url matching
-        if path in self.method_url_mapping[method]:
-            return self.method_url_mapping[method][path], {}, ()
-        elif path in self.method_url_mapping["_"]:
-            return self.method_url_mapping["_"][path], {}, ()
+        if decoded_path in self.method_url_mapping[method]:
+            return self.method_url_mapping[method][decoded_path], {}, ()
+        elif decoded_path in self.method_url_mapping["_"]:
+            return self.method_url_mapping["_"][decoded_path], {}, ()
 
         # url with path value matching
-        fun_and_val = self.__try_get_from_path_val(path, method)
+        fun_and_val = self.__try_get_from_path_val(decoded_path, method)
         if fun_and_val is None:
-            fun_and_val = self.__try_get_from_path_val(path, "_")
+            fun_and_val = self.__try_get_from_path_val(decoded_path, "_")
         if fun_and_val is not None:
             return fun_and_val[0], fun_and_val[1], ()
 
         # regexp
-        func_and_groups = self.__try_get_from_regexp(path, method)
+        func_and_groups = self.__try_get_from_regexp(decoded_path, method)
         if func_and_groups is None:
-            func_and_groups = self.__try_get_from_regexp(path, "_")
+            func_and_groups = self.__try_get_from_regexp(decoded_path, "_")
         if func_and_groups is not None:
             return func_and_groups[0], {}, func_and_groups[1]
         # static files
         for k, v in self.res_conf:
-            if path.startswith(k):
+            if decoded_path.startswith(k):
                 def static_fun():
-                    return self._res_(path, k, v)
+                    return self._res_(decoded_path, k, v)
                 return ControllerFunction(func=static_fun), {}, ()
         return None, {}, ()
 

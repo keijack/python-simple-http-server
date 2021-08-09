@@ -77,7 +77,7 @@ async def say(sth: str = ""):
     return f"Success! {sth}"
 
 
-@request_map("/coroutine")
+@request_map("/中文/coroutine")
 async def coroutine_ctrl(hey: str = "Hey!"):
     # raise RuntimeError
     return await say(hey)

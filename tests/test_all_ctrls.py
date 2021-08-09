@@ -94,6 +94,11 @@ class HttpRequestTest(unittest.TestCase):
             _logger.info(error_msg)        
             assert error_msg == "code：400, message: Parameter Error!, explain: Test Parameter Error!"
 
+    def test_coroutine(self):
+        txt = self.visit(f"%E4%B8%AD%E6%96%87/coroutine?hey=KJ2")
+        assert txt == "Success! KJ2"
+        
+
     def test_exception(self):
         try:
             self.visit("exception")
