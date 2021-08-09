@@ -492,6 +492,10 @@ From `0.12.0`, you can use coroutine tasks than threads to handle requests, you 
     server.start(prefer_coroutine=True)
 ```
 
+After doing this, all your controller, including the one you define using `async def` or not will run in a seperated thread. If this parameter set to False, each of the request will run in a thread. 
+
+*Notice: Please do not defind you wesocker handler to be `async`*
+
 ## Logger
 
 The default logger is try to write logs to the screen, you can specify the logger handler to write it to a file.
