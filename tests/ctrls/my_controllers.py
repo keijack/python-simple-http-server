@@ -79,7 +79,7 @@ async def say(sth: str = ""):
 
 @request_map("/coroutine")
 async def coroutine_ctrl(hey: str = "Hey!"):
-
+    # raise RuntimeError
     return await say(hey)
 
 

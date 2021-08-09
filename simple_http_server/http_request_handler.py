@@ -24,15 +24,12 @@ SOFTWARE.
 
 
 import asyncio
-from asyncio.futures import Future
 import os
 import json
 import inspect
-import queue
 import threading
 import http.cookies as cookies
 import datetime
-import time
 
 from typing import Dict, List, Union
 
@@ -55,6 +52,8 @@ class RequestWrapper(Request):
         self._headers_keys_in_lowcase = {}
         self._path = ""
         self.__session = None
+        self._socket_req = None
+        self._server = None
 
     def get_session(self, create: bool = False) -> Session:
         if not self.__session:
@@ -106,44 +105,13 @@ class ResponseWrapper(Response):
         })
 
 
-class CoroutineControllerRunner:
-
-    DEFAULT_TIMEOUT = 30
-
-    def __init__(self) -> None:        
-        self.__coroutine_thread: threading.Thread = threading.Thread(target=self.coroutine_main, name="coroutine-controllers-thread", daemon=True)
-        self.__loop = None
-        self.__is_live = False
-
-    def coroutine_main(self):
-        _logger.info("Start to run a thread for coroutine controllers. ")
-        self.__loop = asyncio.new_event_loop()
-        self.__loop.run_forever()
-
-    def call_func(self, ctrl, args, kwargs):
-        if not self.__is_live:
-            self.__coroutine_thread.start()
-            self.__is_live = True
-        while not self.__loop:
-            time.sleep(1)
-        if kwargs is None:
-            coro = ctrl(*args)
-        else:
-            coro = ctrl(*args, **kwargs)
-        res_future = asyncio.run_coroutine_threadsafe(coro, self.__loop)
-        return res_future.result(timeout=self.DEFAULT_TIMEOUT)
-
-
-_coroutine_ctrl_runner = CoroutineControllerRunner()
-
-
 class FilterContex:
     """Context of a filter"""
 
     DEFAULT_TIME_OUT = 10
 
     def __init__(self, req, res, controller: ControllerFunction, filters=None):
-        self.__request = req
+        self.__request: RequestWrapper = req
         self.__response = res
         self.__controller: ControllerFunction = controller
         self.__filters = filters if filters is not None else []
@@ -156,72 +124,92 @@ class FilterContex:
     def response(self) -> Response:
         return self.__response
 
-    def _run_ctroller(self):
+    def _run_ctrl_fun(self):
         args = self.__prepare_args()
         kwargs = self.__prepare_kwargs()
 
-        if asyncio.iscoroutinefunction(self.__controller.func):
-            # res_queue = queue.Queue(1)
-            return _coroutine_ctrl_runner.call_func(self.__controller.func, args, kwargs)
-            # return res_queue.get(timeout=self.DEFAULT_TIME_OUT)
+        if kwargs is None:
+            ctr_res = self.__controller.func(*args)
         else:
-            if kwargs is None:
-                ctr_res = self.__controller.func(*args)
+            ctr_res = self.__controller.func(*args, **kwargs)
+        return ctr_res
+
+    def _prepare_res(self, ctr_res):
+        session = self.request.get_session()
+        if session and session.is_valid:
+            exp = datetime.datetime.utcfromtimestamp(session.last_accessed_time + session.max_inactive_interval)
+            sck = Cookies()
+            sck[SESSION_COOKIE_NAME] = session.id
+            sck[SESSION_COOKIE_NAME]["httponly"] = True
+            sck[SESSION_COOKIE_NAME]["path"] = "/"
+            sck[SESSION_COOKIE_NAME]["expires"] = exp.strftime(Cookies.EXPIRE_DATE_FORMAT)
+            self.response.cookies.update(sck)
+        elif session and SESSION_COOKIE_NAME in self.request.cookies:
+            exp = datetime.datetime.utcfromtimestamp(0)
+            sck = Cookies()
+            sck[SESSION_COOKIE_NAME] = session.id
+            sck[SESSION_COOKIE_NAME]["httponly"] = True
+            sck[SESSION_COOKIE_NAME]["path"] = "/"
+            sck[SESSION_COOKIE_NAME]["expires"] = exp.strftime(Cookies.EXPIRE_DATE_FORMAT)
+            self.response.cookies.update(sck)
+
+        if ctr_res is not None:
+            if isinstance(ctr_res, tuple):
+                status, headers, cks, body = self.__decode_tuple_response(ctr_res)
+                self.response.status_code = status if status is not None else self.response.status_code
+                self.response.body = body if body is not None else self.response.body
+                self.response.add_headers(headers)
+                self.response.cookies.update(cks)
+            elif isinstance(ctr_res, Response):
+                self.response.status_code = ctr_res.status_code
+                self.response.body = ctr_res.body
+                self.response.add_headers(ctr_res.headers)
+            elif isinstance(ctr_res, Redirect):
+                self.response.send_redirect(ctr_res.url)
+            elif isinstance(ctr_res, int) and ctr_res >= 200 and ctr_res < 600:
+                self.response.status_code = ctr_res
+            elif isinstance(ctr_res, Headers):
+                self.response.add_headers(ctr_res)
+            elif isinstance(ctr_res, cookies.BaseCookie):
+                self.response.cookies.update(ctr_res)
             else:
-                ctr_res = self.__controller.func(*args, **kwargs)
-            return ctr_res
+                self.response.body = ctr_res
+
+    def _do_request_sync(self):
+        ctr_res = self._run_ctrl_fun()
+
+        self._prepare_res(ctr_res)
+
+        if self.request.method.upper() == "HEAD":
+            self.response.body = None
+        if not self.response.is_sent:
+            self.response.send_response()
+
+    async def _do_request_async(self):
+        ctr_res = await self._run_ctrl_fun()
+
+        self._prepare_res(ctr_res)
+
+        if self.request.method.upper() == "HEAD":
+            self.response.body = None
+        if not self.response.is_sent:
+            self.response.send_response()
+
+    def _do_request(self):
+        if asyncio.iscoroutinefunction(self.__controller.func):
+            try:
+                self.__request._server.put_coroutine_task(self.__request._socket_req, asyncio.create_task(self._do_request_async()))
+            except AttributeError:
+                _logger.debug("This is a coroutine controller, but server is not run in coroutine mode, try to start a new event loop. ")
+                asyncio.run(self._do_request_async())
+        else:
+            self._do_request_sync()
 
     def do_chain(self):
         if self.response.is_sent:
             return
         if len(self.__filters) == 0:
-
-            ctr_res = self._run_ctroller()
-
-            session = self.request.get_session()
-            if session and session.is_valid:
-                exp = datetime.datetime.utcfromtimestamp(session.last_accessed_time + session.max_inactive_interval)
-                sck = Cookies()
-                sck[SESSION_COOKIE_NAME] = session.id
-                sck[SESSION_COOKIE_NAME]["httponly"] = True
-                sck[SESSION_COOKIE_NAME]["path"] = "/"
-                sck[SESSION_COOKIE_NAME]["expires"] = exp.strftime(Cookies.EXPIRE_DATE_FORMAT)
-                self.response.cookies.update(sck)
-            elif session and SESSION_COOKIE_NAME in self.request.cookies:
-                exp = datetime.datetime.utcfromtimestamp(0)
-                sck = Cookies()
-                sck[SESSION_COOKIE_NAME] = session.id
-                sck[SESSION_COOKIE_NAME]["httponly"] = True
-                sck[SESSION_COOKIE_NAME]["path"] = "/"
-                sck[SESSION_COOKIE_NAME]["expires"] = exp.strftime(Cookies.EXPIRE_DATE_FORMAT)
-                self.response.cookies.update(sck)
-
-            if ctr_res is not None:
-                if isinstance(ctr_res, tuple):
-                    status, headers, cks, body = self.__decode_tuple_response(ctr_res)
-                    self.response.status_code = status if status is not None else self.response.status_code
-                    self.response.body = body if body is not None else self.response.body
-                    self.response.add_headers(headers)
-                    self.response.cookies.update(cks)
-                elif isinstance(ctr_res, Response):
-                    self.response.status_code = ctr_res.status_code
-                    self.response.body = ctr_res.body
-                    self.response.add_headers(ctr_res.headers)
-                elif isinstance(ctr_res, Redirect):
-                    self.response.send_redirect(ctr_res.url)
-                elif isinstance(ctr_res, int) and ctr_res >= 200 and ctr_res < 600:
-                    self.response.status_code = ctr_res
-                elif isinstance(ctr_res, Headers):
-                    self.response.add_headers(ctr_res)
-                elif isinstance(ctr_res, cookies.BaseCookie):
-                    self.response.cookies.update(ctr_res)
-                else:
-                    self.response.body = ctr_res
-
-            if self.request.method.upper() == "HEAD":
-                self.response.body = None
-            if not self.response.is_sent:
-                self.response.send_response()
+            self._do_request()
         else:
             func = self.__filters[0]
             self.__filters = self.__filters[1:]
@@ -488,8 +476,10 @@ class HTTPRequestHandler:
         self.base_http_quest_handler = base_http_quest_handler
         self.method = base_http_quest_handler.command
         self.request_path = base_http_quest_handler.request_path
+        self.socket_request = base_http_quest_handler.request
         self.query_string = base_http_quest_handler.query_string
         self.query_parameters = base_http_quest_handler.query_parameters
+
         self.server = base_http_quest_handler.server
         self.headers = base_http_quest_handler.headers
         self.rfile = base_http_quest_handler.rfile
@@ -530,6 +520,8 @@ class HTTPRequestHandler:
     def __prepare_request(self, method) -> RequestWrapper:
         path = self.request_path
         req = RequestWrapper()
+        req._socket_req = self.socket_request
+        req._server = self.server
         req.environment = self.environment or {}
         req.path = "/" + path
         req._path = path

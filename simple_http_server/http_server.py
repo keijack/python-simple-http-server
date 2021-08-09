@@ -34,6 +34,7 @@ import asyncio
 
 from collections import OrderedDict
 from socketserver import ThreadingMixIn, TCPServer
+from types import coroutine
 from urllib.parse import unquote
 from urllib.parse import quote
 
@@ -368,6 +369,13 @@ class AsyncioMixin:
         self.__coroutine_thread: threading.Thread = threading.Thread(target=self.coroutine_main, name="coroutine-thread", daemon=True)
         self.__coroutine_thread.start()
         self.__loop = None
+        self.__coroutine_tasks = {}
+
+    def put_coroutine_task(self, request, task):
+        if request in self.__coroutine_tasks:
+            self.__coroutine_tasks[request].append(task)
+        else:
+            self.__coroutine_tasks[request] = [task]
 
     def coroutine_main(self):
         self.__loop = loop = asyncio.new_event_loop()
@@ -387,6 +395,12 @@ class AsyncioMixin:
         _logger.debug("do request in a coroutine task!")
         try:
             self.finish_request(request, client_address)
+            if request in self.__coroutine_tasks:
+                coroutine_tasks = self.__coroutine_tasks[request]
+                _logger.debug(f"{len(coroutine_tasks)} corotine task(s) are(is) found assoiated with this request, await them(it)")
+                for task in coroutine_tasks:
+                    await task
+                del self.__coroutine_tasks[request]
         except Exception:
             self.handle_error(request, client_address)
         finally:
