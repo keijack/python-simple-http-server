@@ -38,7 +38,7 @@ from types import coroutine
 from urllib.parse import unquote
 from urllib.parse import quote
 
-from typing import Callable, Dict, List, Tuple
+from typing import Callable, Coroutine, Dict, List, Tuple
 
 from simple_http_server import ControllerFunction, StaticFile
 
@@ -360,25 +360,44 @@ class ThreadingMixInHTTPServer(ThreadingMixIn, HTTPServer):
     pass
 
 
-class AsyncioMixin:
+class CoroutineMixin:
 
-    DEFAULT_QUEUE_SIZE = 100
+    daemon_threads = True
 
-    def __init__(self) -> None:
-        # All the coroutine tasks will run in this thread.
-        self.__loop = None
-        self.__coroutine_thread: threading.Thread = threading.Thread(target=self.coroutine_main, name="coroutine-thread", daemon=False)
-        self.__coroutine_thread.start()
-        self.__coroutine_tasks = {}
+    @property
+    def coroutine_tasks(self):
+        if not hasattr(self, "_coroutine_tasks"):
+            self._coroutine_tasks = {}
+        return self._coroutine_tasks
+
+    @property
+    def coroutine_thread(self) -> threading.Thread:
+        if not hasattr(self, "_coroutine_thread"):
+            self._coroutine_thread = None
+        return self._coroutine_thread
+
+    @coroutine_thread.setter
+    def coroutine_thread(self, val: threading.Thread):
+        self._coroutine_thread = val
+
+    @property
+    def loop(self) -> asyncio.AbstractEventLoop:
+        if not hasattr(self, "_loop"):
+            self._loop = None
+        return self._loop
+
+    @loop.setter
+    def loop(self, val: asyncio.AbstractEventLoop):
+        self._loop = val
 
     def put_coroutine_task(self, request, task):
-        if request in self.__coroutine_tasks:
-            self.__coroutine_tasks[request].append(task)
+        if request in self.coroutine_tasks:
+            self.coroutine_tasks[request].append(task)
         else:
-            self.__coroutine_tasks[request] = [task]
+            self.coroutine_tasks[request] = [task]
 
     def coroutine_main(self):
-        self.__loop = loop = asyncio.new_event_loop()
+        self.loop = loop = asyncio.new_event_loop()
         try:
             loop.run_forever()
         finally:
@@ -391,42 +410,43 @@ class AsyncioMixin:
         In addition, exception handling is done here.
 
         """
-        _logger.debug("do request in a coroutine task!")
         try:
             self.finish_request(request, client_address)
-            if request in self.__coroutine_tasks:
-                coroutine_tasks = self.__coroutine_tasks[request]
-                _logger.debug(f"{len(coroutine_tasks)} corotine task(s) are(is) found assoiated with this request, await them(it)")
+            if request in self.coroutine_tasks:
+                coroutine_tasks = self.coroutine_tasks[request]
                 for task in coroutine_tasks:
                     await task
-                del self.__coroutine_tasks[request]
+                del self.coroutine_tasks[request]
         except Exception:
             self.handle_error(request, client_address)
         finally:
             self.shutdown_request(request)
 
     def process_request(self, request, client_address):
-        while not self.__loop:
-            # wait for the loop ready
-            time.sleep(0.3)
-        asyncio.run_coroutine_threadsafe(self.process_request_async(request, client_address), self.__loop)
+        if self.coroutine_thread is None:
+            self.coroutine_thread = threading.Thread(target=self.coroutine_main, name="coroutine-thread", daemon=self.daemon_threads)
+            self.coroutine_thread.start()
+
+            while not self.loop:
+                # wait for the loop ready
+                time.sleep(0.1)
+        asyncio.run_coroutine_threadsafe(self.process_request_async(request, client_address), self.loop)
 
     def server_close(self):
         super().server_close()
-        self.__loop.call_soon_threadsafe(self.__loop.stop)
-        self.__coroutine_thread.join()
+        if self.loop:
+            self.loop.call_soon_threadsafe(self.loop.stop)
+            self.coroutine_thread.join()
 
     def shutdown(self):
         super().shutdown()
-        self.__loop.call_soon_threadsafe(self.__loop.stop)
-        self.__coroutine_thread.join()
+        if self.loop:
+            self.loop.call_soon_threadsafe(self.loop.stop)
+            self.coroutine_thread.join()
 
 
-class AsyncioMixInHTTPServer(AsyncioMixin, HTTPServer):
-
-    def __init__(self, addr, res_conf={}):
-        HTTPServer.__init__(self, addr, res_conf=res_conf)
-        AsyncioMixin.__init__(self)
+class AsyncioMixInHTTPServer(CoroutineMixin, HTTPServer):
+    pass
 
 
 class SimpleDispatcherHttpServer:
