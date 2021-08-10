@@ -381,14 +381,14 @@ class CoroutineMixin:
         self._coroutine_thread = val
 
     @property
-    def loop(self) -> asyncio.AbstractEventLoop:
-        if not hasattr(self, "_loop"):
-            self._loop = None
-        return self._loop
+    def coroutine_loop(self) -> asyncio.AbstractEventLoop:
+        if not hasattr(self, "_coroutine_loop"):
+            self._coroutine_loop = None
+        return self._coroutine_loop
 
-    @loop.setter
-    def loop(self, val: asyncio.AbstractEventLoop):
-        self._loop = val
+    @coroutine_loop.setter
+    def coroutine_loop(self, val: asyncio.AbstractEventLoop):
+        self._coroutine_loop = val
 
     def put_coroutine_task(self, request, task):
         if request in self.coroutine_tasks:
@@ -397,7 +397,7 @@ class CoroutineMixin:
             self.coroutine_tasks[request] = [task]
 
     def coroutine_main(self):
-        self.loop = loop = asyncio.new_event_loop()
+        self.coroutine_loop = loop = asyncio.new_event_loop()
         try:
             loop.run_forever()
         finally:
@@ -427,21 +427,21 @@ class CoroutineMixin:
             self.coroutine_thread = threading.Thread(target=self.coroutine_main, name="coroutine-thread", daemon=self.daemon_threads)
             self.coroutine_thread.start()
 
-            while not self.loop:
+            while not self.coroutine_loop:
                 # wait for the loop ready
                 time.sleep(0.1)
-        asyncio.run_coroutine_threadsafe(self.process_request_async(request, client_address), self.loop)
+        asyncio.run_coroutine_threadsafe(self.process_request_async(request, client_address), self.coroutine_loop)
 
     def server_close(self):
         super().server_close()
-        if self.loop:
-            self.loop.call_soon_threadsafe(self.loop.stop)
+        if self.coroutine_loop:
+            self.coroutine_loop.call_soon_threadsafe(self.coroutine_loop.stop)
             self.coroutine_thread.join()
 
     def shutdown(self):
         super().shutdown()
-        if self.loop:
-            self.loop.call_soon_threadsafe(self.loop.stop)
+        if self.coroutine_loop:
+            self.coroutine_loop.call_soon_threadsafe(self.coroutine_loop.stop)
             self.coroutine_thread.join()
 
 

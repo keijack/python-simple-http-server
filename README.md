@@ -61,13 +61,13 @@ from simple_http_server import Cookie
 from simple_http_server import Redirect
 from simple_http_server import ModelDict
 
-
+# request_map has an alias name `route`, you can select the one you familiar with.
 @request_map("/index")
 def my_ctrl():
     return {"code": 0, "message": "success"}  # You can return a dictionary, a string or a `simple_http_server.simple_http_server.Response` object.
 
 
-@request_map("/say_hello", method=["GET", "POST"])
+@route("/say_hello", method=["GET", "POST"])
 def my_ctrl2(name, name2=Parameter("name", default="KEIJACK"), model=ModelDict()):
     """name and name2 is the same"""
     name == name2 # True
@@ -124,7 +124,7 @@ def tuple_with_cookies(all_cookies=Cookies(), cookie_sc=Cookie("sc")):
 
     cks = Cookies()
     # cks = cookies.SimpleCookie() # you could also use the build-in cookie objects
-    cks["ck1"] = "keijack"
+    cks["ck1"] = "keijack"request
     cks["ck1"]["path"] = "/"
     cks["ck1"]["expires"] = expires.strftime(Cookies.EXPIRE_DATE_FORMAT)
     # You can ignore status code, headers, cookies even body in this tuple.
@@ -153,6 +153,16 @@ def test_session(session=Session(), invalid=False):
         __logger.info("session[%s] is being invalidated. " % session.id)
         session.invalidate()
     return "<!DOCTYPE html><html><body>%s</body></html>" % str(ins)
+
+# use coroutine
+
+async def say(sth: str = ""):
+    _logger.info(f"Say: {sth}")
+    return f"Success! {sth}"
+
+@request_map("/中文/coroutine")
+async def coroutine_ctrl(hey: str = "Hey!"):
+    return await say(hey)
 ```
 
 Beside using the default values, you can also use variable annotations to specify your controller function's variables.

@@ -50,6 +50,8 @@ python3 -m pip install simple_http_server
 
 基础的配置如下，该例子中，请求 /index 将会路由到当前的方法中。
 
+请注意，其中 `request_map` 还有另外一个别称 `route`，你可以选择熟悉的标注使用。
+
 ```Python
 from simple_http_server import request_map
 
@@ -89,6 +91,19 @@ def your_ctroller_function():
 @request_map("/index")
 def index():
     return "<html><body>Hello, World!</body></html>"
+```
+
+你也可以使用协程来编写你的控制器，*注意：当你不是用协程模式启动时，你的协程会运行在处理该请求的线程当中。如果以协程模式启动，所有你的控制器，无论你有没有使用`async def`定义，均通过协程的方式运行在一个线程中。*
+
+```python
+
+async def say(sth: str = ""):
+    _logger.info(f"Say: {sth}")
+    return f"Success! {sth}"
+
+@request_map("/中文/coroutine")
+async def coroutine_ctrl(hey: str = "Hey!"):
+    return await say(hey)
 ```
 
 ### 取的请求中的信息
