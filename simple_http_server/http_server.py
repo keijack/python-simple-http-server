@@ -170,31 +170,30 @@ class RoutingConf:
         return StaticFile(fpath, content_type)
 
     def get_url_controller(self, path="", method="") -> Tuple[ControllerFunction, Dict, List]:
-        decoded_path = unquote(path)
         # explicitly url matching
-        if decoded_path in self.method_url_mapping[method]:
-            return self.method_url_mapping[method][decoded_path], {}, ()
-        elif decoded_path in self.method_url_mapping["_"]:
-            return self.method_url_mapping["_"][decoded_path], {}, ()
+        if path in self.method_url_mapping[method]:
+            return self.method_url_mapping[method][path], {}, ()
+        elif path in self.method_url_mapping["_"]:
+            return self.method_url_mapping["_"][path], {}, ()
 
         # url with path value matching
-        fun_and_val = self.__try_get_from_path_val(decoded_path, method)
+        fun_and_val = self.__try_get_from_path_val(path, method)
         if fun_and_val is None:
-            fun_and_val = self.__try_get_from_path_val(decoded_path, "_")
+            fun_and_val = self.__try_get_from_path_val(path, "_")
         if fun_and_val is not None:
             return fun_and_val[0], fun_and_val[1], ()
 
         # regexp
-        func_and_groups = self.__try_get_from_regexp(decoded_path, method)
+        func_and_groups = self.__try_get_from_regexp(path, method)
         if func_and_groups is None:
-            func_and_groups = self.__try_get_from_regexp(decoded_path, "_")
+            func_and_groups = self.__try_get_from_regexp(path, "_")
         if func_and_groups is not None:
             return func_and_groups[0], {}, func_and_groups[1]
         # static files
         for k, v in self.res_conf:
-            if decoded_path.startswith(k):
+            if path.startswith(k):
                 def static_fun():
-                    return self._res_(decoded_path, k, v)
+                    return self._res_(path, k, v)
                 return ControllerFunction(func=static_fun), {}, ()
         return None, {}, ()
 
@@ -367,9 +366,9 @@ class AsyncioMixin:
 
     def __init__(self) -> None:
         # All the coroutine tasks will run in this thread.
+        self.__loop = None
         self.__coroutine_thread: threading.Thread = threading.Thread(target=self.coroutine_main, name="coroutine-thread", daemon=False)
         self.__coroutine_thread.start()
-        self.__loop = None
         self.__coroutine_tasks = {}
 
     def put_coroutine_task(self, request, task):
@@ -407,6 +406,9 @@ class AsyncioMixin:
             self.shutdown_request(request)
 
     def process_request(self, request, client_address):
+        while not self.__loop:
+            # wait for the loop ready
+            time.sleep(0.3)
         asyncio.run_coroutine_threadsafe(self.process_request_async(request, client_address), self.__loop)
 
     def server_close(self):

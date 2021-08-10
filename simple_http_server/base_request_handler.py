@@ -30,6 +30,7 @@ import time
 from typing import Any, Dict
 
 from http import HTTPStatus
+from urllib.parse import unquote
 
 import simple_http_server.__utils as utils
 from simple_http_server import version as __version__
@@ -181,6 +182,7 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
         path = ori_path.split('?', 1)[0]
         path = path.split('#', 1)[0]
         path = utils.remove_url_first_slash(path)
+        path = unquote(path)
         return path
 
     def handle_expect_100(self):
