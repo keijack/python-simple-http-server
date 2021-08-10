@@ -31,7 +31,7 @@ from typing import Any, Dict, List, Tuple, Type, Union, Callable
 from simple_http_server.logger import get_logger
 
 name = "simple_http_server"
-version = "0.12.0"
+version = "0.12.1"
 
 DEFAULT_ENCODING: str = "UTF-8"
 

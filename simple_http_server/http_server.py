@@ -367,7 +367,7 @@ class AsyncioMixin:
 
     def __init__(self) -> None:
         # All the coroutine tasks will run in this thread.
-        self.__coroutine_thread: threading.Thread = threading.Thread(target=self.coroutine_main, name="coroutine-thread", daemon=True)
+        self.__coroutine_thread: threading.Thread = threading.Thread(target=self.coroutine_main, name="coroutine-thread", daemon=False)
         self.__coroutine_thread.start()
         self.__loop = None
         self.__coroutine_tasks = {}
@@ -385,7 +385,6 @@ class AsyncioMixin:
         finally:
             loop.run_until_complete(loop.shutdown_asyncgens())
             loop.close()
-            _logger.info("End of the coroutine....")
 
     async def process_request_async(self, request, client_address):
         """Same as in BaseServer but as async.
@@ -412,14 +411,13 @@ class AsyncioMixin:
 
     def server_close(self):
         super().server_close()
-        self.__loop.stop()
+        self.__loop.call_soon_threadsafe(self.__loop.stop)
         self.__coroutine_thread.join()
 
     def shutdown(self):
         super().shutdown()
-        self.__loop.stop()
+        self.__loop.call_soon_threadsafe(self.__loop.stop)
         self.__coroutine_thread.join()
-        _logger.debug("shutdown....join thread...")
 
 
 class AsyncioMixInHTTPServer(AsyncioMixin, HTTPServer):
@@ -498,12 +496,8 @@ class SimpleDispatcherHttpServer:
             raise
 
     def shutdown(self):
-        def shut():
-            for i in (3, 2, 1, 0):
-                _logger.info(f"server receives a shutdown signal, will shut the server in {i} second(s). ")
-                time.sleep(1)
-            self.server.shutdown()
-        threading.Thread(target=shut, daemon=True).start()
+        # shutdown it in a seperate thread.
+        threading.Thread(target=self.server.shutdown, daemon=True).start()
 
 
 class WSGIProxy(RoutingConf):
