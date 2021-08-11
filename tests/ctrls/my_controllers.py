@@ -181,10 +181,10 @@ def filter_tuple(ctx):
     else:
         # you should always use do_chain method to go to the next
         res: Response = ctx.response
-        print("add headers to response!")
         res.add_header("Access-Control-Allow-Origin", "*")
         res.add_header("Access-Control-Allow-Methods", "*")
         res.add_header("Access-Control-Allow-Headers", "*")
+        res.add_header("Res-Filter-Header", "from-filter")
         ctx.do_chain()
 
 

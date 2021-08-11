@@ -98,6 +98,10 @@ class HttpRequestTest(unittest.TestCase):
         txt = self.visit(f"%E4%B8%AD%E6%96%87/coroutine?hey=KJ2")
         assert txt == "Success! KJ2"
         
+    def test_filter(self):
+        res: http.client.HTTPResponse = self.visit(f"tuple?user_name=kj&pass=wu", return_type="RESPONSE")
+        assert "Res-Filter-Header" in res.headers
+        assert res.headers["Res-Filter-Header"] == "from-filter"
 
     def test_exception(self):
         try:

@@ -31,7 +31,7 @@ import threading
 import http.cookies as cookies
 import datetime
 
-from typing import Dict, List, Union
+from typing import Callable, Dict, List, Union
 
 from simple_http_server import ModelDict, Environment, RegGroup, RegGroups, HttpError, StaticFile, \
     Headers, Redirect, Response, Cookies, Cookie, JSONBody, Header, Parameters, PathValue, \
@@ -110,11 +110,11 @@ class FilterContex:
 
     DEFAULT_TIME_OUT = 10
 
-    def __init__(self, req, res, controller: ControllerFunction, filters=None):
+    def __init__(self, req, res, controller: ControllerFunction, filters: List[Callable] = None):
         self.__request: RequestWrapper = req
         self.__response = res
         self.__controller: ControllerFunction = controller
-        self.__filters = filters if filters is not None else []
+        self.__filters: List[Callable] = filters if filters is not None else []
 
     @property
     def request(self) -> Request:
@@ -208,12 +208,10 @@ class FilterContex:
     def do_chain(self):
         if self.response.is_sent:
             return
-        if len(self.__filters) == 0:
-            self._do_request()
+        if self.__filters:
+            self.__filters.pop(0)(self)
         else:
-            func = self.__filters[0]
-            self.__filters = self.__filters[1:]
-            func(self)
+            self._do_request()
 
     def __decode_tuple_response(self, ctr_res):
         status_code = None
