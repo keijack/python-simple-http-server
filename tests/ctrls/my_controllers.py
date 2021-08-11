@@ -4,7 +4,7 @@ import asyncio
 import queue
 from typing import List
 import uuid
-from simple_http_server import ModelDict, Redirect, RegGroup, RegGroups
+from simple_http_server import FilterContex, ModelDict, Redirect, RegGroup, RegGroups
 from simple_http_server import Headers
 from simple_http_server import StaticFile
 from simple_http_server import HttpError
@@ -168,7 +168,7 @@ def header_echo(headers: Headers):
 
 
 @filter_map("^/tuple")
-def filter_tuple(ctx):
+def filter_tuple(ctx: FilterContex):
     print("---------- through filter ---------------")
     # add a header to request header
     ctx.request.headers["filter-set"] = "through filter"

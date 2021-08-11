@@ -33,7 +33,7 @@ import datetime
 
 from typing import Callable, Dict, List, Union
 
-from simple_http_server import ModelDict, Environment, RegGroup, RegGroups, HttpError, StaticFile, \
+from simple_http_server import FilterContex, ModelDict, Environment, RegGroup, RegGroups, HttpError, StaticFile, \
     Headers, Redirect, Response, Cookies, Cookie, JSONBody, Header, Parameters, PathValue, \
     Parameter, MultipartFile, Request, Session, ControllerFunction, _get_session_factory, \
     DEFAULT_ENCODING, SESSION_COOKIE_NAME
@@ -105,7 +105,7 @@ class ResponseWrapper(Response):
         })
 
 
-class FilterContex:
+class FilterContexImpl(FilterContex):
     """Context of a filter"""
 
     DEFAULT_TIME_OUT = 10
@@ -117,11 +117,11 @@ class FilterContex:
         self.__filters: List[Callable] = filters if filters is not None else []
 
     @property
-    def request(self) -> Request:
+    def request(self) -> RequestWrapper:
         return self.__request
 
     @property
-    def response(self) -> Response:
+    def response(self) -> ResponseWrapper:
         return self.__response
 
     def _run_ctrl_fun(self):
@@ -198,7 +198,7 @@ class FilterContex:
     def _do_request(self):
         if asyncio.iscoroutinefunction(self.__controller.func):
             try:
-                self.__request._server.put_coroutine_task(self.__request._socket_req, asyncio.create_task(self._do_request_async()))
+                self.request._server.put_coroutine_task(self.request._socket_req, asyncio.create_task(self._do_request_async()))
             except AttributeError:
                 _logger.debug("This is a coroutine controller, but server is not run in coroutine mode, try to start a new event loop. ")
                 asyncio.run(self._do_request_async())
@@ -506,7 +506,7 @@ class HTTPRequestHandler:
             res.send_error(404, "Controller Not Found", "Cannot find a controller for your path")
         else:
             filters = self.server.get_matched_filters(req.path)
-            ctx = FilterContex(req, res, ctrl, filters)
+            ctx = FilterContexImpl(req, res, ctrl, filters)
             try:
                 ctx.do_chain()
             except HttpError as e:

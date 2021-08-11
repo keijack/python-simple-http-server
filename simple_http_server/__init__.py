@@ -31,7 +31,7 @@ from typing import Any, Dict, List, Tuple, Type, Union, Callable
 from simple_http_server.logger import get_logger
 
 name = "simple_http_server"
-version = "0.12.1"
+version = "0.12.2"
 
 DEFAULT_ENCODING: str = "UTF-8"
 
@@ -413,6 +413,21 @@ class Cookie(http.cookies.Morsel):
     @property
     def _required(self) -> bool:
         return self.__required
+
+
+class FilterContex:
+
+    @property
+    def request(self) -> Request:
+        return None
+
+    @property
+    def response(self) -> Response:
+        return None
+
+    @abstractmethod
+    def do_chain(self):
+        pass
 
 
 class WebsocketRequest:
