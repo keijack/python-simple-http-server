@@ -10,8 +10,6 @@ This is a simple http server, use MVC like design.
 
 Python 3.7+
 
-from `0.4.0`, python 2.7 is no longer supported, if you are using python 2.7, please use version `0.3.1`
-
 ## Why choose
 
 * Lightway.
@@ -20,7 +18,7 @@ from `0.4.0`, python 2.7 is no longer supported, if you are using python 2.7, pl
 * Session support, and can support distributed session by [this extention](https://gitee.com/keijack/python-simple-http-server-redis-session).
 * Spring MVC like request mapping.
 * SSL support.
-* Websocket support (from 0.9.0).
+* Websocket support
 * Easy to use.
 * Free style controller writing.
 * Easily integraded with WSGI servers. 

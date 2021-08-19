@@ -360,7 +360,7 @@ class ThreadingMixInHTTPServer(ThreadingMixIn, HTTPServer):
     pass
 
 
-class CoroutineMixin:
+class CoroutineMixIn:
 
     daemon_threads = True
 
@@ -445,7 +445,7 @@ class CoroutineMixin:
             self.coroutine_thread.join()
 
 
-class AsyncioMixInHTTPServer(CoroutineMixin, HTTPServer):
+class CoroutineMixInHTTPServer(CoroutineMixIn, HTTPServer):
     pass
 
 
@@ -480,7 +480,7 @@ class SimpleDispatcherHttpServer:
 
         self.ssl = ssl
         if prefer_corountine:
-            self.server = AsyncioMixInHTTPServer(self.host, res_conf=resources)
+            self.server = CoroutineMixInHTTPServer(self.host, res_conf=resources)
         else:
             self.server = ThreadingMixInHTTPServer(self.host, res_conf=resources)
 
