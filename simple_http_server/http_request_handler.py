@@ -134,7 +134,7 @@ class FilterContexImpl(FilterContex):
             ctr_res = self.__controller.func(*args, **kwargs)
         return ctr_res
 
-    def _prepare_res(self, ctr_res):
+    def _do_res(self, ctr_res):
         session = self.request.get_session()
         if session and session.is_valid:
             exp = datetime.datetime.utcfromtimestamp(session.last_accessed_time + session.max_inactive_interval)
@@ -175,25 +175,18 @@ class FilterContexImpl(FilterContex):
             else:
                 self.response.body = ctr_res
 
-    def _do_request_sync(self):
-        ctr_res = self._run_ctrl_fun()
-
-        self._prepare_res(ctr_res)
-
         if self.request.method.upper() == "HEAD":
             self.response.body = None
         if not self.response.is_sent:
             self.response.send_response()
+
+    def _do_request_sync(self):
+        ctr_res = self._run_ctrl_fun()
+        self._do_res(ctr_res)
 
     async def _do_request_async(self):
         ctr_res = await self._run_ctrl_fun()
-
-        self._prepare_res(ctr_res)
-
-        if self.request.method.upper() == "HEAD":
-            self.response.body = None
-        if not self.response.is_sent:
-            self.response.send_response()
+        self._do_res(ctr_res)
 
     def _do_request(self):
         if asyncio.iscoroutinefunction(self.__controller.func):
