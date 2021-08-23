@@ -115,6 +115,10 @@ class FilterContexImpl(FilterContex):
         self.__response = res
         self.__controller: ControllerFunction = controller
         self.__filters: List[Callable] = filters if filters is not None else []
+        self.__is_coroutine: bool = False
+        for func in self.__filters:
+            if asyncio.iscoroutinefunction(func):
+                self.__is_coroutine = True
 
     @property
     def request(self) -> RequestWrapper:
@@ -123,6 +127,11 @@ class FilterContexImpl(FilterContex):
     @property
     def response(self) -> ResponseWrapper:
         return self.__response
+
+    @property
+    def is_coroutine(self) -> bool:
+
+        return self.__is_coroutine
 
     def _run_ctrl_fun(self):
         args = self.__prepare_args()
@@ -193,10 +202,27 @@ class FilterContexImpl(FilterContex):
             try:
                 self.request._server.put_coroutine_task(self.request._socket_req, asyncio.create_task(self._do_request_async()))
             except AttributeError:
-                _logger.debug("This is a coroutine controller, but server is not run in coroutine mode, try to start a new event loop. ")
-                asyncio.run(self._do_request_async())
+                try:
+                    asyncio.get_running_loop()
+                    _logger.debug("Server is not run in coroutine mode, but there are filter functions defined aysnc, run controller in that event loop. ")
+                    return asyncio.create_task(self._do_request_async())
+                except RuntimeError:
+                    _logger.debug("This is a coroutine controller, but server is not run in coroutine mode, try to start a new event loop. ")
+                    asyncio.run(self._do_request_async())
         else:
             self._do_request_sync()
+
+    async def do_chain_async(self):
+        if self.response.is_sent:
+            return
+        if self.__filters:
+            func = self.__filters.pop(0)
+            if asyncio.iscoroutinefunction(func):
+                await func(self)
+            else:
+                func(self)
+        else:
+            return self._do_request()
 
     def do_chain(self):
         if self.response.is_sent:
@@ -500,13 +526,35 @@ class HTTPRequestHandler:
         else:
             filters = self.server.get_matched_filters(req.path)
             ctx = FilterContexImpl(req, res, ctrl, filters)
-            try:
-                ctx.do_chain()
-            except HttpError as e:
-                res.send_error(e.code, e.message, e.explain)
-            except Exception as e:
-                _logger.exception("error occurs! returning 500")
-                res.send_error(500, None, str(e))
+            _logger.debug(f"ctx->coroutine {ctx.is_coroutine}")
+            if ctx.is_coroutine:
+                try:
+                    self.server.put_coroutine_task(req._socket_req, asyncio.create_task(self.__ctx_do_chain_async(ctx)))
+                except AttributeError:
+                    _logger.debug("This is a coroutine controller, but server is not run in coroutine mode, try to start a new event loop. ")
+                    asyncio.run(self.__ctx_do_chain_async(ctx))
+            else:
+                self.__ctx_do_chain(ctx)
+
+    async def __ctx_do_chain_async(self, ctx: FilterContexImpl):
+        try:
+            res_async = await ctx.do_chain_async()
+            if res_async:
+                await res_async
+        except HttpError as e:
+            ctx.response.send_error(e.code, e.message, e.explain)
+        except Exception as e:
+            _logger.exception("error occurs! returning 500")
+            ctx.response.send_error(500, None, str(e))
+
+    def __ctx_do_chain(self, ctx: FilterContexImpl):
+        try:
+            ctx.do_chain()
+        except HttpError as e:
+            ctx.response.send_error(e.code, e.message, e.explain)
+        except Exception as e:
+            _logger.exception("error occurs! returning 500")
+            ctx.response.send_error(500, None, str(e))
 
     def __prepare_request(self, method) -> RequestWrapper:
         path = self.request_path

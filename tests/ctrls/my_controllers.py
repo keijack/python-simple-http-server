@@ -124,7 +124,7 @@ def set_headers(res: Response, headers: Headers, cookies: Cookies, cookie=Cookie
 
 
 @request_map("tuple")
-def tuple_results():
+async def tuple_results():
     return 200, Headers({"MyHeader": "my header"}), "hello tuple result!"
 
 
@@ -168,7 +168,7 @@ def header_echo(headers: Headers):
 
 
 @filter_map("^/tuple")
-def filter_tuple(ctx: FilterContex):
+async def filter_tuple(ctx: FilterContex):
     print("---------- through filter ---------------")
     # add a header to request header
     ctx.request.headers["filter-set"] = "through filter"
