@@ -424,7 +424,7 @@ class CoroutineMixIn:
 
     def process_request(self, request, client_address):
         if self.coroutine_thread is None:
-            self.coroutine_thread = threading.Thread(target=self.coroutine_main, name="coroutine-thread", daemon=self.daemon_threads)
+            self.coroutine_thread = threading.Thread(target=self.coroutine_main, name="CoroutineThread", daemon=self.daemon_threads)
             self.coroutine_thread.start()
 
             while not self.coroutine_loop:

@@ -31,7 +31,7 @@ _LOG_LEVEL_ = "INFO"
 __cache_loggers = {}
 
 __formatter_ = logging.Formatter(
-    fmt='[%(asctime)s]-[%(name)s:%(lineno)d] -%(levelname)-4s: %(message)s',
+    fmt='[%(asctime)s]-[%(threadName)s]-[%(name)s:%(lineno)d] %(levelname)-4s: %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S')
 
 _handler = logging.StreamHandler(sys.stdout)
@@ -102,6 +102,6 @@ def _log_msg_from_queue():
 
 
 def _log_msg_in_backgrond():
-    Thread(target=_log_msg_from_queue, name="logging-thread", daemon=True).start()
+    Thread(target=_log_msg_from_queue, name="LoggingThread", daemon=True).start()
 
 _log_msg_in_backgrond()

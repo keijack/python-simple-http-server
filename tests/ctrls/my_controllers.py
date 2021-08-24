@@ -1,12 +1,10 @@
 # -*- coding: utf-8 -*-
 
-import asyncio
-import queue
+
 from typing import List
-import uuid
-from simple_http_server import FilterContex, ModelDict, Redirect, RegGroup, RegGroups
+
+from simple_http_server import FilterContex, ModelDict, Redirect, RegGroup
 from simple_http_server import Headers
-from simple_http_server import StaticFile
 from simple_http_server import HttpError
 from simple_http_server import JSONBody
 from simple_http_server import Header
@@ -25,33 +23,12 @@ from simple_http_server import controller
 from simple_http_server import error_message
 import os
 import simple_http_server.logger as logger
-import simple_http_server.server as server
-import functools
 
 
 _logger = logger.get_logger("my_test_main")
 
 
 _logger = logger.get_logger("controller")
-
-
-def cors(origin="*", methods="*", headers="*"):
-    def add_cors_headers(ctrl):
-        def ctrl_warpper(*args, **kwargs):
-            cors_header = Headers({
-                "Access-Control-Allow-Origin": origin,
-                "Access-Control-Allow-Methods": methods,
-                "Access-Control-Allow-Headers": headers
-            })
-            res = ctrl(*args, **kwargs)
-            if isinstance(res, tuple):
-                l = list(res)
-                l.insert(0, cors_header)
-                return tuple(l)
-            else:
-                return cors_header, res
-        return ctrl_warpper
-    return add_cors_headers
 
 
 @request_map("/")
@@ -61,7 +38,6 @@ def my_ctrl():
 
 
 @request_map("/say_hello", method=["GET", "POST"])
-@cors()
 def my_ctrl2(name, name2=Parameter("name", default="KEIJACK")):
     """name and name2 is the same"""
     return f"<!DOCTYPE html><html><body>hello, {name}, {name2}</body></html>"
@@ -171,6 +147,7 @@ def header_echo(headers: Headers):
 def fil(ctx: FilterContex):
     print("---------- through filter ---------------")
     ctx.do_chain()
+
 
 @filter_map("^/tuple")
 async def filter_tuple(ctx: FilterContex):
