@@ -54,6 +54,7 @@ class RequestWrapper(Request):
         self.__session = None
         self._socket_req = None
         self._server = None
+        self._coroutine_objects = []
 
     def get_session(self, create: bool = False) -> Session:
         if not self.__session:
@@ -61,6 +62,12 @@ class RequestWrapper(Request):
             session_fac = _get_session_factory()
             self.__session = session_fac.get_session(sid, create)
         return self.__session
+
+    def _put_coroutine_task(self, coroutine_object):
+        try:
+            self._server.put_coroutine_task(self._socket_req, asyncio.create_task(coroutine_object))
+        except AttributeError:
+            self._coroutine_objects.append(coroutine_object)
 
 
 class ResponseWrapper(Response):
@@ -199,34 +206,32 @@ class FilterContexImpl(FilterContex):
 
     def _do_request(self):
         if asyncio.iscoroutinefunction(self.__controller.func):
-            try:
-                self.request._server.put_coroutine_task(self.request._socket_req, asyncio.create_task(self._do_request_async()))
-            except AttributeError:
-                try:
-                    asyncio.get_running_loop()
-                    _logger.debug("Server is not run in coroutine mode, but there are filter functions defined aysnc, run controller in that event loop. ")
-                    return asyncio.create_task(self._do_request_async())
-                except RuntimeError:
-                    _logger.debug("This is a coroutine controller, but server is not run in coroutine mode, try to start a new event loop. ")
-                    asyncio.run(self._do_request_async())
+            self.request._put_coroutine_task(self._do_request_async())
         else:
             self._do_request_sync()
-
-    async def do_chain_async(self):
-        if self.response.is_sent:
-            return
-        if self.__filters:
-            func = self.__filters.pop(0)
-            if asyncio.iscoroutinefunction(func):
-                await func(self)
-            else:
-                func(self)
-        else:
-            return self._do_request()
 
     def do_chain(self):
         if self.response.is_sent:
             return
+        if self.is_coroutine:
+            self._do_chain_async()
+        else:
+            self._do_chain_sync()
+
+    def _do_chain_async(self):
+        if self.__filters:
+            filter_func = self.__filters.pop(0)
+            self.request._put_coroutine_task(self._wrap_to_async(filter_func, [self]))
+        else:
+            self._do_request()
+
+    async def _wrap_to_async(self, func: Callable, args: List = [], kwargs: Dict = {}):
+        if asyncio.iscoroutinefunction(func):
+            await func(*args, **kwargs)
+        else:
+            func(*args, **kwargs)
+
+    def _do_chain_sync(self):
         if self.__filters:
             self.__filters.pop(0)(self)
         else:
@@ -526,35 +531,22 @@ class HTTPRequestHandler:
         else:
             filters = self.server.get_matched_filters(req.path)
             ctx = FilterContexImpl(req, res, ctrl, filters)
-            _logger.debug(f"ctx->coroutine {ctx.is_coroutine}")
-            if ctx.is_coroutine:
-                try:
-                    self.server.put_coroutine_task(req._socket_req, asyncio.create_task(self.__ctx_do_chain_async(ctx)))
-                except AttributeError:
-                    _logger.debug("This is a coroutine controller, but server is not run in coroutine mode, try to start a new event loop. ")
-                    asyncio.run(self.__ctx_do_chain_async(ctx))
-            else:
-                self.__ctx_do_chain(ctx)
+            try:
+                ctx.do_chain()
+                if req._coroutine_objects:
+                    _logger.debug(
+                        f"Server is not run in coroutine mode, but some of filter functions or contorller function ({req._coroutine_objects}) is defined async, try to start a event loop to run it.")
+                    asyncio.run(self.wait_request_coroutine_tasks(req))
+            except HttpError as e:
+                res.send_error(e.code, e.message, e.explain)
+            except Exception as e:
+                _logger.exception("error occurs! returning 500")
+                res.send_error(500, None, str(e))
 
-    async def __ctx_do_chain_async(self, ctx: FilterContexImpl):
-        try:
-            res_async = await ctx.do_chain_async()
-            if res_async:
-                await res_async
-        except HttpError as e:
-            ctx.response.send_error(e.code, e.message, e.explain)
-        except Exception as e:
-            _logger.exception("error occurs! returning 500")
-            ctx.response.send_error(500, None, str(e))
-
-    def __ctx_do_chain(self, ctx: FilterContexImpl):
-        try:
-            ctx.do_chain()
-        except HttpError as e:
-            ctx.response.send_error(e.code, e.message, e.explain)
-        except Exception as e:
-            _logger.exception("error occurs! returning 500")
-            ctx.response.send_error(500, None, str(e))
+    async def wait_request_coroutine_tasks(self, req: RequestWrapper):
+        while req._coroutine_objects:
+            task = req._coroutine_objects.pop(0)
+            await task
 
     def __prepare_request(self, method) -> RequestWrapper:
         path = self.request_path

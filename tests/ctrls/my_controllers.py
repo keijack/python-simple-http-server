@@ -167,9 +167,14 @@ def header_echo(headers: Headers):
     return 200, headers, ""
 
 
+@filter_map("^/tupl")
+def fil(ctx: FilterContex):
+    print("---------- through filter ---------------")
+    ctx.do_chain()
+
 @filter_map("^/tuple")
 async def filter_tuple(ctx: FilterContex):
-    print("---------- through filter ---------------")
+    print("---------- through filter async ---------------")
     # add a header to request header
     ctx.request.headers["filter-set"] = "through filter"
     if "user_name" not in ctx.request.parameter:
