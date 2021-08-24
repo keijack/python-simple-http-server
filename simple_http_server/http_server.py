@@ -38,7 +38,7 @@ from types import coroutine
 from urllib.parse import unquote
 from urllib.parse import quote
 
-from typing import Callable, Coroutine, Dict, List, Tuple
+from typing import Any, Awaitable, Callable, Coroutine, Dict, List, Tuple
 
 from simple_http_server import ControllerFunction, StaticFile
 
@@ -365,7 +365,7 @@ class CoroutineMixIn:
     daemon_threads = True
 
     @property
-    def coroutine_tasks(self):
+    def coroutine_tasks(self) -> Dict[Any, List[Awaitable]]:
         if not hasattr(self, "_coroutine_tasks"):
             self._coroutine_tasks = {}
         return self._coroutine_tasks
@@ -390,7 +390,7 @@ class CoroutineMixIn:
     def coroutine_loop(self, val: asyncio.AbstractEventLoop):
         self._coroutine_loop = val
 
-    def put_coroutine_task(self, request, task):
+    def put_coroutine_task(self, request, task: Awaitable):
         if request in self.coroutine_tasks:
             self.coroutine_tasks[request].append(task)
         else:
@@ -414,8 +414,8 @@ class CoroutineMixIn:
             self.finish_request(request, client_address)
             if request in self.coroutine_tasks:
                 coroutine_tasks = self.coroutine_tasks[request]
-                for task in coroutine_tasks:
-                    await task
+                while coroutine_tasks:
+                    await coroutine_tasks.pop(0)
                 del self.coroutine_tasks[request]
         except Exception:
             self.handle_error(request, client_address)

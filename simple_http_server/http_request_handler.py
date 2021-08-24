@@ -545,8 +545,7 @@ class HTTPRequestHandler:
 
     async def wait_request_coroutine_tasks(self, req: RequestWrapper):
         while req._coroutine_objects:
-            task = req._coroutine_objects.pop(0)
-            await task
+            await req._coroutine_objects.pop(0)
 
     def __prepare_request(self, method) -> RequestWrapper:
         path = self.request_path
