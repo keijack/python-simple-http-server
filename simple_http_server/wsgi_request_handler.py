@@ -77,6 +77,11 @@ class WSGIRequestHandler:
     def query_string(self):
         return self.env['QUERY_STRING']
 
+    @property
+    def request(self):
+        return self
+
+
     def handle(self) -> List[bytes]:
         handler = HTTPRequestHandler(self, environment=self.env)
         handler.handle()
