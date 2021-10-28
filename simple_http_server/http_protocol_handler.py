@@ -24,42 +24,82 @@ SOFTWARE.
 
 import html
 import http.client
-import socket  # For gethostbyaddr()
+import email.parser
+import email.message
 import socketserver
-import time
-from typing import Any, Dict
-
-from http import HTTPStatus
-from urllib.parse import unquote
+import asyncio
+import socket
 
 import simple_http_server.__utils as utils
+
+from typing import Any, Dict
+from http import HTTPStatus
+from urllib.parse import unquote
+from asyncio.streams import StreamReader, StreamWriter
+from http import HTTPStatus
+
 from simple_http_server import version as __version__
 from .logger import get_logger
 from .http_request_handler import HTTPRequestHandler
 from .websocket_request_handler import WebsocketRequestHandler
 
+
+_MAXLINE = 65536
+_MAXHEADERS = 100
+
 _logger = get_logger("simple_http_server.base_request_handler")
 
 
-class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
+class RequestWriter:
+
+    def __init__(self, writer: StreamWriter) -> None:
+        self.writer: StreamWriter = writer
+
+    def send(self, data: bytes):
+        self.writer.write(data)
+
+
+class HttpProtocolHandler:
 
     server_version = "simple-http-server/" + __version__
 
-    default_request_version = "HTTP/0.9"
+    default_request_version = "HTTP/1.1"
 
-    def parse_request(self):
-        """Parse a request (internal).
+    # The version of the HTTP protocol we support.
+    # Set this to HTTP/1.1 to enable automatic keepalive
+    protocol_version = "HTTP/1.1"
 
-        The request should be stored in self.requestline; the results
-        are in self.command, self.path, self.request_version and
-        self.headers.
+    # MessageClass used to parse headers
+    MessageClass = http.client.HTTPMessage
 
-        Return True for success, False for failure; on failure, any relevant
-        error response has already been sent back.
+    # hack to maintain backwards compatibility
+    responses = {
+        v: (v.phrase, v.description)
+        for v in HTTPStatus.__members__.values()
+    }
 
-        """
-        raw_requestline = self.rfile.readline(65537)
-        if len(raw_requestline) > 65536:
+    def __init__(self, reader: StreamReader, writer: StreamWriter, request_writer=None, routing_conf=None) -> None:
+        self.routing_conf = routing_conf
+        self.reader: StreamReader = reader
+        self.writer: StreamWriter = writer
+        self.request_writer: RequestWriter = request_writer if request_writer else RequestWriter(
+            writer)
+
+        self.coroutine = False
+        self.close_connection = True
+
+        self.requestline = ''
+        self.request_version = ''
+        self.command = ''
+        self.path = ''
+        self.request_path = ''
+        self.query_string = ''
+        self.query_parameters = {}
+        self.headers = {}
+
+    async def parse_request(self):
+        raw_requestline = await self.reader.readline()
+        if len(raw_requestline) > _MAXLINE:
             self.requestline = ''
             self.request_version = ''
             self.command = ''
@@ -68,7 +108,7 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
         if not raw_requestline:
             self.close_connection = True
             return False
-        self.command = None  # set in case of error on the first line
+        self.command = None
         self.request_version = version = self.default_request_version
         self.close_connection = True
         requestline = str(raw_requestline, 'iso-8859-1')
@@ -97,17 +137,16 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
             except (ValueError, IndexError):
                 self.send_error(
                     HTTPStatus.BAD_REQUEST,
-                    "Bad request version (%r)" % version)
+                    f"Bad request version {version}")
                 return False
-            if version_number >= (1, 1) and self.protocol_version >= "HTTP/1.1":
-                self.close_connection = False
+
             if version_number >= (2, 0):
                 self.send_error(
                     HTTPStatus.HTTP_VERSION_NOT_SUPPORTED,
-                    "Invalid HTTP version (%s)" % base_version_number)
+                    f"Invalid HTTP version {base_version_number}")
                 return False
             self.request_version = version
-
+            _logger.info(f"request version: {self.request_version}")
         if not 2 <= len(words) <= 3:
             self.send_error(
                 HTTPStatus.BAD_REQUEST,
@@ -127,12 +166,12 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
 
         self.query_string = self.__get_query_string(self.path)
 
-        self.query_parameters = self._decode_query_string(self.query_string)
+        self.query_parameters = utils.decode_query_string(self.query_string)
 
         # Examine the headers and look for a Connection directive.
         try:
-            self.headers = http.client.parse_headers(self.rfile,
-                                                     _class=self.MessageClass)
+
+            self.headers = await self.parse_headers()
         except http.client.LineTooLong as err:
             self.send_error(
                 HTTPStatus.REQUEST_HEADER_FIELDS_TOO_LARGE,
@@ -162,28 +201,30 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
                 return False
         return True
 
-    def _decode_query_string(self, query_string: str):
-        return utils.decode_query_string(query_string)
+    async def parse_headers(self):
+        """Parses only RFC2822 headers from a file pointer.
 
-    def _break(self, txt: str, separator: str):
-        return utils.break_into(txt, separator)
+        email Parser wants to see strings rather than bytes.
+        But a TextIOWrapper around self.rfile would buffer too many bytes
+        from the stream, bytes which we later need to read as bytes.
+        So we read the correct bytes here, as bytes, for email Parser
+        to parse.
 
-    def _put_to(self, params, key, val):
-        utils.put_to(params, key, val)
+        """
+        headers = []
+        while True:
+            line = await self.reader.readline()
+            if len(line) > _MAXLINE:
+                raise http.client.LineTooLong("header line")
+            headers.append(line)
+            if len(headers) > _MAXHEADERS:
+                raise http.client.HTTPException(
+                    f"got more than {_MAXHEADERS} headers")
+            if line in (b'\r\n', b'\n', b''):
+                break
+        hstring = b''.join(headers).decode('iso-8859-1')
 
-    def __get_query_string(self, ori_path):
-        parts = ori_path.split('?')
-        if len(parts) == 2:
-            return parts[1]
-        else:
-            return ""
-
-    def _get_request_path(self, ori_path: str):
-        path = ori_path.split('?', 1)[0]
-        path = path.split('#', 1)[0]
-        path = utils.remove_url_first_slash(path)
-        path = unquote(path)
-        return path
+        return email.parser.Parser(_class=self.MessageClass).parsestr(hstring)
 
     def handle_expect_100(self):
         """Decide what to do with an "Expect: 100-continue" header.
@@ -203,55 +244,21 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
         self.end_headers()
         return True
 
-    def handle_http_request(self):
-        try:
-            http_request_handler = HTTPRequestHandler(self)
-            http_request_handler.handle()
-            self.wfile.flush()  # actually send the response if not already done.
-        except socket.timeout as e:
-            # a read or a write timed out.  Discard this connection
-            self.log_error("Request timed out: %r", e)
-            self.close_connection = True
-            return
+    def __get_query_string(self, ori_path: str):
+        parts = ori_path.split('?')
+        if len(parts) == 2:
+            return parts[1]
+        else:
+            return ""
 
-    def handle(self):
-        if not self.parse_request():
-            # An error code has been sent, just exit
-            return
-
-        if self.request_version == "HTTP/1.1" and self.command == "GET" and "Upgrade" in self.headers and self.headers["Upgrade"] == "websocket":
-            ws_handler = WebsocketRequestHandler(self)
-            ws_handler.handle()
-            return
-
-        """Handle multiple requests if necessary."""
-        self.close_connection = True
-
-        self.handle_http_request()
-        while not self.close_connection:
-            if not self.parse_request():
-                # An error code has been sent, just exit
-                return
-            self.handle_http_request()
+    def _get_request_path(self, ori_path: str):
+        path = ori_path.split('?', 1)[0]
+        path = path.split('#', 1)[0]
+        path = utils.remove_url_first_slash(path)
+        path = unquote(path)
+        return path
 
     def send_error(self, code: int, message: str = None, explain: str = None, headers: Dict[str, str] = {}):
-        """Send and log an error reply.
-
-        Arguments are
-        * code:    an HTTP error code
-                   3 digits
-        * message: a simple optional 1 line reason phrase.
-                   *( HTAB / SP / VCHAR / %x80-FF )
-                   defaults to short entry matching the response code
-        * explain: a detailed message defaults to the long entry
-                   matching the response code.
-
-        This sends an error response (so it must be called before any
-        output has been generated), logs the error, and finally sends
-        a piece of HTML explaining the error to the user.
-
-        """
-
         try:
             shortmsg, longmsg = self.responses[code]
         except KeyError:
@@ -273,9 +280,11 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
                          HTTPStatus.RESET_CONTENT,
                          HTTPStatus.NOT_MODIFIED)):
             try:
-                content: Any = self.server.error_page(code, html.escape(message, quote=False), html.escape(explain, quote=False))
+                content: Any = self.routing_conf.error_page(code, html.escape(
+                    message, quote=False), html.escape(explain, quote=False))
             except:
-                content: str = ""
+                content: str = html.escape(
+                    message, quote=False) + ":" + html.escape(explain, quote=False)
             content_type, body = utils.decode_response_body_to_bytes(content)
 
             self.send_header("Content-Type", content_type)
@@ -286,7 +295,7 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
         self.end_headers()
 
         if self.command != 'HEAD' and body:
-            self.wfile.write(body)
+            self.writer.write(body)
 
     def send_response(self, code, message=None):
         """Add the response header to the headers buffer and log the
@@ -298,30 +307,16 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
         """
         self.log_request(code)
         self.send_response_only(code, message)
-        self.send_header('Server', self.version_string())
-        self.send_header('Date', self.date_time_string())
+        self.send_header('Server', self.server_version)
+        self.send_header('Date', utils.date_time_string())
 
-    def send_response_only(self, code, message=None):
-        """Send the response header only."""
-        if self.request_version != 'HTTP/0.9':
-            if message is None:
-                if code in self.responses:
-                    message = self.responses[code][0]
-                else:
-                    message = ''
-            if not hasattr(self, '_headers_buffer'):
-                self._headers_buffer = []
-            self._headers_buffer.append(("%s %d %s\r\n" %
-                                         (self.protocol_version, code, message)).encode(
-                'latin-1', 'strict'))
-
-    def send_header(self, keyword, value):
+    def send_header(self, keyword: str, value: str):
         """Send a MIME header to the headers buffer."""
         if self.request_version != 'HTTP/0.9':
             if not hasattr(self, '_headers_buffer'):
                 self._headers_buffer = []
             self._headers_buffer.append(
-                ("%s: %s\r\n" % (keyword, value)).encode('latin-1', 'strict'))
+                f"{keyword}: {value}\r\n".encode('latin-1', 'strict'))
 
         if keyword.lower() == 'connection':
             if value.lower() == 'close':
@@ -337,8 +332,21 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
 
     def flush_headers(self):
         if hasattr(self, '_headers_buffer'):
-            self.wfile.write(b"".join(self._headers_buffer))
+            self.writer.write(b"".join(self._headers_buffer))
             self._headers_buffer = []
+
+    def send_response_only(self, code, message=None):
+        """Send the response header only."""
+        if self.request_version != 'HTTP/0.9':
+            if message is None:
+                if code in self.responses:
+                    message = self.responses[code][0]
+                else:
+                    message = ''
+            if not hasattr(self, '_headers_buffer'):
+                self._headers_buffer = []
+            self._headers_buffer.append(f"{self.protocol_version} {code} {message}\r\n".encode(
+                'latin-1', 'strict'))
 
     def log_request(self, code='-', size='-'):
         if isinstance(code, HTTPStatus):
@@ -350,45 +358,60 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
         self.log_message(format, *args)
 
     def log_message(self, format, *args):
-        _logger.info(f"{self.client_address[0]} - {format % args}")
+        _logger.info(f"{format % args}")
 
-    def version_string(self):
-        """Return the server software version string."""
-        return self.server_version
+    async def handle_request(self):
+        parse_request_success = await self.parse_request()
+        if not parse_request_success:
+            return
 
-    def date_time_string(self, timestamp=None):
-        return utils.date_time_string(timestamp=timestamp)
+        if self.request_version == "HTTP/1.1" and self.command == "GET" and "Upgrade" in self.headers and self.headers["Upgrade"] == "websocket":
+            ws_handler = WebsocketRequestHandler(self)
+            await ws_handler.handle_request()
+            self.writer.write_eof()
+            return
 
-    def log_date_time_string(self):
-        """Return the current time formatted for logging."""
-        now = time.time()
-        year, month, day, hh, mm, ss, x, y, z = time.localtime(now)
-        s = "%02d/%3s/%04d %02d:%02d:%02d" % (
-            day, self.monthname[month], year, hh, mm, ss)
-        return s
+        if self.coroutine:
+            self.close_connection = True
 
-    weekdayname = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+        await self.handle_http_request()
+        while not self.close_connection:
+            parse_request_success = await self.parse_request()
+            if not parse_request_success:
+                # An error code has been sent, just exit
+                return
+            await self.handle_http_request()
 
-    monthname = [None,
-                 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    async def handle_http_request(self):
+        try:
+            http_request_handler = HTTPRequestHandler(self)
+            await http_request_handler.handle_request()
+            self.writer.write_eof()
+        except socket.timeout as e:
+            # a read or a write timed out.  Discard this connection
+            self.log_error("Request timed out: %r", e)
+            self.close_connection = True
+            return
 
-    def address_string(self):
-        """Return the client address."""
 
-        return self.client_address[0]
+class SocketServerStreamRequestHandlerWraper(socketserver.StreamRequestHandler):
 
-    # Essentially static class variables
+    server_version = HttpProtocolHandler.server_version
 
-    # The version of the HTTP protocol we support.
-    # Set this to HTTP/1.1 to enable automatic keepalive
-    protocol_version = "HTTP/1.1"
+    # Wrapper method for readline
+    async def readline(self):
+        return self.rfile.readline(_MAXLINE)
 
-    # MessageClass used to parse headers
-    MessageClass = http.client.HTTPMessage
+    async def read(self, n: int = -1):
+        return self.rfile.read(n)
 
-    # hack to maintain backwards compatibility
-    responses = {
-        v: (v.phrase, v.description)
-        for v in HTTPStatus.__members__.values()
-    }
+    def write(self, data: bytes):
+        self.wfile.write(data)
+
+    def write_eof(self):
+        self.wfile.flush()
+
+    def handle(self) -> None:
+        handler: HttpProtocolHandler = HttpProtocolHandler(
+            self, self, request_writer=self.request, routing_conf=self.server)
+        asyncio.run(handler.handle_request())

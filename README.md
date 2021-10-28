@@ -29,7 +29,7 @@ Python 3.7+
 There are no other dependencies needed to run this project. However, if you want to run the unitests in the `tests` folder, you need to install `websocket` via pip:
 
 ```shell
-python3 -m pip install websocket
+python3 -m pip install websocket-client
 ```
 
 ## How to use
@@ -500,9 +500,7 @@ From `0.12.0`, you can use coroutine tasks than threads to handle requests, you 
     server.start(prefer_coroutine=True)
 ```
 
-After doing this, all your controller, including the one you define using `async def` or not will run in a seperated thread. If this parameter set to False, each of the request will run in a thread. 
-
-*Notice: Please do not defind you wesocker handler to be `async`*
+From `0.13.0`, coroutine mode uses the coroutine server, that means all requests will use the async I/O rather than block I/O. 
 
 ## Logger
 

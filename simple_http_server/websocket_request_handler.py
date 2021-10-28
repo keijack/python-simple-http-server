@@ -81,23 +81,23 @@ class WebsocketRequestHandler:
 
     GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
 
-    def __init__(self, base_http_quest_handler) -> None:
-        self.base_http_quest_handler = base_http_quest_handler
-        self.request = base_http_quest_handler.request
-        self.server = base_http_quest_handler.server
-        self.send_response = base_http_quest_handler.send_response_only
-        self.send_header = base_http_quest_handler.send_header
-        self.rfile = base_http_quest_handler.rfile
+    def __init__(self, http_protocol_handler) -> None:
+        self.base_http_quest_handler = http_protocol_handler
+        self.request_writer = http_protocol_handler.request_writer
+        self.routing_conf = http_protocol_handler.routing_conf
+        self.send_response = http_protocol_handler.send_response_only
+        self.send_header = http_protocol_handler.send_header
+        self.reader = http_protocol_handler.reader
         self.keep_alive = True
         self.handshake_done = False
 
-        handler_class, path_values = self.server.get_websocket_handler(base_http_quest_handler.request_path)
+        handler_class, path_values = self.routing_conf.get_websocket_handler(http_protocol_handler.request_path)
         self.handler = handler_class() if handler_class else None
         self.ws_request = WebsocketRequest()
-        self.ws_request.headers = base_http_quest_handler.headers
-        self.ws_request.path = base_http_quest_handler.request_path
-        self.ws_request.query_string = base_http_quest_handler.query_string
-        self.ws_request.parameters = base_http_quest_handler.query_parameters
+        self.ws_request.headers = http_protocol_handler.headers
+        self.ws_request.path = http_protocol_handler.request_path
+        self.ws_request.query_string = http_protocol_handler.query_string
+        self.ws_request.parameters = http_protocol_handler.query_parameters
         self.ws_request.path_values = path_values
         if "cookie" in self.ws_request.headers:
             self.ws_request.cookies.load(self.ws_request.headers["cookie"])
@@ -154,12 +154,12 @@ class WebsocketRequestHandler:
         if hasattr(self.handler, "on_close") and callable(self.handler.on_close):
             self.handler.on_close(self.session, self.close_reason)
 
-    def handle(self):
+    async def handle_request(self):
         while self.keep_alive:
             if not self.handshake_done:
                 self.handshake()
             else:
-                self.read_next_message()
+                await self.read_next_message()
 
         self.on_close()
 
@@ -183,7 +183,7 @@ class WebsocketRequestHandler:
 
         ws_res_headers = b"".join(self.response_headers) + b"\r\n"
         _logger.debug(ws_res_headers)
-        self.request.send(ws_res_headers)
+        self.request_writer.send(ws_res_headers)
         self.handshake_done = True
         if self.keep_alive == True:
             self.on_open()
@@ -195,13 +195,13 @@ class WebsocketRequestHandler:
         response_key = b64encode(hash.digest()).strip()
         return response_key.decode('ASCII')
 
-    def read_bytes(self, num):
-        return self.rfile.read(num)
+    async def read_bytes(self, num):
+        return await self.reader.read(num)
 
-    def read_next_message(self):
+    async def read_next_message(self):
         _logger.debug("read next message")
         try:
-            b1, b2 = self.read_bytes(2)
+            b1, b2 = await self.read_bytes(2)
         except SocketError as e:  # to be replaced with ConnectionResetError for py3
             if e.errno == errno.ECONNRESET:
                 _logger.info("Client closed connection.")
@@ -246,13 +246,16 @@ class WebsocketRequestHandler:
             return
 
         if payload_length == 126:
-            payload_length = struct.unpack(">H", self.rfile.read(2))[0]
+            hb = await self.reader.read(2)
+            payload_length = struct.unpack(">H", hb)[0]
         elif payload_length == 127:
-            payload_length = struct.unpack(">Q", self.rfile.read(8))[0]
+            qb = await self.reader.read(8)
+            payload_length = struct.unpack(">Q", qb)[0]
 
-        masks = self.read_bytes(4)
+        masks = await self.read_bytes(4)
         message_bytes = bytearray()
-        for message_byte in self.read_bytes(payload_length):
+        payload = await self.read_bytes(payload_length)
+        for message_byte in payload:
             message_byte ^= masks[len(message_bytes) % 4]
             message_bytes.append(message_byte)
         opcode_handler(opcode, message_bytes.decode('utf8'))
@@ -308,7 +311,7 @@ class WebsocketRequestHandler:
         else:
             raise Exception("Message is too big. Consider breaking it into chunks.")
 
-        self.request.send(header + payload)
+        self.request_writer.send(header + payload)
 
     def close(self, reason=""):
         self.send_text(reason, OPCODE_CLOSE_CONN)

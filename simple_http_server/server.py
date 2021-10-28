@@ -268,7 +268,7 @@ def _favicon():
         b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' + \
         b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
 
-
+"""
 def init_wsgi_proxy(resources: Dict[str, str] = {}, session_factory=None) -> http_server.WSGIProxy:
     set_session_factory(session_factory or LocalSessionFactory())
     proxy = http_server.WSGIProxy(res_conf=resources)
@@ -292,3 +292,4 @@ def init_wsgi_proxy(resources: Dict[str, str] = {}, session_factory=None) -> htt
         proxy.map_error_page(code, func)
 
     return proxy
+"""

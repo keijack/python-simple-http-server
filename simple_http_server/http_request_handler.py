@@ -31,7 +31,7 @@ import threading
 import http.cookies as cookies
 import datetime
 
-from typing import Callable, Dict, List, Union
+from typing import Any, Callable, Dict, List, Union
 
 from simple_http_server import FilterContex, ModelDict, Environment, RegGroup, RegGroups, HttpError, StaticFile, \
     Headers, Redirect, Response, Cookies, Cookie, JSONBody, Header, Parameters, PathValue, \
@@ -53,21 +53,18 @@ class RequestWrapper(Request):
         self._path = ""
         self.__session = None
         self._socket_req = None
-        self._server = None
         self._coroutine_objects = []
 
     def get_session(self, create: bool = False) -> Session:
         if not self.__session:
-            sid = self.cookies[SESSION_COOKIE_NAME].value if SESSION_COOKIE_NAME in self.cookies.keys() else ""
+            sid = self.cookies[SESSION_COOKIE_NAME].value if SESSION_COOKIE_NAME in self.cookies.keys(
+            ) else ""
             session_fac = _get_session_factory()
             self.__session = session_fac.get_session(sid, create)
         return self.__session
 
     def _put_coroutine_task(self, coroutine_object):
-        try:
-            self._server.put_coroutine_task(self._socket_req, asyncio.create_task(coroutine_object))
-        except AttributeError:
-            self._coroutine_objects.append(coroutine_object)
+        self._coroutine_objects.append(coroutine_object)
 
 
 class ResponseWrapper(Response):
@@ -89,7 +86,8 @@ class ResponseWrapper(Response):
         with self.__send_lock__:
             self.__is_sent = True
             self.status_code = status_code
-            self.__req_handler.send_error(self.status_code, message=message, explain=explain, headers=self.headers)
+            self.__req_handler.send_error(
+                self.status_code, message=message, explain=explain, headers=self.headers)
 
     def send_redirect(self, url: str) -> None:
         self.status_code = 302
@@ -153,12 +151,14 @@ class FilterContexImpl(FilterContex):
     def _do_res(self, ctr_res):
         session = self.request.get_session()
         if session and session.is_valid:
-            exp = datetime.datetime.utcfromtimestamp(session.last_accessed_time + session.max_inactive_interval)
+            exp = datetime.datetime.utcfromtimestamp(
+                session.last_accessed_time + session.max_inactive_interval)
             sck = Cookies()
             sck[SESSION_COOKIE_NAME] = session.id
             sck[SESSION_COOKIE_NAME]["httponly"] = True
             sck[SESSION_COOKIE_NAME]["path"] = "/"
-            sck[SESSION_COOKIE_NAME]["expires"] = exp.strftime(Cookies.EXPIRE_DATE_FORMAT)
+            sck[SESSION_COOKIE_NAME]["expires"] = exp.strftime(
+                Cookies.EXPIRE_DATE_FORMAT)
             self.response.cookies.update(sck)
         elif session and SESSION_COOKIE_NAME in self.request.cookies:
             exp = datetime.datetime.utcfromtimestamp(0)
@@ -166,12 +166,14 @@ class FilterContexImpl(FilterContex):
             sck[SESSION_COOKIE_NAME] = session.id
             sck[SESSION_COOKIE_NAME]["httponly"] = True
             sck[SESSION_COOKIE_NAME]["path"] = "/"
-            sck[SESSION_COOKIE_NAME]["expires"] = exp.strftime(Cookies.EXPIRE_DATE_FORMAT)
+            sck[SESSION_COOKIE_NAME]["expires"] = exp.strftime(
+                Cookies.EXPIRE_DATE_FORMAT)
             self.response.cookies.update(sck)
 
         if ctr_res is not None:
             if isinstance(ctr_res, tuple):
-                status, headers, cks, body = self.__decode_tuple_response(ctr_res)
+                status, headers, cks, body = self.__decode_tuple_response(
+                    ctr_res)
                 self.response.status_code = status if status is not None else self.response.status_code
                 self.response.body = body if body is not None else self.response.body
                 self.response.add_headers(headers)
@@ -221,7 +223,8 @@ class FilterContexImpl(FilterContex):
     def _do_chain_async(self):
         if self.__filters:
             filter_func = self.__filters.pop(0)
-            self.request._put_coroutine_task(self._wrap_to_async(filter_func, [self]))
+            self.request._put_coroutine_task(
+                self._wrap_to_async(filter_func, [self]))
         else:
             self._do_request()
 
@@ -266,7 +269,8 @@ class FilterContexImpl(FilterContex):
         for arg, arg_type_anno in args:
             if arg not in self.request.parameter.keys() \
                     and arg_type_anno not in (Request, Session, Response, RegGroups, RegGroup, Headers, cookies.BaseCookie, cookies.SimpleCookie, Cookies, PathValue, JSONBody, ModelDict):
-                raise HttpError(400, "Missing Paramter", f"Parameter[{arg}] is required! ")
+                raise HttpError(400, "Missing Paramter",
+                                f"Parameter[{arg}] is required! ")
             param = self.__get_params_(arg, arg_type_anno)
             arg_vals.append(param)
 
@@ -323,14 +327,16 @@ class FilterContexImpl(FilterContex):
         elif arg_type in (dict, Dict):
             param = self.__build_dict(arg, **kws)
         elif type_check:
-            raise HttpError(400, None, f"Parameter[{arg}] with Type {arg_type} is not supported yet.")
+            raise HttpError(
+                400, None, f"Parameter[{arg}] with Type {arg_type} is not supported yet.")
         else:
             param = val
         return param
 
     def __build_reg_group(self, val: RegGroup = RegGroup(group=0)):
         if val.group >= len(self.request.reg_groups):
-            raise HttpError(400, None, f"RegGroup required an element at {val.group}, but the reg length is only {len(self.request.reg_groups)}")
+            raise HttpError(
+                400, None, f"RegGroup required an element at {val.group}, but the reg length is only {len(self.request.reg_groups)}")
         return RegGroup(group=val.group, _value=self.request.reg_groups[val.group])
 
     def __build_model_dict(self):
@@ -348,7 +354,8 @@ class FilterContexImpl(FilterContex):
             return None
         kwarg_vals = {}
         for k, v, t in kwargs:
-            kwarg_vals[k] = self.__get_params_(k, type(v) if v is not None else t, v, False)
+            kwarg_vals[k] = self.__get_params_(
+                k, type(v) if v is not None else t, v, False)
 
         return kwarg_vals
 
@@ -357,12 +364,14 @@ class FilterContexImpl(FilterContex):
         if name in self.request.path_values:
             return PathValue(name=name, _value=self.request.path_values[name])
         else:
-            raise HttpError(500, None, f"path name[{name}] not in your url mapping!")
+            raise HttpError(
+                500, None, f"path name[{name}] not in your url mapping!")
 
     def __build_cookie(self, key, val=None):
         name = val.name if val.name is not None and val.name != "" else key
         if val._required and name not in self.request.cookies:
-            raise HttpError(400, "Missing Cookie", f"Cookie[{name}] is required.")
+            raise HttpError(400, "Missing Cookie",
+                            f"Cookie[{name}] is required.")
         if name in self.request.cookies:
             morsel = self.request.cookies[name]
             cookie = Cookie()
@@ -375,13 +384,15 @@ class FilterContexImpl(FilterContex):
     def __build_multipart(self, key, val=MultipartFile()):
         name = val.name if val.name is not None and val.name != "" else key
         if val._required and name not in self.request.parameter.keys():
-            raise HttpError(400, "Missing Parameter", f"Parameter[{name}] is required.")
+            raise HttpError(400, "Missing Parameter",
+                            f"Parameter[{name}] is required.")
         if name in self.request.parameter.keys():
             v = self.request.parameter[key]
             if isinstance(v, MultipartFile):
                 return v
             else:
-                raise HttpError(400, None, f"Parameter[{name}] should be a file.")
+                raise HttpError(
+                    400, None, f"Parameter[{name}] should be a file.")
         else:
             return val
 
@@ -390,7 +401,8 @@ class FilterContexImpl(FilterContex):
             try:
                 return json.loads(self.request.parameter[key])
             except:
-                raise HttpError(400, None, f"Parameter[{key}] should be a JSON string.")
+                raise HttpError(
+                    400, None, f"Parameter[{key}] should be a JSON string.")
         else:
             return val
 
@@ -404,19 +416,22 @@ class FilterContexImpl(FilterContex):
             try:
                 return [int(p) for p in ori_list]
             except:
-                raise HttpError(400, None, f"One of the parameter[{key}] is not int. ")
+                raise HttpError(
+                    400, None, f"One of the parameter[{key}] is not int. ")
         elif target_type == List[float]:
             try:
                 return [float(p) for p in ori_list]
             except:
-                raise HttpError(400, None, f"One of the parameter[{key}] is not float. ")
+                raise HttpError(
+                    400, None, f"One of the parameter[{key}] is not float. ")
         elif target_type == List[bool]:
             return [p.lower() not in ("0", "false", "") for p in ori_list]
         elif target_type in (List[dict], List[Dict]):
             try:
                 return [json.loads(p) for p in ori_list]
             except:
-                raise HttpError(400, None, f"One of the parameter[{key}] is not JSON string. ")
+                raise HttpError(
+                    400, None, f"One of the parameter[{key}] is not JSON string. ")
         elif target_type == List[Parameter]:
             return [Parameter(name=key, default=p, required=False) for p in ori_list]
         else:
@@ -427,7 +442,8 @@ class FilterContexImpl(FilterContex):
             try:
                 return float(self.request.parameter[key])
             except:
-                raise HttpError(400, None, f"Parameter[{key}] should be an float. ")
+                raise HttpError(
+                    400, None, f"Parameter[{key}] should be an float. ")
         else:
             return val
 
@@ -436,7 +452,8 @@ class FilterContexImpl(FilterContex):
             try:
                 return int(self.request.parameter[key])
             except:
-                raise HttpError(400, None, f"Parameter[{key}] should be an int. ")
+                raise HttpError(
+                    400, None, f"Parameter[{key}] should be an int. ")
         else:
             return val
 
@@ -458,13 +475,15 @@ class FilterContexImpl(FilterContex):
     def __build_json_body(self):
         if "content-type" not in self.request._headers_keys_in_lowcase.keys() or \
                 not self.request._headers_keys_in_lowcase["content-type"].lower().startswith("application/json"):
-            raise HttpError(400, None, 'The content type of this request must be "application/json"')
+            raise HttpError(
+                400, None, 'The content type of this request must be "application/json"')
         return JSONBody(self.request.json)
 
     def __build_header(self, key, val=Header()):
         name = val.name if val.name is not None and val.name != "" else key
         if val._required and name not in self.request.headers:
-            raise HttpError(400, "Missing Header", f"Header[{name}] is required.")
+            raise HttpError(400, "Missing Header",
+                            f"Header[{name}] is required.")
         if name in self.request.headers:
             v = self.request.headers[name]
             return Header(name=name, default=v, required=val._required)
@@ -474,7 +493,8 @@ class FilterContexImpl(FilterContex):
     def __build_params(self, key, val=Parameters()):
         name = val.name if val.name is not None and val.name != "" else key
         if val._required and name not in self.request.parameters:
-            raise HttpError(400, "Missing Parameter", f"Parameter[{name}] is required.")
+            raise HttpError(400, "Missing Parameter",
+                            f"Parameter[{name}] is required.")
         if name in self.request.parameters:
             v = self.request.parameters[name]
             return Parameters(name=name, default=v, required=val._required)
@@ -484,7 +504,8 @@ class FilterContexImpl(FilterContex):
     def __build_param(self, key, val=Parameter()):
         name = val.name if val.name is not None and val.name != "" else key
         if val._required and name not in self.request.parameter:
-            raise HttpError(400, "Missing Parameter", f"Parameter[{name}] is required.")
+            raise HttpError(400, "Missing Parameter",
+                            f"Parameter[{name}] is required.")
         if name in self.request.parameter:
             v = self.request.parameter[name]
             return Parameter(name=name, default=v, required=val._required)
@@ -494,64 +515,55 @@ class FilterContexImpl(FilterContex):
 
 class HTTPRequestHandler:
 
-    def __init__(self, base_http_quest_handler, environment={}) -> None:
-        self.base_http_quest_handler = base_http_quest_handler
-        self.method = base_http_quest_handler.command
-        self.request_path = base_http_quest_handler.request_path
-        self.socket_request = base_http_quest_handler.request
-        self.query_string = base_http_quest_handler.query_string
-        self.query_parameters = base_http_quest_handler.query_parameters
+    def __init__(self, http_protocol_handler, environment={}) -> None:
+        self.method: str = http_protocol_handler.command
+        self.request_path: str = http_protocol_handler.request_path
+        self.query_string: str = http_protocol_handler.query_string
+        self.query_parameters: Dict[str, List[str]
+                                    ] = http_protocol_handler.query_parameters
+        self.headers: Dict[str, Dict[str, str]] = http_protocol_handler.headers
 
-        self.server = base_http_quest_handler.server
-        self.headers = base_http_quest_handler.headers
-        self.rfile = base_http_quest_handler.rfile
-        self.send_header = base_http_quest_handler.send_header
-        self.end_headers = base_http_quest_handler.end_headers
-        self.send_response = base_http_quest_handler.send_response
-        self.send_error = base_http_quest_handler.send_error
-        self.wfile = base_http_quest_handler.wfile
-        self.environment = environment
+        self.routing_conf = http_protocol_handler.routing_conf
+        self.reader = http_protocol_handler.reader
 
-        self.__decode_query_string = utils.decode_query_string
-        self.__put_to = utils.put_to
-        self.__break = utils.break_into
-        self.date_time_string = utils.date_time_string
+        self.send_header = http_protocol_handler.send_header
+        self.end_headers = http_protocol_handler.end_headers
+        self.send_response = http_protocol_handler.send_response
+        self.send_error = http_protocol_handler.send_error
+        self.writer = http_protocol_handler.writer
+        self.environment: Dict[str, Any] = environment
 
-    def handle(self):
+    async def handle_request(self):
         mth = self.method.upper()
 
-        req = self.__prepare_request(mth)
+        req = await self.__prepare_request(mth)
         path = req._path
 
-        ctrl, req.path_values, req.reg_groups = self.server.get_url_controller(path, mth)
+        ctrl, req.path_values, req.reg_groups = self.routing_conf.get_url_controller(
+            path, mth)
 
         res = ResponseWrapper(self)
         if ctrl is None:
-            res.send_error(404, "Controller Not Found", "Cannot find a controller for your path")
+            res.send_error(404, "Controller Not Found",
+                           "Cannot find a controller for your path")
         else:
-            filters = self.server.get_matched_filters(req.path)
+            filters = self.routing_conf.get_matched_filters(req.path)
             ctx = FilterContexImpl(req, res, ctrl, filters)
             try:
                 ctx.do_chain()
                 if req._coroutine_objects:
-                    _logger.debug(
-                        f"Server is not run in coroutine mode, but some of filter functions or contorller function ({req._coroutine_objects}) is defined async, try to start a event loop to run it.")
-                    asyncio.run(self.wait_request_coroutine_tasks(req))
+                    _logger.debug(f"wait all the objects in waiting list.")
+                    while req._coroutine_objects:
+                        await req._coroutine_objects.pop(0)
             except HttpError as e:
                 res.send_error(e.code, e.message, e.explain)
             except Exception as e:
                 _logger.exception("error occurs! returning 500")
                 res.send_error(500, None, str(e))
 
-    async def wait_request_coroutine_tasks(self, req: RequestWrapper):
-        while req._coroutine_objects:
-            await req._coroutine_objects.pop(0)
-
-    def __prepare_request(self, method) -> RequestWrapper:
+    async def __prepare_request(self, method) -> RequestWrapper:
         path = self.request_path
         req = RequestWrapper()
-        req._socket_req = self.socket_request
-        req._server = self.server
         req.environment = self.environment or {}
         req.path = "/" + path
         req._path = path
@@ -572,13 +584,14 @@ class HTTPRequestHandler:
         req.parameters = self.query_parameters
 
         if "content-length" in _headers_keys_in_lowers.keys():
-            req.body = self.rfile.read(int(_headers_keys_in_lowers["content-length"]))
-            self.rfile.close()
+            req.body = await self.reader.read(int(_headers_keys_in_lowers["content-length"]))
             content_type = _headers_keys_in_lowers["content-type"]
             if content_type.lower().startswith("application/x-www-form-urlencoded"):
-                data_params = self.__decode_query_string(req.body.decode(DEFAULT_ENCODING))
+                data_params = utils.decode_query_string(
+                    req.body.decode(DEFAULT_ENCODING))
             elif content_type.lower().startswith("multipart/form-data"):
-                data_params = self.__decode_multipart(content_type, req.body.decode("ISO-8859-1"))
+                data_params = self.__decode_multipart(
+                    content_type, req.body.decode("ISO-8859-1"))
             elif content_type.lower().startswith("application/json"):
                 req.json = json.loads(req.body.decode(DEFAULT_ENCODING))
                 data_params = {}
@@ -608,7 +621,7 @@ class HTTPRequestHandler:
             # trim the first and the last empty row
             f = field[field.index("\r\n") + 2: field.rindex("\r\n")]
             key, val = self.__decode_multipart_field(f)
-            self.__put_to(params, key, val)
+            utils.put_to(params, key, val)
         return params
 
     def __decode_multipart_field(self, field):
@@ -619,16 +632,19 @@ class HTTPRequestHandler:
         kname = kvs["name"].encode("ISO-8859-1").decode(DEFAULT_ENCODING)
         if len(kvs) == 1:
             # this is a string field, the second line is an empty line, the rest is the value
-            val = self.__read_line(rest)[1].encode("ISO-8859-1").decode(DEFAULT_ENCODING)
+            val = self.__read_line(rest)[1].encode(
+                "ISO-8859-1").decode(DEFAULT_ENCODING)
         elif len(kvs) == 2:
-            filename = kvs["filename"].encode("ISO-8859-1").decode(DEFAULT_ENCODING)
+            filename = kvs["filename"].encode(
+                "ISO-8859-1").decode(DEFAULT_ENCODING)
             # the second line is Content-Type line
             ct_line, rest = self.__read_line(rest)
             content_type = ct_line.split(":")[1].strip()
             # the third line is an empty line, the rest is the value
             content = self.__read_line(rest)[1].encode("ISO-8859-1")
 
-            val = MultipartFile(kname, filename=filename, content_type=content_type, content=content)
+            val = MultipartFile(kname, filename=filename,
+                                content_type=content_type, content=content)
         else:
             val = "UNKNOWN"
 
@@ -638,12 +654,12 @@ class HTTPRequestHandler:
         cont_dis = {}
         es = line.split(";")[1:]
         for e in es:
-            k, v = self.__break(e.strip(), "=")
+            k, v = utils.break_into(e.strip(), "=")
             cont_dis[k] = v[1: -1]  # ignore the '"' symbol
         return cont_dis
 
     def __read_line(self, txt):
-        return self.__break(txt, "\r\n")
+        return utils.break_into(txt, "\r\n")
 
     def _send_response(self, response):
         try:
@@ -663,7 +679,7 @@ class HTTPRequestHandler:
             headers["Content-Type"] = content_type
 
         self.send_response(status_code)
-        self.send_header("Last-Modified", str(self.date_time_string()))
+        self.send_header("Last-Modified", str(utils.date_time_string()))
         for k, v in headers.items():
             if isinstance(v, str):
                 self.send_header(k, v)
@@ -683,12 +699,12 @@ class HTTPRequestHandler:
             data = body.encode(DEFAULT_ENCODING)
             self.send_header("Content-Length", len(data))
             self.end_headers()
-            self.wfile.write(data)
+            self.writer.write(data)
 
         elif isinstance(body, bytes):
             self.send_header("Content-Length", len(body))
             self.end_headers()
-            self.wfile.write(body)
+            self.writer.write(body)
         elif isinstance(body, StaticFile):
             file_size = os.path.getsize(body.file_path)
             self.send_header("Content-Length", file_size)
@@ -697,5 +713,5 @@ class HTTPRequestHandler:
             with open(body.file_path, "rb") as in_file:
                 data = in_file.read(buffer_size)
                 while data:
-                    self.wfile.write(data)
+                    self.writer.write(data)
                     data = in_file.read(buffer_size)

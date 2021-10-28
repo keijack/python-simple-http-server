@@ -23,27 +23,29 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+
 import json
 import socket
 import os
 import re
 import ssl as _ssl
 import threading
-import time
 import asyncio
+
+from asyncio.base_events import Server
+from asyncio.streams import StreamReader, StreamWriter
 
 from collections import OrderedDict
 from socketserver import ThreadingMixIn, TCPServer
-from types import coroutine
+from time import sleep
 from urllib.parse import unquote
 from urllib.parse import quote
 
-from typing import Any, Awaitable, Callable, Coroutine, Dict, List, Tuple
+from typing import Callable, Dict, List, Tuple
 
 from simple_http_server import ControllerFunction, StaticFile
+from simple_http_server.http_protocol_handler import HttpProtocolHandler, SocketServerStreamRequestHandlerWraper
 
-from .base_request_handler import BaseHTTPRequestHandler
-from .wsgi_request_handler import WSGIRequestHandler
 from .__utils import remove_url_first_slash, get_function_args, get_function_kwargs
 from .logger import get_logger
 
@@ -52,12 +54,16 @@ _logger = get_logger("simple_http_server.http_server")
 
 class RoutingConf:
 
-    HTTP_METHODS = ["OPTIONS", "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT"]
+    HTTP_METHODS = ["OPTIONS", "GET", "HEAD",
+                    "POST", "PUT", "DELETE", "TRACE", "CONNECT"]
 
     def __init__(self, res_conf={}):
-        self.method_url_mapping: Dict[str, Dict[str, ControllerFunction]] = {"_": {}}
-        self.path_val_url_mapping: Dict[str, Dict[str, ControllerFunction]] = {"_": OrderedDict()}
-        self.method_regexp_mapping: Dict[str, Dict[str, ControllerFunction]] = {"_": OrderedDict()}
+        self.method_url_mapping: Dict[str,
+                                      Dict[str, ControllerFunction]] = {"_": {}}
+        self.path_val_url_mapping: Dict[str, Dict[str, ControllerFunction]] = {
+            "_": OrderedDict()}
+        self.method_regexp_mapping: Dict[str, Dict[str, ControllerFunction]] = {
+            "_": OrderedDict()}
         for mth in self.HTTP_METHODS:
             self.method_url_mapping[mth] = {}
             self.path_val_url_mapping[mth] = OrderedDict()
@@ -125,7 +131,8 @@ class RoutingConf:
         url = ctrl.url
         regexp = ctrl.regexp
         method = ctrl.method
-        _logger.debug(f"map url {url}|{regexp} with method[{method}] to function {ctrl.func}. ")
+        _logger.debug(
+            f"map url {url}|{regexp} with method[{method}] to function {ctrl.func}. ")
         assert method is None or method == "" or method.upper() in self.HTTP_METHODS
         _method = method.upper() if method is not None and method != "" else "_"
         if regexp:
@@ -137,7 +144,8 @@ class RoutingConf:
             if path_pattern is None:
                 self.method_url_mapping[_method][_url] = ctrl
             else:
-                self.path_val_url_mapping[_method][path_pattern] = (ctrl, path_names)
+                self.path_val_url_mapping[_method][path_pattern] = (
+                    ctrl, path_names)
 
     def _res_(self, path, res_pre, res_dir):
         fpath = os.path.join(res_dir, path.replace(res_pre, ""))
@@ -200,7 +208,8 @@ class RoutingConf:
     def __try_get_from_regexp(self, path, method):
         for regex, ctrl in self.method_regexp_mapping[method].items():
             m = re.match(regex, path)
-            _logger.debug(f"regexp::pattern::[{regex}] => path::[{path}] match? {m is not None}")
+            _logger.debug(
+                f"regexp::pattern::[{regex}] => path::[{path}] match? {m is not None}")
             if m:
                 return ctrl, tuple([unquote(v) for v in m.groups()])
         return None
@@ -208,7 +217,8 @@ class RoutingConf:
     def __try_get_from_path_val(self, path, method):
         for patterns, val in self.path_val_url_mapping[method].items():
             m = re.match(patterns, path)
-            _logger.debug(f"url with path value::pattern::[{patterns}] => path::[{path}] match? {m is not None}")
+            _logger.debug(
+                f"url with path value::pattern::[{patterns}] => path::[{path}] match? {m is not None}")
             if m:
                 fun, path_names = val
                 path_values = {}
@@ -234,7 +244,8 @@ class RoutingConf:
         if path_pattern is None:
             self.ws_mapping[url] = handler_class
         else:
-            self.ws_path_val_mapping[path_pattern] = (handler_class, path_names)
+            self.ws_path_val_mapping[path_pattern] = (
+                handler_class, path_names)
 
     def get_websocket_handler(self, path):
         if path in self.ws_mapping:
@@ -244,7 +255,8 @@ class RoutingConf:
     def __try_get_ws_handler_from_path_val(self, path):
         for patterns, val in self.ws_path_val_mapping.items():
             m = re.match(patterns, path)
-            _logger.debug(f"websocket endpoint with path value::pattern::[{patterns}] => path::[{path}] match? {m is not None}")
+            _logger.debug(
+                f"websocket endpoint with path value::pattern::[{patterns}] => path::[{path}] match? {m is not None}")
             if m:
                 clz, path_names = val
                 path_values = {}
@@ -352,102 +364,65 @@ class HTTPServer(TCPServer, RoutingConf):
         self.server_port = port
 
     def __init__(self, addr, res_conf={}):
-        TCPServer.__init__(self, addr, BaseHTTPRequestHandler)
+        TCPServer.__init__(self, addr, SocketServerStreamRequestHandlerWraper)
         RoutingConf.__init__(self, res_conf)
 
 
 class ThreadingMixInHTTPServer(ThreadingMixIn, HTTPServer):
-    pass
+
+    def start(self):
+        self.serve_forever()
+
+    def _shutdown(self) -> None:
+        return super().shutdown()
+
+    def shutdown(self) -> None:
+        threading.Thread(target=self._shutdown, daemon=True)
 
 
-class CoroutineMixIn:
+class CoroutineHTTPServer(RoutingConf):
 
-    daemon_threads = True
+    def __init__(self, host: str = '', port: int = 9090, ssl: _ssl.SSLContext = None, res_conf={}) -> None:
+        RoutingConf.__init__(self, res_conf)
+        self.host: str = host
+        self.port: int = port
+        self.ssl: _ssl.SSLContext = ssl
+        self.server: Server = None
+        
+    async def callback(self, reader: StreamReader, writer: StreamWriter):
+        handler = HttpProtocolHandler(reader, writer, routing_conf=self)
+        handler.coroutine = True
+        await handler.handle_request()
 
-    @property
-    def coroutine_tasks(self) -> Dict[Any, List[Awaitable]]:
-        if not hasattr(self, "_coroutine_tasks"):
-            self._coroutine_tasks = {}
-        return self._coroutine_tasks
+    async def start_server(self):
+        self.server = await asyncio.start_server(
+            self.callback, host=self.host, port=self.port, ssl=self.ssl)
+        async with self.server:
+            try:
+                await self.server.serve_forever()
+            except asyncio.exceptions.CancelledError:
+                _logger.debug("Some requests are lost for the reason that the server is shutted down.")
+            finally:
+                await self.server.wait_closed()
 
-    @property
-    def coroutine_thread(self) -> threading.Thread:
-        if not hasattr(self, "_coroutine_thread"):
-            self._coroutine_thread = None
-        return self._coroutine_thread
+    def start(self):
+        asyncio.run(self.start_server())
 
-    @coroutine_thread.setter
-    def coroutine_thread(self, val: threading.Thread):
-        self._coroutine_thread = val
-
-    @property
-    def coroutine_loop(self) -> asyncio.AbstractEventLoop:
-        if not hasattr(self, "_coroutine_loop"):
-            self._coroutine_loop = None
-        return self._coroutine_loop
-
-    @coroutine_loop.setter
-    def coroutine_loop(self, val: asyncio.AbstractEventLoop):
-        self._coroutine_loop = val
-
-    def put_coroutine_task(self, request, task: Awaitable):
-        if request in self.coroutine_tasks:
-            self.coroutine_tasks[request].append(task)
-        else:
-            self.coroutine_tasks[request] = [task]
-
-    def coroutine_main(self):
-        self.coroutine_loop = loop = asyncio.new_event_loop()
-        try:
-            loop.run_forever()
-        finally:
-            loop.run_until_complete(loop.shutdown_asyncgens())
-            loop.close()
-
-    async def process_request_async(self, request, client_address):
-        """Same as in BaseServer but as async.
-
-        In addition, exception handling is done here.
-
-        """
-        try:
-            self.finish_request(request, client_address)
-            if request in self.coroutine_tasks:
-                coroutine_tasks = self.coroutine_tasks[request]
-                while coroutine_tasks:
-                    await coroutine_tasks.pop(0)
-                del self.coroutine_tasks[request]
-        except Exception:
-            self.handle_error(request, client_address)
-        finally:
-            self.shutdown_request(request)
-
-    def process_request(self, request, client_address):
-        if self.coroutine_thread is None:
-            self.coroutine_thread = threading.Thread(target=self.coroutine_main, name="CoroutineThread", daemon=self.daemon_threads)
-            self.coroutine_thread.start()
-
-            while not self.coroutine_loop:
-                # wait for the loop ready
-                time.sleep(0.1)
-        asyncio.run_coroutine_threadsafe(self.process_request_async(request, client_address), self.coroutine_loop)
-
-    def server_close(self):
-        super().server_close()
-        if self.coroutine_loop:
-            self.coroutine_loop.call_soon_threadsafe(self.coroutine_loop.stop)
-            self.coroutine_thread.join()
+    def _shutdown(self):
+        _logger.debug("Try to shutdown server.")
+        self.server.close()
+        loop = self.server.get_loop()
+        loop.call_soon_threadsafe(loop.stop)
 
     def shutdown(self):
-        super().shutdown()
-        if self.coroutine_loop:
-            self.coroutine_loop.call_soon_threadsafe(self.coroutine_loop.stop)
-            self.coroutine_thread.join()
-
-
-class CoroutineMixInHTTPServer(CoroutineMixIn, HTTPServer):
-    pass
-
+        wait_time = 5
+        while wait_time:
+            sleep(1)
+            _logger.debug(f"couting to shutdown: {wait_time}")
+            wait_time = wait_time - 1
+            if wait_time == 0:
+                _logger.debug("shutdown server....")
+                self._shutdown()
 
 class SimpleDispatcherHttpServer:
     """Dispatcher Http server"""
@@ -479,25 +454,30 @@ class SimpleDispatcherHttpServer:
         self.__ready = False
 
         self.ssl = ssl
-        if prefer_corountine:
-            self.server = CoroutineMixInHTTPServer(self.host, res_conf=resources)
-        else:
-            self.server = ThreadingMixInHTTPServer(self.host, res_conf=resources)
 
         if ssl:
             if ssl_context:
-                ssl_ctx = ssl_context
+                self.ssl_ctx = ssl_context
             else:
                 assert keyfile and certfile, "keyfile and certfile should be provided. "
                 ssl_ctx = _ssl.SSLContext(protocol=ssl_protocol)
                 ssl_ctx.check_hostname = ssl_check_hostname
-                ssl_ctx.load_cert_chain(certfile=certfile, keyfile=keyfile, password=keypass)
-            self.server.socket = ssl_ctx.wrap_socket(
-                self.server.socket,
-                server_side=True
-            )
+                ssl_ctx.load_cert_chain(
+                    certfile=certfile, keyfile=keyfile, password=keypass)
+                self.ssl_ctx = ssl_ctx
+        else:
+            self.ssl_ctx = None
 
-    @property
+        if prefer_corountine:
+            self.server = CoroutineHTTPServer(
+                self.host[0], self.host[1], self.ssl_ctx, resources)
+        else:
+            self.server = ThreadingMixInHTTPServer(self.host, resources)
+            if self.ssl_ctx:
+                self.server.socket = self.ssl_ctx.wrap_socket(
+                    self.server.socket, server_side=True)
+
+    @ property
     def ready(self):
         return self.__ready
 
@@ -505,28 +485,13 @@ class SimpleDispatcherHttpServer:
         self.server.res_conf = res
 
     def start(self):
-        if self.ssl:
-            ssl_hint = " with SSL on"
-        else:
-            ssl_hint = ""
-        _logger.info(f"Dispatcher Http Server starts. Listen to port [{self.host[1]}]{ssl_hint}.")
         try:
             self.__ready = True
-            self.server.serve_forever()
+            self.server.start()
         except:
             self.__ready = False
             raise
 
     def shutdown(self):
         # shutdown it in a seperate thread.
-        threading.Thread(target=self.server.shutdown, daemon=True).start()
-
-
-class WSGIProxy(RoutingConf):
-
-    def __init__(self, res_conf):
-        super().__init__(res_conf=res_conf)
-
-    def app_proxy(self, environment, start_response):
-        requestHandler = WSGIRequestHandler(self, environment, start_response)
-        return requestHandler.handle()
+        self.server.shutdown()

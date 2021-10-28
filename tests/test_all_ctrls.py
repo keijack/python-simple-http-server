@@ -2,6 +2,7 @@
 
 import os
 from typing import Dict
+from unittest.case import TestCase
 import websocket
 import unittest
 from threading import Thread
@@ -36,7 +37,7 @@ class HttpRequestTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(clz):
-        Thread(target=clz.start_server, daemon=False, name="t").start()
+        Thread(target=clz.start_server, daemon=True, name="t").start()
         retry = 0
         while not server.is_ready():
             sleep(1)
@@ -112,6 +113,7 @@ class HttpRequestTest(unittest.TestCase):
             _logger.info(error_msg)
             assert error_msg == '500-Internal Server Error-some error occurs!'
 
+    
     def test_ws(self):
         ws = websocket.WebSocket()
         path_val = "test"
@@ -121,3 +123,5 @@ class HttpRequestTest(unittest.TestCase):
         txt = ws.recv()
         ws.close()
         assert txt == f"{path_val}-{msg}"
+
+    
