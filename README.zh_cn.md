@@ -29,7 +29,7 @@ Python 3.7+
 这个工程本身并不依赖任何其他的库，但是如果你需要运行在 `tests` 目录下的单元测试，那么，你需要安装 `websocket` 库：
 
 ```shell
-python3 -m pip install websocket
+python3 -m pip install websocket-client
 ```
 
 ## 安装
