@@ -45,6 +45,7 @@ from typing import Callable, Dict, List, Tuple
 
 from simple_http_server import ControllerFunction, StaticFile
 from simple_http_server.http_protocol_handler import HttpProtocolHandler, SocketServerStreamRequestHandlerWraper
+from .wsgi_request_handler import WSGIRequestHandler
 
 from .__utils import remove_url_first_slash, get_function_args, get_function_kwargs
 from .logger import get_logger
@@ -389,7 +390,7 @@ class CoroutineHTTPServer(RoutingConf):
         self.port: int = port
         self.ssl: _ssl.SSLContext = ssl
         self.server: Server = None
-        
+
     async def callback(self, reader: StreamReader, writer: StreamWriter):
         handler = HttpProtocolHandler(reader, writer, routing_conf=self)
         handler.coroutine = True
@@ -404,7 +405,8 @@ class CoroutineHTTPServer(RoutingConf):
             try:
                 await self.server.serve_forever()
             except asyncio.exceptions.CancelledError:
-                _logger.debug("Some requests are lost for the reason that the server is shutted down.")
+                _logger.debug(
+                    "Some requests are lost for the reason that the server is shutted down.")
             finally:
                 await self.server.wait_closed()
 
@@ -426,6 +428,7 @@ class CoroutineHTTPServer(RoutingConf):
             if wait_time == 0:
                 _logger.debug("shutdown server....")
                 self._shutdown()
+
 
 class SimpleDispatcherHttpServer:
     """Dispatcher Http server"""
@@ -498,3 +501,16 @@ class SimpleDispatcherHttpServer:
     def shutdown(self):
         # shutdown it in a seperate thread.
         self.server.shutdown()
+
+
+class WSGIProxy(RoutingConf):
+
+    def __init__(self, res_conf):
+        super().__init__(res_conf=res_conf)
+
+    def app_proxy(self, environment, start_response):
+        return asyncio.run(self.async_app_proxy(environment, start_response))
+
+    async def async_app_proxy(self, environment, start_response):
+        requestHandler = WSGIRequestHandler(self, environment, start_response)
+        return await requestHandler.handle_request()

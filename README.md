@@ -500,7 +500,7 @@ From `0.12.0`, you can use coroutine tasks than threads to handle requests, you 
     server.start(prefer_coroutine=True)
 ```
 
-From `0.13.0`, coroutine mode uses the coroutine server, that means all requests will use the async I/O rather than block I/O. 
+From `0.13.0`, coroutine mode uses the coroutine server, that means all requests will use the async I/O rather than block I/O. So you can now use `async def` to define all your controllers including the Websocket event callback methods.
 
 ## Logger
 
@@ -555,6 +555,10 @@ wsgi_proxy = server.init_wsgi_proxy(resources={"/public/*": f"/you/static/files/
 # wsgi app entrance. 
 def simple_app(environ, start_response):
     return wsgi_proxy.app_proxy(environ, start_response)
+
+# If your entrance is async:
+async def simple_app(envion, start_response):
+    return await wsgi_proxy.async_app_proxy(environ, start_response)
 ```
 
 ## Thanks
