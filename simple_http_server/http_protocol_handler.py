@@ -187,10 +187,13 @@ class HttpProtocolHandler:
             return False
 
         conntype = self.headers.get('Connection', "")
+        _logger.debug(f"connection type:: {conntype}")
         if conntype.lower() == 'close':
             self.close_connection = True
         elif (conntype.lower() == 'keep-alive' and
               self.protocol_version >= "HTTP/1.1"):
+            self.close_connection = False
+        else:
             self.close_connection = False
         # Examine the headers and look for an Expect directive
         expect = self.headers.get('Expect', "")
@@ -366,19 +369,18 @@ class HttpProtocolHandler:
             return
 
         if self.request_version == "HTTP/1.1" and self.command == "GET" and "Upgrade" in self.headers and self.headers["Upgrade"] == "websocket":
+            _logger.debug("This is a websocket connection. ")
             ws_handler = WebsocketRequestHandler(self)
             await ws_handler.handle_request()
             self.writer.write_eof()
             return
 
-        if self.coroutine:
-            self.close_connection = True
-
         await self.handle_http_request()
         while not self.close_connection:
+            _logger.debug("Keep-Alive, read next request. ")
             parse_request_success = await self.parse_request()
             if not parse_request_success:
-                # An error code has been sent, just exit
+                _logger.debug("parse request fails, return. ")
                 return
             await self.handle_http_request()
 
@@ -415,3 +417,7 @@ class SocketServerStreamRequestHandlerWraper(socketserver.StreamRequestHandler):
         handler: HttpProtocolHandler = HttpProtocolHandler(
             self, self, request_writer=self.request, routing_conf=self.server)
         asyncio.run(handler.handle_request())
+
+    def finish(self) -> None:
+        _logger.debug("Finish a socket connection.")
+        return super().finish()

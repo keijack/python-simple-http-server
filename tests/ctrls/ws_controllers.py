@@ -13,7 +13,7 @@ class WSHandler(WebsocketHandler):
     def on_handshake(self, request: WebsocketRequest):
         return 0, {}
 
-    def on_open(self, session: WebsocketSession):
+    async def on_open(self, session: WebsocketSession):
 
         _logger.info(f">>{session.id}<< open! {session.request.path_values}")
 

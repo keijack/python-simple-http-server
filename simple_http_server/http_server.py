@@ -374,10 +374,11 @@ class ThreadingMixInHTTPServer(ThreadingMixIn, HTTPServer):
         self.serve_forever()
 
     def _shutdown(self) -> None:
-        return super().shutdown()
+        _logger.debug("shutdown http server in a seperate thread..")
+        super().shutdown()
 
     def shutdown(self) -> None:
-        threading.Thread(target=self._shutdown, daemon=True)
+        threading.Thread(target=self._shutdown, daemon=False).start()
 
 
 class CoroutineHTTPServer(RoutingConf):
@@ -393,6 +394,8 @@ class CoroutineHTTPServer(RoutingConf):
         handler = HttpProtocolHandler(reader, writer, routing_conf=self)
         handler.coroutine = True
         await handler.handle_request()
+        _logger.debug("Connection ends, close the writer.")
+        writer.close()
 
     async def start_server(self):
         self.server = await asyncio.start_server(
@@ -415,7 +418,7 @@ class CoroutineHTTPServer(RoutingConf):
         loop.call_soon_threadsafe(loop.stop)
 
     def shutdown(self):
-        wait_time = 5
+        wait_time = 3
         while wait_time:
             sleep(1)
             _logger.debug(f"couting to shutdown: {wait_time}")

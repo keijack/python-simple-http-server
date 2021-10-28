@@ -23,7 +23,7 @@ SOFTWARE.
 """
 
 
-
+import asyncio
 import struct
 from base64 import b64encode
 from hashlib import sha1
@@ -91,7 +91,8 @@ class WebsocketRequestHandler:
         self.keep_alive = True
         self.handshake_done = False
 
-        handler_class, path_values = self.routing_conf.get_websocket_handler(http_protocol_handler.request_path)
+        handler_class, path_values = self.routing_conf.get_websocket_handler(
+            http_protocol_handler.request_path)
         self.handler = handler_class() if handler_class else None
         self.ws_request = WebsocketRequest()
         self.ws_request.headers = http_protocol_handler.headers
@@ -113,10 +114,15 @@ class WebsocketRequestHandler:
         else:
             return []
 
-    def on_handshake(self) -> Tuple[int, Dict[str, str]]:
+    async def await_func(self, obj):
+        if asyncio.iscoroutine(obj):
+            return await obj
+        return obj
+
+    async def on_handshake(self) -> Tuple[int, Dict[str, str]]:
         if not hasattr(self.handler, "on_handshake") or not callable(self.handler.on_handshake):
             return None, {}
-        res = self.handler.on_handshake(self.ws_request)
+        res = await self.await_func(self.handler.on_handshake(self.ws_request))
         http_status_code = None
         headers = {}
         if not res:
@@ -135,37 +141,37 @@ class WebsocketRequestHandler:
             _logger.warn(f"Endpoint[{self.ws_request.path}]")
         return http_status_code, headers
 
-    def on_message(self, op_code, message):
+    async def on_message(self, op_code, message):
         if hasattr(self.handler, "on_message") and callable(self.handler.on_message):
-            self.handler.on_message(self.session, OPTYPES[op_code], message)
-        
+            await self.await_func(self.handler.on_message(self.session, OPTYPES[op_code], message))
+
         if op_code == OPCODE_TEXT and hasattr(self.handler, "on_text_message") and callable(self.handler.on_text_message):
-            self.handler.on_text_message(self.session, message)
+            await self.await_func(self.handler.on_text_message(self.session, message))
         elif op_code == OPCODE_PING and hasattr(self.handler, "on_ping_message") and callable(self.handler.on_ping_message):
-            self.handler.on_ping_message(self.session, message)
+            await self.await_func(self.handler.on_ping_message(self.session, message))
         elif op_code == OPCODE_PONG and hasattr(self.handler, "on_pong_message") and callable(self.handler.on_pong_message):
-            self.handler.on_pong_message(self.session, message)
+            await self.await_func(self.handler.on_pong_message(self.session, message))
 
-    def on_open(self):
+    async def on_open(self):
         if hasattr(self.handler, "on_open") and callable(self.handler.on_open):
-            self.handler.on_open(self.session)
+            await self.await_func(self.handler.on_open(self.session))
 
-    def on_close(self):
+    async def on_close(self):
         if hasattr(self.handler, "on_close") and callable(self.handler.on_close):
-            self.handler.on_close(self.session, self.close_reason)
+            await self.await_func(self.handler.on_close(self.session, self.close_reason))
 
     async def handle_request(self):
         while self.keep_alive:
             if not self.handshake_done:
-                self.handshake()
+                await self.handshake()
             else:
                 await self.read_next_message()
 
-        self.on_close()
+        await self.on_close()
 
-    def handshake(self):
+    async def handshake(self):
         if self.handler:
-            code, headers = self.on_handshake()
+            code, headers = await self.on_handshake()
             if code and code != 101:
                 self.keep_alive = False
                 self.send_response(code)
@@ -173,7 +179,8 @@ class WebsocketRequestHandler:
                 self.send_response(101, "Switching Protocols")
                 self.send_header("Upgrade", "websocket")
                 self.send_header("Connection", "Upgrade")
-                self.send_header("Sec-WebSocket-Accept", self.calculate_response_key())
+                self.send_header("Sec-WebSocket-Accept",
+                                 self.calculate_response_key())
             if headers:
                 for h_name, h_val in headers.items():
                     self.send_header(h_name, h_val)
@@ -186,10 +193,11 @@ class WebsocketRequestHandler:
         self.request_writer.send(ws_res_headers)
         self.handshake_done = True
         if self.keep_alive == True:
-            self.on_open()
+            await self.on_open()
 
     def calculate_response_key(self):
-        _logger.debug(f"Sec-WebSocket-Key: {self.ws_request.headers['Sec-WebSocket-Key']}")
+        _logger.debug(
+            f"Sec-WebSocket-Key: {self.ws_request.headers['Sec-WebSocket-Key']}")
         key: str = self.ws_request.headers["Sec-WebSocket-Key"]
         hash = sha1(key.encode() + self.GUID.encode())
         response_key = b64encode(hash.digest()).strip()
@@ -258,7 +266,7 @@ class WebsocketRequestHandler:
         for message_byte in payload:
             message_byte ^= masks[len(message_bytes) % 4]
             message_bytes.append(message_byte)
-        opcode_handler(opcode, message_bytes.decode('utf8'))
+        await opcode_handler(opcode, message_bytes.decode('utf8'))
 
     def send_message(self, message):
         self.send_text(message)
@@ -277,14 +285,17 @@ class WebsocketRequestHandler:
 
         # Validate message
         if isinstance(message, bytes):
-            message = self._try_decode_UTF8(message)  # this is slower but ensures we have UTF-8
+            # this is slower but ensures we have UTF-8
+            message = self._try_decode_UTF8(message)
             if not message:
-                _logger.warning("Can\'t send message, message is not valid UTF-8")
+                _logger.warning(
+                    "Can\'t send message, message is not valid UTF-8")
                 return False
         elif isinstance(message, str):
             pass
         else:
-            _logger.warning('Can\'t send message, message has to be a string or bytes. Given type is %s' % type(message))
+            _logger.warning(
+                'Can\'t send message, message has to be a string or bytes. Given type is %s' % type(message))
             return False
 
         header = bytearray()
@@ -309,7 +320,8 @@ class WebsocketRequestHandler:
             header.extend(struct.pack(">Q", payload_length))
 
         else:
-            raise Exception("Message is too big. Consider breaking it into chunks.")
+            raise Exception(
+                "Message is too big. Consider breaking it into chunks.")
 
         self.request_writer.send(header + payload)
 
