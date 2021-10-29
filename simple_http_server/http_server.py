@@ -393,7 +393,6 @@ class CoroutineHTTPServer(RoutingConf):
 
     async def callback(self, reader: StreamReader, writer: StreamWriter):
         handler = HttpProtocolHandler(reader, writer, routing_conf=self)
-        handler.coroutine = True
         await handler.handle_request()
         _logger.debug("Connection ends, close the writer.")
         writer.close()

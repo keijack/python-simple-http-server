@@ -85,7 +85,6 @@ class HttpProtocolHandler:
         self.request_writer: RequestWriter = request_writer if request_writer else RequestWriter(
             writer)
 
-        self.coroutine = False
         self.close_connection = True
 
         self.requestline = ''
