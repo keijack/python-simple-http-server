@@ -19,21 +19,24 @@ set_level("DEBUG")
 _logger = get_logger("http_test")
 
 
-class HttpRequestTest(unittest.TestCase):
+class ThreadingServerTest(unittest.TestCase):
 
     PORT = 9090
 
     WAIT_COUNT = 10
 
+    COROUTINE = False
+
     @classmethod
     def start_server(clz):
         _logger.info("start server in background. ")
         root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        server.scan(project_dir=root, base_dir="tests/ctrls", regx=r'.*controllers.*')
+        server.scan(project_dir=root, base_dir="tests/ctrls",
+                    regx=r'.*controllers.*')
         server.start(
             port=clz.PORT,
             resources={"/public/*": f"{root}/tests/static"},
-            prefer_coroutine=True)
+            prefer_coroutine=clz.COROUTINE)
 
     @classmethod
     def setUpClass(clz):
@@ -42,7 +45,8 @@ class HttpRequestTest(unittest.TestCase):
         while not server.is_ready():
             sleep(1)
             retry = retry + 1
-            _logger.info(f"server is not ready wait. {retry}/{clz.WAIT_COUNT} ")
+            _logger.info(
+                f"server is not ready wait. {retry}/{clz.WAIT_COUNT} ")
             if retry >= clz.WAIT_COUNT:
                 raise Exception("Server start wait timeout.")
 
@@ -55,7 +59,8 @@ class HttpRequestTest(unittest.TestCase):
 
     @classmethod
     def visit(clz, ctx_path, headers: Dict[str, str] = {}, data=None, return_type: str = "TEXT"):
-        req: urllib.request.Request = urllib.request.Request(f"http://127.0.0.1:{clz.PORT}/{ctx_path}")
+        req: urllib.request.Request = urllib.request.Request(
+            f"http://127.0.0.1:{clz.PORT}/{ctx_path}")
         for k, v in headers.items():
             req.add_header(k, v)
         res: http.client.HTTPResponse = urllib.request.urlopen(req, data=data)
@@ -72,7 +77,8 @@ class HttpRequestTest(unittest.TestCase):
             return txt
 
     def test_header_echo(self):
-        res: http.client.HTTPResponse = self.visit(f"header_echo", headers={"X-KJ-ABC": "my-headers"}, return_type="RESPONSE")
+        res: http.client.HTTPResponse = self.visit(
+            f"header_echo", headers={"X-KJ-ABC": "my-headers"}, return_type="RESPONSE")
         assert "X-Kj-Abc" in res.headers
         assert res.headers["X-Kj-Abc"] == "my-headers"
 
@@ -91,16 +97,17 @@ class HttpRequestTest(unittest.TestCase):
             self.visit("error")
         except urllib.error.HTTPError as err:
             assert err.code == 400
-            error_msg = err.read().decode("utf-8")    
-            _logger.info(error_msg)        
+            error_msg = err.read().decode("utf-8")
+            _logger.info(error_msg)
             assert error_msg == "code：400, message: Parameter Error!, explain: Test Parameter Error!"
 
     def test_coroutine(self):
         txt = self.visit(f"%E4%B8%AD%E6%96%87/coroutine?hey=KJ2")
         assert txt == "Success! KJ2"
-        
+
     def test_filter(self):
-        res: http.client.HTTPResponse = self.visit(f"tuple?user_name=kj&pass=wu", return_type="RESPONSE")
+        res: http.client.HTTPResponse = self.visit(
+            f"tuple?user_name=kj&pass=wu", return_type="RESPONSE")
         assert "Res-Filter-Header" in res.headers
         assert res.headers["Res-Filter-Header"] == "from-filter"
 
@@ -113,7 +120,6 @@ class HttpRequestTest(unittest.TestCase):
             _logger.info(error_msg)
             assert error_msg == '500-Internal Server Error-some error occurs!'
 
-    
     def test_ws(self):
         ws = websocket.WebSocket()
         path_val = "test"
@@ -124,4 +130,7 @@ class HttpRequestTest(unittest.TestCase):
         ws.close()
         assert txt == f"{path_val}-{msg}"
 
-    
+
+class CoroutineServerTest(ThreadingServerTest):
+
+    COROUTINE = True
