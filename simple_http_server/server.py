@@ -27,8 +27,8 @@ import threading
 import inspect
 import importlib
 import re
-import ssl as _ssl
 
+from ssl import PROTOCOL_TLS_SERVER, SSLContext
 from typing import Dict
 
 import simple_http_server.http_server as http_server
@@ -105,12 +105,12 @@ def scan(base_dir: str = "", regx: str = r"", project_dir: str = "") -> None:
 def start(host: str = "",
           port: int = 9090,
           ssl: bool = False,
-          ssl_protocol: int = _ssl.PROTOCOL_TLS_SERVER,
+          ssl_protocol: int = PROTOCOL_TLS_SERVER,
           ssl_check_hostname: bool = False,
           keyfile: str = "",
           certfile: str = "",
           keypass: str = "",
-          ssl_context: _ssl.SSLContext = None,
+          ssl_context: SSLContext = None,
           resources: Dict[str, str] = {},
           prefer_coroutine=False) -> None:
     with __lock:

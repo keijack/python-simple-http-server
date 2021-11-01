@@ -23,7 +23,6 @@ SOFTWARE.
 """
 
 
-import asyncio
 import html
 import simple_http_server.__utils as utils
 

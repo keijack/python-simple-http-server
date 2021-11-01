@@ -28,23 +28,22 @@ import json
 import socket
 import os
 import re
-import ssl as _ssl
+
 import threading
 import asyncio
 
 from asyncio.base_events import Server
 from asyncio.streams import StreamReader, StreamWriter
-
+from ssl import PROTOCOL_TLS_SERVER, SSLContext
 from collections import OrderedDict
 from socketserver import ThreadingMixIn, TCPServer
 from time import sleep
-from urllib.parse import unquote
-from urllib.parse import quote
+from urllib.parse import unquote, quote
 
 from typing import Callable, Dict, List, Tuple
 
 from simple_http_server import ControllerFunction, StaticFile
-from simple_http_server.http_protocol_handler import HttpProtocolHandler, SocketServerStreamRequestHandlerWraper
+from .http_protocol_handler import HttpProtocolHandler, SocketServerStreamRequestHandlerWraper
 from .wsgi_request_handler import WSGIRequestHandler
 
 from .__utils import remove_url_first_slash, get_function_args, get_function_kwargs
@@ -384,11 +383,11 @@ class ThreadingMixInHTTPServer(ThreadingMixIn, HTTPServer):
 
 class CoroutineHTTPServer(RoutingConf):
 
-    def __init__(self, host: str = '', port: int = 9090, ssl: _ssl.SSLContext = None, res_conf={}) -> None:
+    def __init__(self, host: str = '', port: int = 9090, ssl: SSLContext = None, res_conf={}) -> None:
         RoutingConf.__init__(self, res_conf)
         self.host: str = host
         self.port: int = port
-        self.ssl: _ssl.SSLContext = ssl
+        self.ssl: SSLContext = ssl
         self.server: Server = None
 
     async def callback(self, reader: StreamReader, writer: StreamWriter):
@@ -447,12 +446,12 @@ class SimpleDispatcherHttpServer:
     def __init__(self,
                  host: Tuple[str, int] = ('', 9090),
                  ssl: bool = False,
-                 ssl_protocol: int = _ssl.PROTOCOL_TLS_SERVER,
+                 ssl_protocol: int = PROTOCOL_TLS_SERVER,
                  ssl_check_hostname: bool = False,
                  keyfile: str = "",
                  certfile: str = "",
                  keypass: str = "",
-                 ssl_context: _ssl.SSLContext = None,
+                 ssl_context: SSLContext = None,
                  resources: Dict[str, str] = {},
                  prefer_corountine=False):
         self.host = host
@@ -465,7 +464,7 @@ class SimpleDispatcherHttpServer:
                 self.ssl_ctx = ssl_context
             else:
                 assert keyfile and certfile, "keyfile and certfile should be provided. "
-                ssl_ctx = _ssl.SSLContext(protocol=ssl_protocol)
+                ssl_ctx = SSLContext(protocol=ssl_protocol)
                 ssl_ctx.check_hostname = ssl_check_hostname
                 ssl_ctx.load_cert_chain(
                     certfile=certfile, keyfile=keyfile, password=keypass)
