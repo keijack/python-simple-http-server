@@ -247,3 +247,7 @@ def my_40x_page(message: str, explain=""):
 @error_message
 def my_other_error_page(code, message, explain=""):
     return f"{code}-{message}-{explain}"
+
+@request_map("abcde/**")
+def star(path_val=PathValue("_star2")):
+    return f"<html><head><title>path values</title></head><body>{path_val}</body></html>"

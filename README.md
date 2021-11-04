@@ -133,8 +133,17 @@ def tuple_with_cookies(all_cookies=Cookies(), cookie_sc=Cookie("sc")):
 """
 @request_map("/a/b/{path_val}/x")
 def my_path_val_ctr(path_val=PathValue()):
-    return "<html><body>%s</body></html>" % path_val
+    return f"<html><body>{path_val}</body></html>"
 
+@request_map("/star/*") # /star/c will find this controller, but /star/c/d not.
+@request_map("*/star") # /c/star will find this controller, but /c/d/star not.
+def star_path(path_val=PathValue("_star")):
+    return f"<html><body>{path_val}</body></html>"
+
+@request_map("/star/**") # Both /star/c and /star/c/d will find this controller.
+@request_map("**/star") # Both /c/star and /c/d/stars will find this controller.
+def star_path(path_val=PathValue("_star2")):
+    return f"<html><body>{path_val}</body></html>"
 
 @request_map("/redirect")
 def redirect():
@@ -152,7 +161,7 @@ def test_session(session=Session(), invalid=False):
         session.invalidate()
     return "<!DOCTYPE html><html><body>%s</body></html>" % str(ins)
 
-# use coroutine
+# use coroutine, these controller functions will work both in a coroutine mode or threading mode.
 
 async def say(sth: str = ""):
     _logger.info(f"Say: {sth}")

@@ -357,6 +357,20 @@ def my_reg_ctr(reg_groups: RegGroups, reg_group: RegGroup = RegGroup(1)):
     return f"{self._name}, {reg_group.group},{reg_group}"
 ```
 
+从 `0.14.0` 开始，`@request_map` 还支持通配符。你只能使用前置通配符或者时后知通配符其中一项，不能同时配置。如有复杂需求则请使用正则表达式来进行匹配。
+
+```python
+@request_map("/star/*") # /star/c 可以匹配，但是 /star/c/d 不能。
+@request_map("*/star") # /c/star 可以匹配，但是 /c/d/star 不能。
+def star_path(path_val=PathValue("_star")): # 你可以通过特定的 _star 通配符取得 url 中 匹配 * 通配符的内容。
+    return f"<html><body>{path_val}</body></html>"
+
+@request_map("/star/**") # /star/c 和 /star/c/d 均可以匹配。
+@request_map("**/star") # /c/star 和 /c/d/stars 均可匹配。
+def star_path(path_val=PathValue("_star2")): # 你可以通过特定的 _star2 通配符取得 url 中 匹配 ** 通配符的内容。
+    return f"<html><body>{path_val}</body></html>"
+```
+
 在控制器类中使用正则表达式的 request_map:
 
 ```python

@@ -28,10 +28,10 @@ import http.cookies
 import inspect
 import time
 from typing import Any, Dict, List, Tuple, Type, Union, Callable
-from simple_http_server.logger import get_logger
+from .logger import get_logger
 
 name = "simple_http_server"
-version = "0.13.0"
+version = "0.14.0"
 
 DEFAULT_ENCODING: str = "UTF-8"
 

@@ -115,8 +115,29 @@ class RoutingConf:
         _url: str = url
         path_names = re.findall("(?u)\\{\\w+\\}", _url)
         if len(path_names) == 0:
-            # normal url
-            return None, path_names
+            if _url.startswith("**"):
+                _url = _url[2: ]
+                assert _url.find("*") < 0, "You can only config a * or ** at the start or end of a path."
+                _url = f'^([A-Za-z0-9_~!.%-/]+){_url}$'
+                return _url, [quote("_star2")]
+            elif _url.startswith("*"):
+                _url = _url[1: ]
+                assert _url.find("*") < 0, "You can only config a * or ** at the start or end of a path."
+                _url = f'^([A-Za-z0-9_~!.%-]+){_url}$'
+                return _url, [quote("_star")]
+            elif _url.endswith("**"):
+                _url = _url[0: -2]
+                assert _url.find("*") < 0, "You can only config a * or ** at the start or end of a path."
+                _url = f'^{_url}([A-Za-z0-9_~!.%-/]+)$'
+                return _url, [quote("_star2")]
+            elif _url.endswith("*"):
+                _url = _url[0: -1]
+                assert _url.find("*") < 0, "You can only config a * or ** at the start or end of a path."
+                _url = f'^{_url}([A-Za-z0-9_~!.%-]+)$'
+                return _url, [quote("_star")]
+            else:
+                # normal url
+                return None, path_names
         for name in path_names:
             _url = _url.replace(name, "([\\w%.-@!\\(\\)\\[\\]\\|\\$]+)")
         _url = f"^{_url}$"
