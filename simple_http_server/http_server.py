@@ -118,22 +118,22 @@ class RoutingConf:
             if _url.startswith("**"):
                 _url = _url[2: ]
                 assert _url.find("*") < 0, "You can only config a * or ** at the start or end of a path."
-                _url = f'^([A-Za-z0-9_~!.%-/]+){_url}$'
+                _url = f'^([\\w%.-@!\\(\\)\\[\\]\\|\\$/]+){_url}$'
                 return _url, [quote("_star2")]
             elif _url.startswith("*"):
                 _url = _url[1: ]
                 assert _url.find("*") < 0, "You can only config a * or ** at the start or end of a path."
-                _url = f'^([A-Za-z0-9_~!.%-]+){_url}$'
+                _url = f'^([\\w%.-@!\\(\\)\\[\\]\\|\\$]+){_url}$'
                 return _url, [quote("_star")]
             elif _url.endswith("**"):
                 _url = _url[0: -2]
                 assert _url.find("*") < 0, "You can only config a * or ** at the start or end of a path."
-                _url = f'^{_url}([A-Za-z0-9_~!.%-/]+)$'
+                _url = f'^{_url}([\\w%.-@!\\(\\)\\[\\]\\|\\$/]+)$'
                 return _url, [quote("_star2")]
             elif _url.endswith("*"):
                 _url = _url[0: -1]
                 assert _url.find("*") < 0, "You can only config a * or ** at the start or end of a path."
-                _url = f'^{_url}([A-Za-z0-9_~!.%-]+)$'
+                _url = f'^{_url}([\\w%.-@!\\(\\)\\[\\]\\|\\$]+)$'
                 return _url, [quote("_star")]
             else:
                 # normal url
