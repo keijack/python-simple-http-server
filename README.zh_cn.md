@@ -362,12 +362,12 @@ def my_reg_ctr(reg_groups: RegGroups, reg_group: RegGroup = RegGroup(1)):
 ```python
 @request_map("/star/*") # /star/c 可以匹配，但是 /star/c/d 不能。
 @request_map("*/star") # /c/star 可以匹配，但是 /c/d/star 不能。
-def star_path(path_val=PathValue("_star")): # 你可以通过特定的 _star 通配符取得 url 中 匹配 * 通配符的内容。
+def star_path(path_val=PathValue()): # 你可以通过 PathValue 取得 url 中 匹配 * 通配符的内容。
     return f"<html><body>{path_val}</body></html>"
 
 @request_map("/star/**") # /star/c 和 /star/c/d 均可以匹配。
 @request_map("**/star") # /c/star 和 /c/d/stars 均可匹配。
-def star_path(path_val=PathValue("_star2")): # 你可以通过特定的 _star2 通配符取得 url 中 匹配 ** 通配符的内容。
+def star_path(path_val=PathValue()): # 你可以通过 PathValue 通配符取得 url 中 匹配 ** 通配符的内容。
     return f"<html><body>{path_val}</body></html>"
 ```
 

@@ -360,6 +360,13 @@ class FilterContexImpl(FilterContex):
         return kwarg_vals
 
     def __build_path_value(self, key, val=PathValue()):
+        # wildcard value
+        if len(self.request.path_values) == 1 and "__path_wildcard" in self.request.path_values:
+            if val.name:
+                _logger.warning(f"Wildcard value, `name` of the PathValue:: [{val.name}] will be ignored. ")
+            return self.request.path_values["__path_wildcard"]
+            
+        # brace values
         name = val.name if val.name is not None and val.name != "" else key
         if name in self.request.path_values:
             return PathValue(name=name, _value=self.request.path_values[name])

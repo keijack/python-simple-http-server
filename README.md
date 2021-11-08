@@ -137,12 +137,12 @@ def my_path_val_ctr(path_val=PathValue()):
 
 @request_map("/star/*") # /star/c will find this controller, but /star/c/d not.
 @request_map("*/star") # /c/star will find this controller, but /c/d/star not.
-def star_path(path_val=PathValue("_star")):
+def star_path(path_val=PathValue()):
     return f"<html><body>{path_val}</body></html>"
 
 @request_map("/star/**") # Both /star/c and /star/c/d will find this controller.
 @request_map("**/star") # Both /c/star and /c/d/stars will find this controller.
-def star_path(path_val=PathValue("_star2")):
+def star_path(path_val=PathValue()):
     return f"<html><body>{path_val}</body></html>"
 
 @request_map("/redirect")

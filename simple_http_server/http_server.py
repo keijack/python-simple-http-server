@@ -119,22 +119,22 @@ class RoutingConf:
                 _url = _url[2: ]
                 assert _url.find("*") < 0, "You can only config a * or ** at the start or end of a path."
                 _url = f'^([\\w%.-@!\\(\\)\\[\\]\\|\\$/]+){_url}$'
-                return _url, [quote("_star2")]
+                return _url, [quote("__path_wildcard")]
             elif _url.startswith("*"):
                 _url = _url[1: ]
                 assert _url.find("*") < 0, "You can only config a * or ** at the start or end of a path."
                 _url = f'^([\\w%.-@!\\(\\)\\[\\]\\|\\$]+){_url}$'
-                return _url, [quote("_star")]
+                return _url, [quote("__path_wildcard")]
             elif _url.endswith("**"):
                 _url = _url[0: -2]
                 assert _url.find("*") < 0, "You can only config a * or ** at the start or end of a path."
                 _url = f'^{_url}([\\w%.-@!\\(\\)\\[\\]\\|\\$/]+)$'
-                return _url, [quote("_star2")]
+                return _url, [quote("__path_wildcard")]
             elif _url.endswith("*"):
                 _url = _url[0: -1]
                 assert _url.find("*") < 0, "You can only config a * or ** at the start or end of a path."
                 _url = f'^{_url}([\\w%.-@!\\(\\)\\[\\]\\|\\$]+)$'
-                return _url, [quote("_star")]
+                return _url, [quote("__path_wildcard")]
             else:
                 # normal url
                 return None, path_names
@@ -494,9 +494,11 @@ class SimpleDispatcherHttpServer:
             self.ssl_ctx = None
 
         if prefer_corountine:
+            _logger.info(f"Start server in corouting mode, listen to port: {self.host[1]}")
             self.server = CoroutineHTTPServer(
                 self.host[0], self.host[1], self.ssl_ctx, resources)
         else:
+            _logger.info(f"Start server in threading mixed mode, listen to port {self.host[1]}")
             self.server = ThreadingMixInHTTPServer(self.host, resources)
             if self.ssl_ctx:
                 self.server.socket = self.ssl_ctx.wrap_socket(

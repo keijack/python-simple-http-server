@@ -249,5 +249,5 @@ def my_other_error_page(code, message, explain=""):
     return f"{code}-{message}-{explain}"
 
 @request_map("abcde/**")
-def star(path_val=PathValue("_star2")):
+def star(path_val=PathValue()):
     return f"<html><head><title>path values</title></head><body>{path_val}</body></html>"

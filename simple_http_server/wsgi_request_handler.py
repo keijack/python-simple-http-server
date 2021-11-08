@@ -70,7 +70,6 @@ class WSGIRequestHandler:
     @property
     def request_path(self):
         path = self.env['PATH_INFO']
-        path = path.encode('iso-8859-1').decode('utf-8')
         if path.startswith('/'):
             path = path[1:]
         return path
