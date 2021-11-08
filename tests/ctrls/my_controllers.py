@@ -3,7 +3,7 @@
 
 from typing import List
 
-from simple_http_server import FilterContex, ModelDict, Redirect, RegGroup
+from simple_http_server import FilterContex, ModelDict, Redirect, RegGroup, request_filter
 from simple_http_server import Headers
 from simple_http_server import HttpError
 from simple_http_server import JSONBody
@@ -143,13 +143,13 @@ def header_echo(headers: Headers):
     return 200, headers, ""
 
 
-@filter_map("^/tupl")
+@request_filter("/abcde/**")
 def fil(ctx: FilterContex):
     print("---------- through filter ---------------")
     ctx.do_chain()
 
 
-@filter_map("^/tuple")
+@request_filter(regexp="^/abcd")
 async def filter_tuple(ctx: FilterContex):
     print("---------- through filter async ---------------")
     # add a header to request header

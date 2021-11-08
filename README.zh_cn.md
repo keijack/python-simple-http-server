@@ -656,10 +656,11 @@ def my_error_message(code, message, explain=""):
 参考 Java 的设计，我们增加了过滤器链式的设计，这个给了你一定的面向切面编码的能力，虽然比较弱，但是做一些权限验证，日志记录等也是够用的。
 
 ```python
-from simple_http_server import filter_map
+from simple_http_server import request_filter
 
-# 请注意！过滤器的字符串配置是一个正则表达式的字符串。
-@filter_map("^/tuple")
+
+@request_filter("/tuple/**") # 使用通配符，** 可包含 /，* 不包含，上述配置
+@request_filter(regexp="^/tuple") # 使用正则表达式
 def filter_tuple(ctx):
     print("---------- through filter ---------------")
     # 在过滤器中加入一些信息到请求头中

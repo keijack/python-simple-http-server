@@ -434,11 +434,13 @@ def my_error_message(code, message, explain=""):
 
 ### Write filters
 
-```python
-from simple_http_server import filter_map
+This server support filters, you can use `request_filter` decorator to define your filters.
 
-# Please note filter will map a regular expression, not a concrect url.
-@filter_map("^/tuple")
+```python
+from simple_http_server import request_filter
+
+@request_filter("/tuple/**") # use wildcard
+@request_filter(regexp="^/tuple") # use regular expression
 def filter_tuple(ctx):
     print("---------- through filter ---------------")
     # add a header to request header

@@ -28,9 +28,10 @@ import time
 import os
 import email
 import json
+import re
 from collections import OrderedDict
 from typing import Any, Tuple, Union
-from urllib.parse import unquote
+from urllib.parse import unquote, quote
 from simple_http_server import HttpError, StaticFile, DEFAULT_ENCODING
 
 from .logger import get_logger
@@ -161,3 +162,40 @@ def decode_response_body_to_bytes(raw_body: Any) -> Tuple[str, bytes]:
     else:
         raise HttpError(400, explain="Cannot read body into bytes!")
     return content_type, byte_body
+
+def get_path_reg_pattern(url):
+    _url: str = url
+    path_names = re.findall("(?u)\\{\\w+\\}", _url)
+    if len(path_names) == 0:
+        if _url.startswith("**"):
+            _url = _url[2: ]
+            assert _url.find("*") < 0, "You can only config a * or ** at the start or end of a path."
+            _url = f'^([\\w%.-@!\\(\\)\\[\\]\\|\\$/]+){_url}$'
+            return _url, [quote("__path_wildcard")]
+        elif _url.startswith("*"):
+            _url = _url[1: ]
+            assert _url.find("*") < 0, "You can only config a * or ** at the start or end of a path."
+            _url = f'^([\\w%.-@!\\(\\)\\[\\]\\|\\$]+){_url}$'
+            return _url, [quote("__path_wildcard")]
+        elif _url.endswith("**"):
+            _url = _url[0: -2]
+            assert _url.find("*") < 0, "You can only config a * or ** at the start or end of a path."
+            _url = f'^{_url}([\\w%.-@!\\(\\)\\[\\]\\|\\$/]+)$'
+            return _url, [quote("__path_wildcard")]
+        elif _url.endswith("*"):
+            _url = _url[0: -1]
+            assert _url.find("*") < 0, "You can only config a * or ** at the start or end of a path."
+            _url = f'^{_url}([\\w%.-@!\\(\\)\\[\\]\\|\\$]+)$'
+            return _url, [quote("__path_wildcard")]
+        else:
+            # normal url
+            return None, path_names
+    for name in path_names:
+        _url = _url.replace(name, "([\\w%.-@!\\(\\)\\[\\]\\|\\$]+)")
+    _url = f"^{_url}$"
+
+    quoted_names = []
+    for name in path_names:
+        name = name[1: -1]
+        quoted_names.append(quote(name))
+    return _url, quoted_names

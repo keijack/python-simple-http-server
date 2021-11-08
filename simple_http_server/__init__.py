@@ -31,7 +31,7 @@ from typing import Any, Dict, List, Tuple, Type, Union, Callable
 from .logger import get_logger
 
 name = "simple_http_server"
-version = "0.14.2"
+version = "0.14.3"
 
 DEFAULT_ENCODING: str = "UTF-8"
 
@@ -678,7 +678,18 @@ def request_map(*anno_args, url: str = "", regexp: str = "", method: Union[str, 
 route = request_map
 
 
+def request_filter(path: str = "", regexp: str = ""):
+    p = path
+    r = regexp
+    assert (p and not r) or (not p and r)
+    
+    def map(filter_fun):
+        _filters.append({"path": p, "url_pattern": r, "func": filter_fun})
+        return filter_fun    
+    return map
+
 def filter_map(regexp: str = "", filter_function: Callable = None) -> Callable:
+    """ deprecated, plese request_filter instead. """
     def map(filter_fun):
         _filters.append({"url_pattern": regexp, "func": filter_fun})
         return filter_fun

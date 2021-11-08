@@ -40,13 +40,14 @@ from socketserver import ThreadingMixIn, TCPServer
 from time import sleep
 from urllib.parse import unquote, quote
 
-from typing import Callable, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Tuple
 
 from simple_http_server import ControllerFunction, StaticFile
+from tests.ctrls.my_controllers import fil
 from .http_protocol_handler import HttpProtocolHandler, SocketServerStreamRequestHandlerWraper
 from .wsgi_request_handler import WSGIRequestHandler
 
-from .__utils import remove_url_first_slash, get_function_args, get_function_kwargs
+from .__utils import remove_url_first_slash, get_function_args, get_function_kwargs, get_path_reg_pattern
 from .logger import get_logger
 
 _logger = get_logger("simple_http_server.http_server")
@@ -111,43 +112,6 @@ class RoutingConf:
             self._res_conf.append((key, val))
         self._res_conf.sort(key=lambda it: -len(it[0]))
 
-    def __get_path_reg_pattern(self, url):
-        _url: str = url
-        path_names = re.findall("(?u)\\{\\w+\\}", _url)
-        if len(path_names) == 0:
-            if _url.startswith("**"):
-                _url = _url[2: ]
-                assert _url.find("*") < 0, "You can only config a * or ** at the start or end of a path."
-                _url = f'^([\\w%.-@!\\(\\)\\[\\]\\|\\$/]+){_url}$'
-                return _url, [quote("__path_wildcard")]
-            elif _url.startswith("*"):
-                _url = _url[1: ]
-                assert _url.find("*") < 0, "You can only config a * or ** at the start or end of a path."
-                _url = f'^([\\w%.-@!\\(\\)\\[\\]\\|\\$]+){_url}$'
-                return _url, [quote("__path_wildcard")]
-            elif _url.endswith("**"):
-                _url = _url[0: -2]
-                assert _url.find("*") < 0, "You can only config a * or ** at the start or end of a path."
-                _url = f'^{_url}([\\w%.-@!\\(\\)\\[\\]\\|\\$/]+)$'
-                return _url, [quote("__path_wildcard")]
-            elif _url.endswith("*"):
-                _url = _url[0: -1]
-                assert _url.find("*") < 0, "You can only config a * or ** at the start or end of a path."
-                _url = f'^{_url}([\\w%.-@!\\(\\)\\[\\]\\|\\$]+)$'
-                return _url, [quote("__path_wildcard")]
-            else:
-                # normal url
-                return None, path_names
-        for name in path_names:
-            _url = _url.replace(name, "([\\w%.-@!\\(\\)\\[\\]\\|\\$]+)")
-        _url = f"^{_url}$"
-
-        quoted_names = []
-        for name in path_names:
-            name = name[1: -1]
-            quoted_names.append(quote(name))
-        return _url, quoted_names
-
     def map_controller(self, ctrl: ControllerFunction):
         url = ctrl.url
         regexp = ctrl.regexp
@@ -161,7 +125,7 @@ class RoutingConf:
         else:
             _url = remove_url_first_slash(url)
 
-            path_pattern, path_names = self.__get_path_reg_pattern(_url)
+            path_pattern, path_names = get_path_reg_pattern(_url)
             if path_pattern is None:
                 self.method_url_mapping[_method][_url] = ctrl
             else:
@@ -249,19 +213,35 @@ class RoutingConf:
                 return fun, path_values
         return None
 
-    def map_filter(self, path_pattern, filter_fun):
-        self.filter_mapping[path_pattern] = filter_fun
+    def map_filter(self, filter_conf: Dict[str, Any]):
+        # {"path": p, "url_pattern": r, "func": filter_fun}
+        path = filter_conf["path"] if "path" in filter_conf else ""
+        regexp = filter_conf["url_pattern"]
+        filter_fun = filter_conf["func"]
+        if path:
+            regexp = get_path_reg_pattern(path)[0]
+            if not regexp:
+                regexp = f"^{path}$"
+        _logger.debug(f"[path: {path}] map url regexp {regexp} to function: {filter_fun}")
+        self.filter_mapping[regexp] = filter_fun
 
     def get_matched_filters(self, path):
+        return self._get_matched_filters(remove_url_first_slash(path)) + self._get_matched_filters(path)
+
+    def _get_matched_filters(self, path):
         available_filters = []
-        for key, val in self.filter_mapping.items():
-            if re.match(key, path):
+        for regexp, val in self.filter_mapping.items():
+            m = re.match(regexp, path)
+            _logger.debug(f"filter:: [{regexp}], path:: [{path}] match? {m is not None}")
+            if m:
                 available_filters.append(val)
         return available_filters
 
+    
+
     def map_websocket_handler(self, endpoint, handler_class):
         url = remove_url_first_slash(endpoint)
-        path_pattern, path_names = self.__get_path_reg_pattern(url)
+        path_pattern, path_names = get_path_reg_pattern(url)
         if path_pattern is None:
             self.ws_mapping[url] = handler_class
         else:
@@ -452,8 +432,8 @@ class CoroutineHTTPServer(RoutingConf):
 class SimpleDispatcherHttpServer:
     """Dispatcher Http server"""
 
-    def map_filter(self, path_pattern, filter_fun):
-        self.server.map_filter(path_pattern, filter_fun)
+    def map_filter(self, filter_conf):
+        self.server.map_filter(filter_conf)
 
     def map_controller(self, ctrl: ControllerFunction):
         self.server.map_controller(ctrl)

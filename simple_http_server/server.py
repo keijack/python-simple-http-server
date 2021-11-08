@@ -133,7 +133,7 @@ def start(host: str = "",
     filters = _get_filters()
     # filter configuration
     for ft in filters:
-        _server.map_filter(ft["url_pattern"], ft["func"])
+        _server.map_filter(ft)
 
     request_mappings = _get_request_mappings()
     # request mapping
