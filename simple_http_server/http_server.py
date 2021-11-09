@@ -38,12 +38,11 @@ from ssl import PROTOCOL_TLS_SERVER, SSLContext
 from collections import OrderedDict
 from socketserver import ThreadingMixIn, TCPServer
 from time import sleep
-from urllib.parse import unquote, quote
+from urllib.parse import unquote
 
 from typing import Any, Callable, Dict, List, Tuple
 
 from simple_http_server import ControllerFunction, StaticFile
-from tests.ctrls.my_controllers import fil
 from .http_protocol_handler import HttpProtocolHandler, SocketServerStreamRequestHandlerWraper
 from .wsgi_request_handler import WSGIRequestHandler
 

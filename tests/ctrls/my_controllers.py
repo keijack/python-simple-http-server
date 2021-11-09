@@ -150,6 +150,7 @@ def fil(ctx: FilterContex):
 
 
 @request_filter(regexp="^/abcd")
+@request_filter("/tuple")
 async def filter_tuple(ctx: FilterContex):
     print("---------- through filter async ---------------")
     # add a header to request header
