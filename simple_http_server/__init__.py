@@ -31,7 +31,7 @@ from typing import Any, Dict, List, Tuple, Type, Union, Callable
 from .logger import get_logger
 
 name = "simple_http_server"
-version = "0.14.4"
+version = "0.14.5"
 
 DEFAULT_ENCODING: str = "UTF-8"
 
@@ -277,6 +277,10 @@ class Header(ParamStringValue):
 
 
 class JSONBody(dict):
+    pass
+
+
+class BytesBody(bytes):
     pass
 
 
@@ -682,11 +686,12 @@ def request_filter(path: str = "", regexp: str = ""):
     p = path
     r = regexp
     assert (p and not r) or (not p and r)
-    
+
     def map(filter_fun):
         _filters.append({"path": p, "url_pattern": r, "func": filter_fun})
-        return filter_fun    
+        return filter_fun
     return map
+
 
 def filter_map(regexp: str = "", filter_function: Callable = None) -> Callable:
     """ deprecated, plese request_filter instead. """

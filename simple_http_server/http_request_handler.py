@@ -34,7 +34,7 @@ import datetime
 from typing import Any, Callable, Dict, List, Union
 
 from simple_http_server import FilterContex, ModelDict, Environment, RegGroup, RegGroups, HttpError, StaticFile, \
-    Headers, Redirect, Response, Cookies, Cookie, JSONBody, Header, Parameters, PathValue, \
+    Headers, Redirect, Response, Cookies, Cookie, JSONBody, BytesBody, Header, Parameters, PathValue, \
     Parameter, MultipartFile, Request, Session, ControllerFunction, _get_session_factory, \
     DEFAULT_ENCODING, SESSION_COOKIE_NAME
 import simple_http_server.__utils as utils
@@ -312,6 +312,8 @@ class FilterContexImpl(FilterContex):
             param = self.__build_reg_group(**kws)
         elif arg_type == JSONBody:
             param = self.__build_json_body()
+        elif arg_type == BytesBody:
+            param = BytesBody(self.request.body)
         elif arg_type == str:
             param = self.__build_str(arg, **kws)
         elif arg_type == bool:
@@ -365,7 +367,7 @@ class FilterContexImpl(FilterContex):
             if val.name:
                 _logger.warning(f"Wildcard value, `name` of the PathValue:: [{val.name}] will be ignored. ")
             return self.request.path_values["__path_wildcard"]
-            
+
         # brace values
         name = val.name if val.name is not None and val.name != "" else key
         if name in self.request.path_values:
