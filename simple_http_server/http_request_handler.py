@@ -396,7 +396,7 @@ class FilterContexImpl(FilterContex):
             raise HttpError(400, "Missing Parameter",
                             f"Parameter[{name}] is required.")
         if name in self.request.parameter.keys():
-            v = self.request.parameter[key]
+            v = self.request.parameter[name]
             if isinstance(v, MultipartFile):
                 return v
             else:
