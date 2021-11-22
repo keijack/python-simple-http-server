@@ -268,7 +268,7 @@ class FilterContexImpl(FilterContex):
                 args = args[1:]
         for arg, arg_type_anno in args:
             if arg not in self.request.parameter.keys() \
-                    and arg_type_anno not in (Request, Session, Response, RegGroups, RegGroup, Headers, cookies.BaseCookie, cookies.SimpleCookie, Cookies, PathValue, JSONBody, ModelDict):
+                    and arg_type_anno not in (Request, Session, Response, RegGroups, RegGroup, Headers, cookies.BaseCookie, cookies.SimpleCookie, Cookies, PathValue, JSONBody, BytesBody, ModelDict):
                 raise HttpError(400, "Missing Paramter",
                                 f"Parameter[{arg}] is required! ")
             param = self.__get_params_(arg, arg_type_anno)
