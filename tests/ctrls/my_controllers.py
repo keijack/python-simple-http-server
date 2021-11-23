@@ -276,7 +276,7 @@ async def reader_test(
             _logger.info("read file")
             data = await reader.read(buf)
             _logger.info(f"read data {len(data)} and write")
-            if data == '':
+            if data == b'':
                 break
             outfile.write(data)
     return None
