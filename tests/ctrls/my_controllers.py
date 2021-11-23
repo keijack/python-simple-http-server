@@ -3,7 +3,7 @@
 
 from typing import List
 
-from simple_http_server import FilterContex, ModelDict, Redirect, RegGroup, request_filter
+from simple_http_server import FilterContex, ModelDict, Redirect, RegGroup, RequestBodyReader, request_filter
 from simple_http_server import Headers
 from simple_http_server import HttpError
 from simple_http_server import JSONBody
@@ -249,6 +249,34 @@ def my_40x_page(message: str, explain=""):
 def my_other_error_page(code, message, explain=""):
     return f"{code}-{message}-{explain}"
 
+
 @request_map("abcde/**")
-def star(path_val=PathValue()):
+def wildcard_match(path_val=PathValue()):
     return f"<html><head><title>path values</title></head><body>{path_val}</body></html>"
+
+
+"""
+curl -X PUT --data-binary "@/data1/clamav/scan/trojans/000.exe" \
+    -H "Content-Type: application/octet-stream" \
+    http://10.0.2.16:9090/put/file
+"""
+
+
+@request_map("/put/file", method="PUT")
+async def reader_test(
+        content_type: Header = Header("Content-Type"),
+        reader: RequestBodyReader = None):
+    buf = 1024 * 1024
+    folder = os.path.dirname(os.path.abspath(__file__)) + "/tmp"
+    if not os.path.isdir(folder):
+        os.mkdir(folder)
+    _logger.info(f"content-type:: {content_type}")
+    with open(f"{folder}/target_file", "wb") as outfile:
+        while True:
+            _logger.info("read file")
+            data = await reader.read(buf)
+            _logger.info(f"read data {len(data)} and write")
+            if data == '':
+                break
+            outfile.write(data)
+    return None

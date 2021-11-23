@@ -31,7 +31,7 @@ from typing import Any, Dict, List, Tuple, Type, Union, Callable
 from .logger import get_logger
 
 name = "simple_http_server"
-version = "0.14.7"
+version = "0.14.8"
 
 DEFAULT_ENCODING: str = "UTF-8"
 
@@ -89,6 +89,12 @@ class Cookies(http.cookies.SimpleCookie):
     EXPIRE_DATE_FORMAT = "%a, %d %b %Y %H:%M:%S GMT"
 
 
+class RequestBodyReader:
+
+    async def read(self, n: int = -1):
+        pass
+
+
 class Request:
     """Request"""
 
@@ -102,9 +108,10 @@ class Request:
         self.path: str = ""  # Path
         self.__parameters = {}  # Parameters, key-value array, merged by query string and request body if the `Content-Type` in request header is `application/x-www-form-urlencoded` or `multipart/form-data`
         self.__parameter = {}  # Parameters, key-value, if more than one parameters with the same key, only the first one will be stored.
-        self.body: bytes = b""  # Request body
+        self._body: bytes = b""  # Request body
         self.json: Dict[str, Any] = None  # A dictionary if the `Content-Type` in request header is `application/json`
         self.environment = {}
+        self.reader: RequestBodyReader = None  # A stream reader
 
     @property
     def cookies(self) -> Cookies:
@@ -124,6 +131,27 @@ class Request:
     @property
     def parameter(self) -> Dict[str, str]:
         return self.__parameter
+
+    @property
+    def host(self) -> str:
+        if "Host" not in self.headers:
+            return ""
+        else:
+            return self.headers["Host"]
+
+    @property
+    def content_type(self) -> str:
+        if "Content-Type" not in self.headers:
+            return ""
+        else:
+            return self.headers["Content-Type"]
+
+    @property
+    def content_length(self) -> int:
+        if "Content-Length" not in self.headers:
+            return None
+        else:
+            return int(self.headers["Content-Length"])
 
     def get_parameter(self, key: str, default: str = None) -> str:
         if key not in self.parameters.keys():

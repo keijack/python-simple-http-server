@@ -39,6 +39,7 @@ from asyncio.streams import StreamReader, StreamWriter
 from http import HTTPStatus
 
 from simple_http_server import version as __version__
+from simple_http_server import RequestBodyReader
 from .logger import get_logger
 from .http_request_handler import HTTPRequestHandler
 from .websocket_request_handler import WebsocketRequestHandler
@@ -395,7 +396,7 @@ class HttpProtocolHandler:
             return
 
 
-class SocketServerStreamRequestHandlerWraper(socketserver.StreamRequestHandler):
+class SocketServerStreamRequestHandlerWraper(socketserver.StreamRequestHandler, RequestBodyReader):
 
     server_version = HttpProtocolHandler.server_version
 

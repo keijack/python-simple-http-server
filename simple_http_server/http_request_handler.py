@@ -24,6 +24,7 @@ SOFTWARE.
 
 
 import asyncio
+from asyncio.streams import StreamReader
 import os
 import json
 import inspect
@@ -33,7 +34,7 @@ import datetime
 
 from typing import Any, Callable, Dict, List, Union
 
-from simple_http_server import FilterContex, ModelDict, Environment, RegGroup, RegGroups, HttpError, StaticFile, \
+from simple_http_server import FilterContex, ModelDict, Environment, RegGroup, RegGroups, HttpError, RequestBodyReader, StaticFile, \
     Headers, Redirect, Response, Cookies, Cookie, JSONBody, BytesBody, Header, Parameters, PathValue, \
     Parameter, MultipartFile, Request, Session, ControllerFunction, _get_session_factory, \
     DEFAULT_ENCODING, SESSION_COOKIE_NAME
@@ -45,6 +46,34 @@ from .__utils import get_function_args, get_function_kwargs
 _logger = get_logger("simple_http_server.http_request_handler")
 
 
+class RequestBodyReaderWrapper(RequestBodyReader):
+
+    def __init__(self, reader: StreamReader, content_length: int = None) -> None:
+        self._content_length: int = content_length
+        self._remain_length: int = content_length
+        self._reader: StreamReader = reader
+
+    async def read(self, n: int = -1):
+        data = b''
+        if self._remain_length is not None and self._remain_length <= 0:
+            return data
+        if not n or n < 0:
+            if self._remain_length:
+                data = await self._reader.read(self._remain_length)
+            else:
+                data = await self._reader.read()
+        else:
+            if self._remain_length and n > self._remain_length:
+                data = await self._reader.read(self._remain_length)
+            else:
+                data = await self._reader.read(n)
+
+        if self._remain_length and self._remain_length > 0:
+            self._remain_length -= len(data)
+
+        return data
+
+
 class RequestWrapper(Request):
 
     def __init__(self):
@@ -54,6 +83,27 @@ class RequestWrapper(Request):
         self.__session = None
         self._socket_req = None
         self._coroutine_objects = []
+
+    @property
+    def host(self) -> str:
+        if "host" not in self._headers_keys_in_lowcase:
+            return ""
+        else:
+            return self.headers["host"]
+
+    @property
+    def content_type(self) -> str:
+        if "content-type" not in self._headers_keys_in_lowcase:
+            return ""
+        else:
+            return self.headers["content-type"]
+
+    @property
+    def content_length(self) -> int:
+        if "content-length" not in self._headers_keys_in_lowcase:
+            return ""
+        else:
+            return self.headers["content-length"]
 
     def get_session(self, create: bool = False) -> Session:
         if not self.__session:
@@ -120,10 +170,6 @@ class FilterContexImpl(FilterContex):
         self.__response = res
         self.__controller: ControllerFunction = controller
         self.__filters: List[Callable] = filters if filters is not None else []
-        self.__is_coroutine: bool = False
-        for func in self.__filters:
-            if asyncio.iscoroutinefunction(func):
-                self.__is_coroutine = True
 
     @property
     def request(self) -> RequestWrapper:
@@ -133,19 +179,19 @@ class FilterContexImpl(FilterContex):
     def response(self) -> ResponseWrapper:
         return self.__response
 
-    @property
-    def is_coroutine(self) -> bool:
-
-        return self.__is_coroutine
-
-    def _run_ctrl_fun(self):
-        args = self.__prepare_args()
-        kwargs = self.__prepare_kwargs()
-
-        if kwargs is None:
-            ctr_res = self.__controller.func(*args)
+    async def _run_ctrl_fun(self):
+        args = await self.__prepare_args()
+        kwargs = await self.__prepare_kwargs()
+        if asyncio.iscoroutinefunction(self.__controller.func):
+            if kwargs is None:
+                ctr_res = await self.__controller.func(*args)
+            else:
+                ctr_res = await self.__controller.func(*args, **kwargs)
         else:
-            ctr_res = self.__controller.func(*args, **kwargs)
+            if kwargs is None:
+                ctr_res = self.__controller.func(*args)
+            else:
+                ctr_res = self.__controller.func(*args, **kwargs)
         return ctr_res
 
     def _do_res(self, ctr_res):
@@ -198,47 +244,24 @@ class FilterContexImpl(FilterContex):
         if not self.response.is_sent:
             self.response.send_response()
 
-    def _do_request_sync(self):
-        ctr_res = self._run_ctrl_fun()
-        self._do_res(ctr_res)
-
     async def _do_request_async(self):
         ctr_res = await self._run_ctrl_fun()
         self._do_res(ctr_res)
 
-    def _do_request(self):
-        if asyncio.iscoroutinefunction(self.__controller.func):
-            self.request._put_coroutine_task(self._do_request_async())
-        else:
-            self._do_request_sync()
-
     def do_chain(self):
         if self.response.is_sent:
             return
-        if self.is_coroutine:
-            self._do_chain_async()
-        else:
-            self._do_chain_sync()
-
-    def _do_chain_async(self):
         if self.__filters:
             filter_func = self.__filters.pop(0)
-            self.request._put_coroutine_task(
-                self._wrap_to_async(filter_func, [self]))
+            self.request._put_coroutine_task(self._wrap_to_async(filter_func, [self]))
         else:
-            self._do_request()
+            self.request._put_coroutine_task(self._do_request_async())
 
     async def _wrap_to_async(self, func: Callable, args: List = [], kwargs: Dict = {}):
         if asyncio.iscoroutinefunction(func):
             await func(*args, **kwargs)
         else:
             func(*args, **kwargs)
-
-    def _do_chain_sync(self):
-        if self.__filters:
-            self.__filters.pop(0)(self)
-        else:
-            self._do_request()
 
     def __decode_tuple_response(self, ctr_res):
         status_code = None
@@ -258,7 +281,7 @@ class FilterContexImpl(FilterContex):
                     body = item
         return status_code, headers, cks, body
 
-    def __prepare_args(self):
+    async def __prepare_args(self):
         args = get_function_args(self.__controller.func)
         arg_vals = []
         if len(args) > 0:
@@ -268,15 +291,16 @@ class FilterContexImpl(FilterContex):
                 args = args[1:]
         for arg, arg_type_anno in args:
             if arg not in self.request.parameter.keys() \
-                    and arg_type_anno not in (Request, Session, Response, RegGroups, RegGroup, Headers, cookies.BaseCookie, cookies.SimpleCookie, Cookies, PathValue, JSONBody, BytesBody, ModelDict):
+                    and arg_type_anno not in (Request, Session, Response, RegGroups, RegGroup, Headers, cookies.BaseCookie,
+                                              cookies.SimpleCookie, Cookies, PathValue, JSONBody, BytesBody, RequestBodyReader, ModelDict):
                 raise HttpError(400, "Missing Paramter",
                                 f"Parameter[{arg}] is required! ")
-            param = self.__get_params_(arg, arg_type_anno)
+            param = await self.__get_params_(arg, arg_type_anno)
             arg_vals.append(param)
 
         return arg_vals
 
-    def __get_params_(self, arg, arg_type, val=None, type_check=True):
+    async def __get_params_(self, arg, arg_type, val=None, type_check=True):
         if val is not None:
             kws = {"val": val}
         else:
@@ -312,8 +336,11 @@ class FilterContexImpl(FilterContex):
             param = self.__build_reg_group(**kws)
         elif arg_type == JSONBody:
             param = self.__build_json_body()
+        elif arg_type == RequestBodyReader:
+            param = self.request.reader
         elif arg_type == BytesBody:
-            param = BytesBody(self.request.body)
+            req_body = await self.request.reader.read()
+            param = BytesBody(req_body)
         elif arg_type == str:
             param = self.__build_str(arg, **kws)
         elif arg_type == bool:
@@ -350,13 +377,13 @@ class FilterContexImpl(FilterContex):
                 mdict[k] = v
         return mdict
 
-    def __prepare_kwargs(self):
+    async def __prepare_kwargs(self):
         kwargs = get_function_kwargs(self.__controller.func)
         if kwargs is None:
             return None
         kwarg_vals = {}
         for k, v, t in kwargs:
-            kwarg_vals[k] = self.__get_params_(
+            kwarg_vals[k] = await self.__get_params_(
                 k, type(v) if v is not None else t, v, False)
 
         return kwarg_vals
@@ -593,20 +620,28 @@ class HTTPRequestHandler:
         req.parameters = self.query_parameters
 
         if "content-length" in _headers_keys_in_lowers.keys():
-            req.body = await self.reader.read(int(_headers_keys_in_lowers["content-length"]))
+            content_length = int(_headers_keys_in_lowers["content-length"])
+
+            req.reader = RequestBodyReaderWrapper(self.reader, content_length)
+
             content_type = _headers_keys_in_lowers["content-type"]
             if content_type.lower().startswith("application/x-www-form-urlencoded"):
+                req_body = await self.reader.read(content_length)
                 data_params = utils.decode_query_string(
-                    req.body.decode(DEFAULT_ENCODING))
+                    req_body.decode(DEFAULT_ENCODING))
             elif content_type.lower().startswith("multipart/form-data"):
+                req_body = await self.reader.read(content_length)
                 data_params = self.__decode_multipart(
-                    content_type, req.body.decode("ISO-8859-1"))
+                    content_type, req_body.decode("ISO-8859-1"))
             elif content_type.lower().startswith("application/json"):
-                req.json = json.loads(req.body.decode(DEFAULT_ENCODING))
+                req_body = await self.reader.read(content_length)
+                req.json = json.loads(req_body.decode(DEFAULT_ENCODING))
                 data_params = {}
             else:
                 data_params = {}
             req.parameters = self.__merge(data_params, req.parameters)
+        else:
+            req.reader = RequestBodyReaderWrapper(self.reader)
         return req
 
     def __merge(self, dic0: Dict[str, List[str]], dic1: Dict[str, List[str]]):
