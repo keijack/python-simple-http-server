@@ -31,7 +31,7 @@ from typing import Any, Dict, List, Tuple, Type, Union, Callable
 from .logger import get_logger
 
 name = "simple_http_server"
-version = "0.14.8"
+version = "0.14.9"
 
 DEFAULT_ENCODING: str = "UTF-8"
 
@@ -91,7 +91,7 @@ class Cookies(http.cookies.SimpleCookie):
 
 class RequestBodyReader:
 
-    async def read(self, n: int = -1):
+    async def read(self, n: int = -1) -> bytes:
         pass
 
 

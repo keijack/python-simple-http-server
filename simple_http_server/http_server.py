@@ -33,6 +33,7 @@ import threading
 import asyncio
 
 from asyncio.base_events import Server
+from concurrent.futures import ThreadPoolExecutor
 from asyncio.streams import StreamReader, StreamWriter
 from ssl import PROTOCOL_TLS_SERVER, SSLContext
 from collections import OrderedDict
@@ -236,8 +237,6 @@ class RoutingConf:
                 available_filters.append(val)
         return available_filters
 
-    
-
     def map_websocket_handler(self, endpoint, handler_class):
         url = remove_url_first_slash(endpoint)
         path_pattern, path_names = get_path_reg_pattern(url)
@@ -356,6 +355,8 @@ class HTTPServer(TCPServer, RoutingConf):
 
     allow_reuse_address = 1    # Seems to make sense in testing environment
 
+    _default_max_workers = 50
+
     def server_bind(self):
         """Override server_bind to store the server name."""
         TCPServer.server_bind(self)
@@ -363,12 +364,29 @@ class HTTPServer(TCPServer, RoutingConf):
         self.server_name = socket.getfqdn(host)
         self.server_port = port
 
-    def __init__(self, addr, res_conf={}):
+    def __init__(self, addr, res_conf={}, max_workers: int = None):
         TCPServer.__init__(self, addr, SocketServerStreamRequestHandlerWraper)
         RoutingConf.__init__(self, res_conf)
+        self.max_workers = max_workers or self._default_max_workers
+        self.threadpool: ThreadPoolExecutor = ThreadPoolExecutor(
+            thread_name_prefix="ReqThread",
+            max_workers=self.max_workers)
 
+    def process_request_thread(self, request, client_address):
+        try:
+            self.finish_request(request, client_address)
+        except Exception:
+            self.handle_error(request, client_address)
+        finally:
+            self.shutdown_request(request)
 
-class ThreadingMixInHTTPServer(ThreadingMixIn, HTTPServer):
+    # override
+    def process_request(self, request, client_address):
+        self.threadpool.submit(self.process_request_thread, request, client_address)
+
+    def server_close(self):
+        super().server_close()
+        self.threadpool.shutdown(True)
 
     def start(self):
         self.serve_forever()
@@ -453,7 +471,8 @@ class SimpleDispatcherHttpServer:
                  keypass: str = "",
                  ssl_context: SSLContext = None,
                  resources: Dict[str, str] = {},
-                 prefer_corountine=False):
+                 prefer_corountine=False,
+                 max_workers: int = None):
         self.host = host
         self.__ready = False
 
@@ -478,12 +497,12 @@ class SimpleDispatcherHttpServer:
                 self.host[0], self.host[1], self.ssl_ctx, resources)
         else:
             _logger.info(f"Start server in threading mixed mode, listen to port {self.host[1]}")
-            self.server = ThreadingMixInHTTPServer(self.host, resources)
+            self.server = HTTPServer(self.host, resources, max_workers=max_workers)
             if self.ssl_ctx:
                 self.server.socket = self.ssl_ctx.wrap_socket(
                     self.server.socket, server_side=True)
 
-    @ property
+    @property
     def ready(self):
         return self.__ready
 
