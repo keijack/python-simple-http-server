@@ -37,7 +37,7 @@ from concurrent.futures import ThreadPoolExecutor
 from asyncio.streams import StreamReader, StreamWriter
 from ssl import PROTOCOL_TLS_SERVER, SSLContext
 from collections import OrderedDict
-from socketserver import ThreadingMixIn, TCPServer
+from socketserver import TCPServer
 from time import sleep
 from urllib.parse import unquote
 
