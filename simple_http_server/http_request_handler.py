@@ -626,15 +626,15 @@ class HTTPRequestHandler:
 
             content_type = _headers_keys_in_lowers["content-type"]
             if content_type.lower().startswith("application/x-www-form-urlencoded"):
-                req_body = await self.reader.read(content_length)
+                req_body = await req.reader.read(content_length)
                 data_params = utils.decode_query_string(
                     req_body.decode(DEFAULT_ENCODING))
             elif content_type.lower().startswith("multipart/form-data"):
-                req_body = await self.reader.read(content_length)
+                req_body = await req.reader.read(content_length)
                 data_params = self.__decode_multipart(
                     content_type, req_body.decode("ISO-8859-1"))
             elif content_type.lower().startswith("application/json"):
-                req_body = await self.reader.read(content_length)
+                req_body = await req.reader.read(content_length)
                 req.json = json.loads(req_body.decode(DEFAULT_ENCODING))
                 data_params = {}
             else:
