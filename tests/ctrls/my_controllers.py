@@ -85,7 +85,7 @@ def normal_form_post(txt=Parameter("中文txt", required=False, default="DEFAULT
 @request_map("/post_json", method="POST")
 def post_json(json=JSONBody()):
     print(json)
-    return json
+    return dict(json)
 
 
 @request_map("/cookies")
