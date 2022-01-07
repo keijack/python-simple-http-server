@@ -162,7 +162,7 @@ class RoutingConf:
 
         return StaticFile(fpath, content_type)
 
-    def get_url_controller(self, path="", method="") -> Tuple[ControllerFunction, Dict, List]:
+    def get_url_controller(self, path: str = "", method: str = "") -> Tuple[ControllerFunction, Dict, List]:
         # explicitly url matching
         if path in self.method_url_mapping[method]:
             return self.method_url_mapping[method][path], {}, ()

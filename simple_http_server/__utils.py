@@ -170,22 +170,22 @@ def get_path_reg_pattern(url):
         if _url.startswith("**"):
             _url = _url[2: ]
             assert _url.find("*") < 0, "You can only config a * or ** at the start or end of a path."
-            _url = f'^([\\w%.-@!\\(\\)\\[\\]\\|\\$/]+){_url}$'
+            _url = f'^([\\w%.\\-@!\\(\\)\\[\\]\\|\\$/]+){_url}$'
             return _url, [quote("__path_wildcard")]
         elif _url.startswith("*"):
             _url = _url[1: ]
             assert _url.find("*") < 0, "You can only config a * or ** at the start or end of a path."
-            _url = f'^([\\w%.-@!\\(\\)\\[\\]\\|\\$]+){_url}$'
+            _url = f'^([\\w%.\\-@!\\(\\)\\[\\]\\|\\$]+){_url}$'
             return _url, [quote("__path_wildcard")]
         elif _url.endswith("**"):
             _url = _url[0: -2]
             assert _url.find("*") < 0, "You can only config a * or ** at the start or end of a path."
-            _url = f'^{_url}([\\w%.-@!\\(\\)\\[\\]\\|\\$/]+)$'
+            _url = f'^{_url}([\\w%.\\-@!\\(\\)\\[\\]\\|\\$/]+)$'
             return _url, [quote("__path_wildcard")]
         elif _url.endswith("*"):
             _url = _url[0: -1]
             assert _url.find("*") < 0, "You can only config a * or ** at the start or end of a path."
-            _url = f'^{_url}([\\w%.-@!\\(\\)\\[\\]\\|\\$]+)$'
+            _url = f'^{_url}([\\w%.\\-@!\\(\\)\\[\\]\\|\\$]+)$'
             return _url, [quote("__path_wildcard")]
         else:
             # normal url
