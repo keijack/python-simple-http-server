@@ -1,15 +1,15 @@
 # coding: utf-8
 
 import os
-from typing import Dict
-from unittest.case import TestCase
+import json
 import websocket
 import unittest
-from threading import Thread
-from time import sleep
 import urllib.request
 import urllib.error
 import http.client
+from typing import Dict
+from threading import Thread
+from time import sleep
 
 from simple_http_server.logger import get_logger, set_level
 import simple_http_server.server as server
@@ -104,6 +104,16 @@ class ThreadingServerTest(unittest.TestCase):
     def test_coroutine(self):
         txt = self.visit(f"%E4%B8%AD%E6%96%87/coroutine?hey=KJ2")
         assert txt == "Success! KJ2"
+
+    def test_post_json(self):
+        data_dict = {
+            "code": 0,
+            "msg": "xxx"
+        }
+        res: str = self.visit(f"post_json", headers={"Content-Type": "application/json"}, data=json.dumps(data_dict).encode())
+        res_dict: dict = json.loads(res)
+        assert data_dict["code"] == res_dict["code"]
+        assert data_dict["msg"] == res_dict["msg"]
 
     def test_filter(self):
         res: http.client.HTTPResponse = self.visit(

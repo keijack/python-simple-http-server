@@ -31,7 +31,7 @@ from typing import Any, Dict, List, Tuple, Type, Union, Callable
 from .logger import get_logger
 
 name = "simple_http_server"
-version = "0.14.10"
+version = "0.14.11"
 
 DEFAULT_ENCODING: str = "UTF-8"
 
@@ -355,7 +355,12 @@ class Response:
         self.__set_body(val)
 
     def __set_body(self, val):
-        assert val is None or type(val) in (str, dict, StaticFile, bytes), "Body type is not supported."
+        assert val is None \
+            or isinstance(val, str) \
+            or isinstance(val, dict) \
+            or isinstance(val, StaticFile) \
+            or isinstance(val, bytes), \
+            "Body type is not supported."
         self.__body = val
 
     @property
