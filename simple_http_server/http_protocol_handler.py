@@ -48,7 +48,7 @@ from .websocket_request_handler import WebsocketRequestHandler
 _MAXLINE = 65536
 _MAXHEADERS = 100
 
-_logger = get_logger("simple_http_server.base_request_handler")
+_logger = get_logger("simple_http_server.http_protocol_handler")
 
 
 class RequestWriter:

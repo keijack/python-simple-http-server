@@ -132,7 +132,7 @@ class ThreadingServerTest(unittest.TestCase):
 
     def test_ws(self):
         ws = websocket.WebSocket()
-        path_val = "test"
+        path_val = "test-ws"
         msg = "hello websocket!"
         ws.connect(f"ws://127.0.0.1:{self.PORT}/ws/{path_val}")
         ws.send(msg)

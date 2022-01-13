@@ -191,7 +191,7 @@ def get_path_reg_pattern(url):
             # normal url
             return None, path_names
     for name in path_names:
-        _url = _url.replace(name, "([\\w%.-@!\\(\\)\\[\\]\\|\\$]+)")
+        _url = _url.replace(name, "([\\w%.\\-@!\\(\\)\\[\\]\\|\\$]+)")
     _url = f"^{_url}$"
 
     quoted_names = []
