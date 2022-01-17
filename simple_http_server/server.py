@@ -275,7 +275,7 @@ def init_wsgi_proxy(resources: Dict[str, str] = {}, session_factory=None) -> htt
     filters = _get_filters()
     # filter configuration
     for ft in filters:
-        proxy.map_filter(ft["url_pattern"], ft["func"])
+        proxy.map_filter(ft)
 
     request_mappings = _get_request_mappings()
     # request mapping

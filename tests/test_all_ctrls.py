@@ -29,6 +29,7 @@ class ThreadingServerTest(unittest.TestCase):
 
     @classmethod
     def start_server(clz):
+        clz.tearDownClass()
         _logger.info("start server in background. ")
         root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         server.scan(project_dir=root, base_dir="tests/ctrls",
@@ -142,5 +143,7 @@ class ThreadingServerTest(unittest.TestCase):
 
 
 class CoroutineServerTest(ThreadingServerTest):
+
+    PORT = 9091
 
     COROUTINE = True

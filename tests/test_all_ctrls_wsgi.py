@@ -5,7 +5,6 @@ from typing import Dict
 import unittest
 from threading import Thread
 from time import sleep
-from unittest.case import skip
 import urllib.request
 import urllib.error
 import http.client
@@ -17,12 +16,12 @@ import simple_http_server.server as server
 
 set_level("DEBUG")
 
-_logger = get_logger("http_test")
+_logger = get_logger("wsgi_test")
 
 
 class WSGIHttpRequestTest(unittest.TestCase):
 
-    PORT = 9090
+    PORT = 9092
 
     WAIT_COUNT = 10
 
@@ -36,7 +35,6 @@ class WSGIHttpRequestTest(unittest.TestCase):
         root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         server.scan(project_dir=root, base_dir="tests/ctrls", regx=r'.*controllers.*')
         wsgi_proxy = server.init_wsgi_proxy(resources={"/public/*": f"{root}/tests/static"})
-
         def wsgi_simple_app(environment, start_response):
             return wsgi_proxy.app_proxy(environment, start_response)
         clz.httpd = make_server("", clz.PORT, wsgi_simple_app)
