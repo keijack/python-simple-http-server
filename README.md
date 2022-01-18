@@ -541,8 +541,18 @@ If you want to change the logger level:
 logger.set_level("DEBUG")
 ```
 
-This logger will first save all the log record to a global queue, and then output them in a background thread, so it is very suitable for getting several logger with a same handler, especialy the `TimedRotatingFileHandler` which may slice the log files not quite well in a mutiple thread environment. 
+From `0.15.0`, a coroutine thread is used for logging but not a Queue. All logging action will also work in a seperated thread but not in the main thread. 
 
+From `0.15.0`, you can get a stand alone logger which is independent from the framework one via a new class `logger.LoggerFactory`. 
+
+```python
+log_fac = logger.get_logger_factory("my_log_fac")
+log_fac.log_level = "DEBUG"
+log = log_fac.get_logger("my_service")
+
+log.info(...)
+
+```
 
 ## WSGI Support
 

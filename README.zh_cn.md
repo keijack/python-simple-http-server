@@ -26,7 +26,7 @@ Python 3.7+
 
 ## 依赖
 
-这个工程本身并不依赖任何其他的库，但是如果你需要运行在 `tests` 目录下的单元测试，那么，你需要安装 `websocket` 库：
+这个工程本身并不依赖任何其他的库，但是如果你需要运行在 `tests` 目录下的单元测试，那么，你需要安装 `websocket-client` 库：
 
 ```shell
 python3 -m pip install websocket-client
@@ -779,6 +779,17 @@ logger.set_level("DEBUG")
 ```
 
 这个日志使用了一个背景线程来输出日志，因此其非常适合使用在多线程的场景，特别你是你有多个 logger 共用一个 `TimedRotatingFileHandler` 的时候。在多线程的场景下，这个日志控制器经常不能正常地按时切割文件。
+
+从 `0.15.0` 开始，你可以通过 `logger.LoggerFactory` 来取得新的 logger，这个 logger 将与框架默认的区分开来，通过这个方法，你可以分开控制框架和业务的日志级别。
+
+```python
+log_fac = logger.get_logger_factory("my_log_fac")
+log_fac.log_level = "DEBUG"
+log = log_fac.get_logger("my_service")
+
+log.info(...)
+
+```
 
 ## WSGI 支持
 
