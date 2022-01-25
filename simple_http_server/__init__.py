@@ -841,5 +841,4 @@ def _get_websocket_handlers() -> Dict[str, Type]:
 
 
 def _get_error_pages() -> Dict[str, Callable]:
-    _logger.debug(f"error pages:: {_error_page}")
     return _error_page
