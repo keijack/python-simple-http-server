@@ -82,13 +82,12 @@ class LazyCalledLoggerThread:
         asyncio.run_coroutine_threadsafe(self._call(logger, record), self.coroutine_loop)
 
 
-_lazy_called_logger_thread: LazyCalledLoggerThread = LazyCalledLoggerThread()
-
-
 class CachingLogger(LazyCalledLogger):
 
+    logger_thread: LazyCalledLoggerThread = LazyCalledLoggerThread()
+
     def callHandlers(self, record):
-        _lazy_called_logger_thread.call_logger_handler(self, record)
+        CachingLogger.logger_thread.call_logger_handler(self, record)
 
 
 class LoggerFactory:
