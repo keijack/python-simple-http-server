@@ -59,6 +59,9 @@ class LazyCalledLoggerThread:
 
     def start(self):
         if self.coroutine_thread is not None:
+            while not self.coroutine_loop:
+                # wait for the loop ready
+                time.sleep(0.1)
             return
         self.coroutine_thread = Thread(target=self.coroutine_main, name="logger-thread", daemon=self.daemon_threads)
         self.coroutine_thread.start()

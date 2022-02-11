@@ -676,11 +676,9 @@ class HTTPRequestHandler:
         kname = kvs["name"].encode("ISO-8859-1").decode(DEFAULT_ENCODING)
         if len(kvs) == 1:
             # this is a string field, the second line is an empty line, the rest is the value
-            val = self.__read_line(rest)[1].encode(
-                "ISO-8859-1").decode(DEFAULT_ENCODING)
+            val = self.__read_line(rest)[1].encode("ISO-8859-1").decode(DEFAULT_ENCODING)
         elif len(kvs) == 2:
-            filename = kvs["filename"].encode(
-                "ISO-8859-1").decode(DEFAULT_ENCODING)
+            filename = kvs["filename"].encode("ISO-8859-1").decode(DEFAULT_ENCODING)
             # the second line is Content-Type line
             ct_line, rest = self.__read_line(rest)
             content_type = ct_line.split(":")[1].strip()
