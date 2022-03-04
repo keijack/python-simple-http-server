@@ -40,6 +40,8 @@ _logger = get_logger("simple_http_server.websocket_request_handler")
 
 
 '''
+https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_servers
+
 +-+-+-+-+-------+-+-------------+-------------------------------+
  0                   1                   2                   3
  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -225,6 +227,8 @@ class WebsocketRequestHandler:
         masked = b2 & MASKED
         payload_length = b2 & PAYLOAD_LEN
 
+        _logger.debug(f"{opcode}::{masked}::{payload_length}")
+
         if opcode == OPCODE_CLOSE_CONN:
             _logger.info("Client asked to close connection.")
             self.keep_alive = False
@@ -235,19 +239,12 @@ class WebsocketRequestHandler:
             self.keep_alive = False
             self.close_reason = "Client is not masked."
             return
-        if opcode == OPCODE_CONTINUATION:
-            _logger.warn("Continuation frames are not supported.")
-            return
-        elif opcode == OPCODE_BINARY:
+        if opcode == OPCODE_BINARY:
             _logger.warn("Binary frames are not supported.")
+            self.keep_alive = False
+            self.close_reason = "Binary frames are not supported."
             return
-        elif opcode == OPCODE_TEXT:
-            opcode_handler = self.on_message
-        elif opcode == OPCODE_PING:
-            opcode_handler = self.on_message
-        elif opcode == OPCODE_PONG:
-            opcode_handler = self.on_message
-        else:
+        elif opcode not in (OPCODE_TEXT, OPCODE_PING, OPCODE_PONG, OPCODE_CONTINUATION):
             _logger.warn(f"Unknown opcode {opcode}.")
             self.keep_alive = False
             self.close_reason = f"Unknown opcode {opcode}."
@@ -259,14 +256,39 @@ class WebsocketRequestHandler:
         elif payload_length == 127:
             qb = await self.reader.read(8)
             payload_length = struct.unpack(">Q", qb)[0]
+        _logger.debug(f"Payload length to read: {payload_length}")
 
         masks = await self.read_bytes(4)
         message_bytes = bytearray()
         payload = await self.read_bytes(payload_length)
-        for message_byte in payload:
-            message_byte ^= masks[len(message_bytes) % 4]
-            message_bytes.append(message_byte)
-        await opcode_handler(opcode, message_bytes.decode('utf8'))
+        for encoded_byte in payload:
+            decoded_byte = encoded_byte ^ masks[len(message_bytes) % 4]
+            message_bytes.append(decoded_byte)
+
+        if fin and opcode != OPCODE_CONTINUATION:
+            msg = message_bytes.decode('utf8')
+            await self.on_message(opcode, msg)
+            return
+
+        if not fin and opcode:  # fragment msg start
+            _logger.debug(f"fragment message start:: {opcode}")
+            self.fragment_opcode = opcode
+            self.fragment_payload_buf = message_bytes
+            return
+
+        if not fin and opcode == OPCODE_CONTINUATION:  # fragment msg ing
+            _logger.debug(f"fragment message extending....")
+            self.fragment_payload_buf.extend(message_bytes)
+            return
+
+        if fin and opcode == OPCODE_CONTINUATION:  # fragment msg end
+            _logger.debug(f"fragment message end, real opcode:: {self.fragment_opcode}")
+            if self.fragment_opcode == OPCODE_TEXT:
+                self.fragment_payload_buf.extend(message_bytes)
+                msg = self.fragment_payload_buf.decode('utf8')
+                await self.on_message(self.fragment_opcode, msg)
+            elif self.fragment_opcode == OPCODE_BINARY:
+                _logger.warn("Binary frames are not supported.")
 
     def send_message(self, message):
         self.send_text(message)

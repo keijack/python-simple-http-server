@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 
+import time
 from typing import List, OrderedDict
 
 from simple_http_server import FilterContex, ModelDict, Redirect, RegGroup, RequestBodyReader, request_filter
@@ -46,6 +47,15 @@ def my_ctrl2(name, name2=Parameter("name", default="KEIJACK")):
 @request_map("/error")
 def my_ctrl3():
     raise HttpError(400, "Parameter Error!", "Test Parameter Error!")
+
+
+@request_map("/sleep")
+def sleep_secs(secs: int = 10):
+    _logger.info(f"Sleep {secs} secondes...")
+    time.sleep(secs)
+    return {
+        "message": "OK"
+    }
 
 
 async def say(sth: str = ""):
