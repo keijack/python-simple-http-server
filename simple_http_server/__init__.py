@@ -521,10 +521,10 @@ class WebsocketSession:
     def send(self, message: str):
         pass
 
-    def send_pone(self, message: str):
+    def send_pone(self, message: bytes):
         pass
 
-    def send_ping(self, message: str):
+    def send_ping(self, message: bytes):
         pass
 
     def close(self, reason: str):
@@ -539,14 +539,30 @@ class WebsocketHandler:
     def on_open(self, session: WebsocketSession = None):
         pass
 
-    def on_message(self, session: WebsocketSession = None, message_type: str = "", message: Any = None):
+    def on_close(self, session: WebsocketSession = None, reason: str = ""):
         pass
+
+    def on_ping_message(self, session: WebsocketSession = None, message: bytes = b''):
+        session.send_pone(message)
+
+    def on_pong_message(self, session: WebsocketSession = None, message: bytes = ""):
+        pass
+
+
+class WebsocketTextMessageHandler(WebsocketHandler):
 
     def on_text_message(self, session: WebsocketSession = None, message: str = ""):
         pass
 
-    def on_close(self, session: WebsocketSession = None, reason: str = ""):
+
+class WebsocketBinaryMessageHandler(WebsocketHandler):
+
+    def on_binary_message(self, session: WebsocketSession = None, message: bytes = b''):
         pass
+
+    def on_binary_frame(self, session: WebsocketSession = None, fin: bool = False, frame_data: bytes = b''):
+        # Return True to cache bytes in session, so that on_binary_message can get a whole binary message.
+        return True
 
 
 def _get_class_of_method(method_defind):
