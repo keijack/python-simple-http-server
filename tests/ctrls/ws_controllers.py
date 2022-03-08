@@ -23,3 +23,11 @@ class WSHandler(WebsocketHandler):
 
     def on_close(self, session: WebsocketSession, reason: str):
         _logger.info(f">>{session.id}<< close::{reason}")
+
+    def on_binary_frame(self, session: WebsocketSession = None, fin: bool = False, frame_data: bytes = b''):
+        _logger.info(f"Fin => {fin}, Data: {frame_data}")
+        return True
+
+    def on_binary_message(self, session: WebsocketSession = None, message: bytes = b''):
+        _logger.info(f'Binary Message:: {message}')
+        session.send(f'{message}')

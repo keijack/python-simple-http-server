@@ -548,14 +548,8 @@ class WebsocketHandler:
     def on_pong_message(self, session: WebsocketSession = None, message: bytes = ""):
         pass
 
-
-class WebsocketTextMessageHandler(WebsocketHandler):
-
     def on_text_message(self, session: WebsocketSession = None, message: str = ""):
         pass
-
-
-class WebsocketBinaryMessageHandler(WebsocketHandler):
 
     def on_binary_message(self, session: WebsocketSession = None, message: bytes = b''):
         pass

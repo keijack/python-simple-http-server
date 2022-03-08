@@ -141,6 +141,25 @@ class ThreadingServerTest(unittest.TestCase):
         ws.close()
         assert txt == f"{path_val}-{msg}"
 
+    def test_ws_continuation(self):
+        ws = websocket.WebSocket()
+        path_val = "test-ws"
+
+        ws.connect(f"ws://127.0.0.1:{self.PORT}/ws/{path_val}")
+        msg0 = "Hello "
+        frame0 = websocket.ABNF.create_frame(msg0, websocket.ABNF.OPCODE_TEXT, 0)
+        ws.send_frame(frame0)
+        msg1 = "Websocket "
+        frame1 = websocket.ABNF.create_frame(msg1, websocket.ABNF.OPCODE_CONT, 0)
+        ws.send_frame(frame1)
+        msg2 = "Frames!"
+        frame2 = websocket.ABNF.create_frame(msg2, websocket.ABNF.OPCODE_CONT, 1)
+        ws.send_frame(frame2)
+
+        txt = ws.recv()
+        ws.close()
+        assert txt == f"{path_val}-{msg0 + msg1 + msg2}"
+
 
 class CoroutineServerTest(ThreadingServerTest):
 

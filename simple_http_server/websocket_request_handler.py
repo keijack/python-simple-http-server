@@ -24,12 +24,11 @@ SOFTWARE.
 
 
 import asyncio
-from ctypes import Union
-from email import message
+
 import struct
 from base64 import b64encode
 from hashlib import sha1
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Union
 from uuid import uuid4
 from socket import error as SocketError
 import errno
@@ -81,6 +80,13 @@ OPTYPES = {
 }
 
 
+class _ContinuationMessageCache:
+
+    def __init__(self, opcode: int) -> None:
+        self.opcode: int = opcode
+        self.message_bytes: bytearray = bytearray()
+
+
 class WebsocketRequestHandler:
 
     GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
@@ -109,11 +115,9 @@ class WebsocketRequestHandler:
         elif "Cookie" in self.ws_request.headers:
             self.ws_request.cookies.load(self.ws_request.headers["Cookie"])
         self.session = WebsocketSessionImpl(self, self.ws_request)
-        self.close_reason = ""
+        self.close_reason: str = ""
 
-        self.fin = False
-        self.opcode = None
-        self.message_bytes = bytearray()
+        self._continution_cache: _ContinuationMessageCache = None
 
     @property
     def response_headers(self):
@@ -149,21 +153,28 @@ class WebsocketRequestHandler:
             _logger.warn(f"Endpoint[{self.ws_request.path}]")
         return http_status_code, headers
 
-    async def on_message(self):
-        if self.opcode == OPCODE_TEXT and hasattr(self.handler, "on_text_message") and callable(self.handler.on_text_message):
-            await self.await_func(self.handler.on_text_message(self.session, self._try_decode_UTF8(self.message_bytes)))
-        elif self.opcode == OPCODE_PING and hasattr(self.handler, "on_ping_message") and callable(self.handler.on_ping_message):
-            await self.await_func(self.handler.on_ping_message(self.session, self.message_bytes))
-        elif self.opcode == OPCODE_PONG and hasattr(self.handler, "on_pong_message") and callable(self.handler.on_pong_message):
-            await self.await_func(self.handler.on_pong_message(self.session, self.message_bytes))
-        elif self.opcode == OPCODE_BINARY and self.message_bytes and hasattr(self.handler, "on_binary_message") and callable(self.handler.on_binary_message):
-            await self.await_func(self.handler.on_binary_message(self.session, self.message_bytes))
+    async def on_message(self, opcode: int, message_bytes: bytes):
+        if opcode == OPCODE_TEXT and hasattr(self.handler, "on_text_message") and callable(self.handler.on_text_message):
+            await self.await_func(self.handler.on_text_message(self.session, self._try_decode_UTF8(message_bytes)))
+        elif opcode == OPCODE_PING and hasattr(self.handler, "on_ping_message") and callable(self.handler.on_ping_message):
+            await self.await_func(self.handler.on_ping_message(self.session, bytes(message_bytes)))
+        elif opcode == OPCODE_PONG and hasattr(self.handler, "on_pong_message") and callable(self.handler.on_pong_message):
+            await self.await_func(self.handler.on_pong_message(self.session, bytes(message_bytes)))
+        elif opcode == OPCODE_BINARY and hasattr(self.handler, "on_binary_message") and callable(self.handler.on_binary_message):
+            await self.await_func(self.handler.on_binary_message(self.session, bytes(message_bytes)))
 
-    async def on_binary_frame(self, message_frame: bytes):
+    async def on_continuation_frame(self, opcode: int, fin: bool, message_frame: bytearray):
+        if opcode != OPCODE_BINARY:
+            self._continution_cache.message_bytes.extend(message_frame)
+            return
+
         if hasattr(self.handler, "on_binary_frame") and callable(self.handler.on_binary_frame):
-            return await self.await_func(self.handler.on_binary_frame(self.session, self.fin, message_frame))
+            should_append_to_cache = await self.await_func(self.handler.on_binary_frame(self.session, fin, bytes(message_frame)))
+            _logger.debug(f"Should append to binary Cache? {should_append_to_cache}")
+            if should_append_to_cache == True:
+                self._continution_cache.message_bytes.extend(message_frame)
         else:
-            return True
+            self._continution_cache.message_bytes.extend(message_frame)
 
     async def on_open(self):
         if hasattr(self.handler, "on_open") and callable(self.handler.on_open):
@@ -220,10 +231,15 @@ class WebsocketRequestHandler:
         return await self.reader.read(num)
 
     async def read_next_message(self):
-        _logger.debug("read next message")
+        _logger.debug(f"Read next websocket[{self.ws_request.path}] message")
         try:
             b1, b2 = await self.read_bytes(2)
-        except SocketError as e:  # to be replaced with ConnectionResetError for py3
+        except ConnectionResetError as e:
+            _logger.info("Client closed connection.")
+            self.keep_alive = False
+            self.close_reason = "Client closed connection."
+            return
+        except SocketError as e:
             if e.errno == errno.ECONNRESET:
                 _logger.info("Client closed connection.")
                 self.keep_alive = False
@@ -233,12 +249,10 @@ class WebsocketRequestHandler:
         except ValueError as e:
             b1, b2 = 0, 0
 
-        self.fin = fin = b1 & FIN
+        fin = b1 & FIN
         opcode = b1 & OPCODE
         masked = b2 & MASKED
         payload_length = b2 & PAYLOAD_LEN
-
-        _logger.debug(f"{opcode}::{masked}::{payload_length}")
 
         if opcode == OPCODE_CLOSE_CONN:
             _logger.info("Client asked to close connection.")
@@ -262,48 +276,44 @@ class WebsocketRequestHandler:
         elif payload_length == 127:
             qb = await self.reader.read(8)
             payload_length = struct.unpack(">Q", qb)[0]
-        _logger.debug(f"Payload length to read: {payload_length}")
 
         masks = await self.read_bytes(4)
         frame_bytes = bytearray()
         payload = await self.read_bytes(payload_length)
         for encoded_byte in payload:
-            decoded_byte = encoded_byte ^ masks[len(frame_bytes) % 4]
-            frame_bytes.append(decoded_byte)
+            frame_bytes.append(encoded_byte ^ masks[len(frame_bytes) % 4])
 
         if fin and opcode != OPCODE_CONTINUATION:
-            self.opcode = opcode
-            self.message_bytes.extend(frame_bytes)
-            await self.on_message()
+            # A normal frame, handle message.
+            await self.on_message(opcode, frame_bytes)
             return
 
-        if not fin and opcode != OPCODE_CONTINUATION:  # Fragment message start
-            _logger.debug(f"fragment message start:: {opcode}")
-            self.opcode = opcode
-            if self.opcode == OPCODE_BINARY and not await self.on_binary_frame(frame_bytes):
-                _logger.debug(F'Binary frame and is consumed by the handler, do not extend to message.')
-            else:
-                self.message_bytes.extend(frame_bytes)
+        if not fin and opcode != OPCODE_CONTINUATION:
+            # Fragment message: first frame, try to create a cache object.
+            if self._continution_cache is not None:
+                # Check if another fragment message is being read.
+                _logger.warning("Another continution message is not yet finished. Close connection for this error!")
+                self.keep_alive = False
+                self.close_reason = "Another continuation message is not yet finished. "
+                return
+            self._continution_cache = _ContinuationMessageCache(opcode)
+
+        if self._continution_cache is None:
+            # When the first frame is not send, all the other frames are ignored.
+            _logger.warning("A continuation fragment frame is received, but the start fragment is not received yet, ignore this frame.")
             return
 
-        if not fin and opcode == OPCODE_CONTINUATION:  # Fragment message chunk
-            if self.opcode == OPCODE_BINARY and not await self.on_binary_frame(frame_bytes):
-                _logger.debug(F'Binary frame and is consumed by the handler, do not extend to message.')
-            else:
-                self.message_bytes.extend(frame_bytes)
-            return
+        await self.on_continuation_frame(self._continution_cache.opcode, bool(fin), frame_bytes)
 
-        if fin and opcode == OPCODE_CONTINUATION:  # Fragment message end
-            if self.opcode == OPCODE_BINARY and not await self.on_binary_frame(frame_bytes):
-                _logger.debug(F'Binary frame and is consumed by the handler, do not extend to message.')
-            else:
-                self.message_bytes.extend(frame_bytes)
-
-            await self.on_message()
+        if fin:
+            # Fragment message: end of this message.
+            if self._continution_cache.message_bytes:
+                await self.on_message(self._continution_cache.opcode, self._continution_cache.message_bytes)
+            self._continution_cache = None
 
     def send_message(self, message: Union[bytes, str]):
         if isinstance(message, bytes):
-            self.send_frame(OPCODE_TEXT, message)
+            self.send_bytes(OPCODE_TEXT, message)
         elif isinstance(message, str):
             self.send_text(message)
         else:
@@ -311,37 +321,21 @@ class WebsocketRequestHandler:
 
     def send_ping(self, message: Union[str, bytes]):
         if isinstance(message, bytes):
-            self.send_frame(OPCODE_PING, message)
+            self.send_bytes(OPCODE_PING, message)
         elif isinstance(message, str):
-            self.send_frame(OPCODE_PING, self._encode_to_UTF8(message))
+            self.send_bytes(OPCODE_PING, self._encode_to_UTF8(message))
 
     def send_pong(self, message: Union[str, bytes]):
         if isinstance(message, bytes):
-            self.send_frame(OPCODE_PONG, message)
+            self.send_bytes(OPCODE_PONG, message)
         elif isinstance(message, str):
-            self.send_frame(OPCODE_PONG, self._encode_to_UTF8(message))
+            self.send_bytes(OPCODE_PONG, self._encode_to_UTF8(message))
 
-    def send_text(self, message: str, opcode=OPCODE_TEXT):
-        # Validate message
-        if isinstance(message, bytes):
-            # this is slower but ensures we have UTF-8
-            message = self._try_decode_UTF8(message)
-            if not message:
-                _logger.warning(
-                    "Can\'t send message, message is not valid UTF-8")
-                return False
-        elif isinstance(message, str):
-            pass
-        else:
-            _logger.warning(
-                'Can\'t send message, message has to be a string or bytes. Given type is %s' % type(message))
-            return False
-
+    def send_text(self, message: str):
         payload = self._encode_to_UTF8(message)
+        self.send_bytes(OPCODE_TEXT, payload)
 
-        self.send_frame(opcode, payload)
-
-    def send_frame(self, opcode, payload: bytes):
+    def send_bytes(self, opcode, payload: bytes):
         header = bytearray()
         payload_length = len(payload)
 
@@ -368,20 +362,19 @@ class WebsocketRequestHandler:
 
         self.request_writer.send(header + payload)
 
-    def close(self, reason=""):
-        self.send_text(reason, OPCODE_CLOSE_CONN)
+    def close(self, reason: str = ""):
+        self.send_bytes(OPCODE_CLOSE_CONN, self._encode_to_UTF8(reason))
         self.keep_alive = False
         self.close_reason = "Server asked to close connection."
 
-    def _encode_to_UTF8(self, data):
+    def _encode_to_UTF8(self, data: str) -> bytes:
         try:
             return data.encode('UTF-8')
         except UnicodeEncodeError as e:
             _logger.error("Could not encode data to UTF-8 -- %s" % e)
-            return False
+            return f'{data}'.encode('UTF-8')
         except Exception as e:
             raise(e)
-            return False
 
     def _try_decode_UTF8(self, data: str):
         try:
