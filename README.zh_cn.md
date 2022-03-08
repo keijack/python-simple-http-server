@@ -601,6 +601,14 @@ class WSHandler(WebsocketHandler):
         """
         _logger.info(f">>{session.id}<< open! {session.request.path_values}")
 
+    def on_close(self, session: WebsocketSession, reason: str):
+        """
+        "
+        " 关闭时调用
+        "
+        """
+        _logger.info(f">>{session.id}<< close::{reason}")
+
     def on_text_message(self, session: WebsocketSession, message: str):
         """
         "
@@ -609,14 +617,6 @@ class WSHandler(WebsocketHandler):
         """
         _logger.info(f">>{session.id}<< on text message: {message}")
         session.send(message)
-
-    def on_close(self, session: WebsocketSession, reason: str):
-        """
-        "
-        " 关闭时调用
-        "
-        """
-        _logger.info(f">>{session.id}<< close::{reason}")
 ```
 
 ### 自定义错误信息

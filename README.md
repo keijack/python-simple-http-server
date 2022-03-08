@@ -383,6 +383,30 @@ class WSHandler(WebsocketHandler):
         """
         _logger.info(f">>{session.id}<< open! {session.request.path_values}")
 
+    def on_close(self, session: WebsocketSession, reason: str):
+        """
+        "
+        " Will be called when the connection closed.
+        "
+        """
+        _logger.info(f">>{session.id}<< close::{reason}")
+
+    def on_ping_message(self, session: WebsocketSession = None, message: bytes = b''):
+        """
+        "
+        " Will be called when receive a ping message. Will send all the message bytes back to client by default.
+        "
+        """
+        session.send_pone(message)
+
+    def on_pong_message(self, session: WebsocketSession = None, message: bytes = ""):
+        """
+        "
+        " Will be called when receive a pong message.
+        "
+        """
+        pass
+
     def on_text_message(self, session: WebsocketSession, message: str):
         """
         "
@@ -392,13 +416,28 @@ class WSHandler(WebsocketHandler):
         _logger.info(f">>{session.id}<< on text message: {message}")
         session.send(message)
 
-    def on_close(self, session: WebsocketSession, reason: str):
+    def on_binary_message(self, session: WebsocketSession = None, message: bytes = b''):
         """
         "
-        " Will be called when the connection closed.
+        " Will be called when receive a binary message if you have not consumed all the bytes in `on_binary_frame` 
+        " method.
         "
         """
-        _logger.info(f">>{session.id}<< close::{reason}")
+        pass
+
+    def on_binary_frame(self, session: WebsocketSession = None, fin: bool = False, frame_payload: bytes = b''):
+        """
+        "
+        " If you are sending a continuation binary message to server, this will be called every time a frame is 
+        " received, you can consumed all the bytes in this method, e.g. save all bytes to a file. By doing so, 
+        " you should not return and value in this method. 
+        "
+        " If you does not implement this method or return a True in this method, all the bytes will be caced in
+        " memory and be sent to your `on_binary_message` method.
+        "
+        """
+        return True
+
 ```
 
 ### Error pages

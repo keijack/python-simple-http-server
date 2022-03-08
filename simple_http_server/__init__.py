@@ -31,7 +31,7 @@ from typing import Any, Dict, List, Tuple, Type, Union, Callable
 from .logger import get_logger
 
 name = "simple_http_server"
-version = "0.15.1"
+version = "0.16.0"
 
 DEFAULT_ENCODING: str = "UTF-8"
 
@@ -521,6 +521,12 @@ class WebsocketSession:
     def send(self, message: str):
         pass
 
+    def send_text(self, message: str):
+        pass
+
+    def send_binary(self, binary: bytes):
+        pass
+
     def send_pone(self, message: bytes):
         pass
 
@@ -534,28 +540,79 @@ class WebsocketSession:
 class WebsocketHandler:
 
     def on_handshake(self, request: WebsocketRequest = None):
+        """
+        "
+        " You can get path/headers/path_values/cookies/query_string/query_parameters from request.
+        " 
+        " You should return a tuple means (http_status_code, headers)
+        "
+        " If status code in (0, None, 101), the websocket will be connected, or will return the status you return. 
+        "
+        " All headers will be send to client
+        "
+        """
         return None
 
     def on_open(self, session: WebsocketSession = None):
+        """
+        " 
+        " Will be called when the connection opened.
+        "
+        """
         pass
 
     def on_close(self, session: WebsocketSession = None, reason: str = ""):
+        """
+        "
+        " Will be called when the connection closed.
+        "
+        """
         pass
 
     def on_ping_message(self, session: WebsocketSession = None, message: bytes = b''):
+        """
+        "
+        " Will be called when receive a ping message. Will send all the message bytes back to client by default.
+        "
+        """
         session.send_pone(message)
 
     def on_pong_message(self, session: WebsocketSession = None, message: bytes = ""):
+        """
+        "
+        " Will be called when receive a pong message.
+        "
+        """
         pass
 
     def on_text_message(self, session: WebsocketSession = None, message: str = ""):
+        """
+        "
+        " Will be called when receive a text message.
+        "
+        """
         pass
 
     def on_binary_message(self, session: WebsocketSession = None, message: bytes = b''):
+        """
+        "
+        " Will be called when receive a binary message if you have not consumed all the bytes in `on_binary_frame` 
+        " method.
+        "
+        """
         pass
 
-    def on_binary_frame(self, session: WebsocketSession = None, fin: bool = False, frame_data: bytes = b''):
-        # Return True to cache bytes in session, so that on_binary_message can get a whole binary message.
+    def on_binary_frame(self, session: WebsocketSession = None, fin: bool = False, frame_payload: bytes = b''):
+        """
+        "
+        " If you are sending a continuation binary message to server, this will be called every time a frame is 
+        " received, you can consumed all the bytes in this method, e.g. save all bytes to a file. By doing so, 
+        " you should not return and value in this method. 
+        "
+        " If you does not implement this method or return a True in this method, all the bytes will be caced in
+        " memory and be sent to your `on_binary_message` method.
+        "
+        """
         return True
 
 

@@ -407,11 +407,17 @@ class WebsocketSessionImpl(WebsocketSession):
     def send_ping(self, message: str):
         self.__handler.send_ping(message)
 
+    def send_pone(self, message: str):
+        self.__handler.send_pong(message)
+
     def send(self, message: str):
         self.__handler.send_message(message)
 
-    def send_pone(self, message: str):
-        self.__handler.send_pong(message)
+    def send_text(self, message: str):
+        self.__handler.send_message(message)
+
+    def send_binary(self, binary: bytes):
+        self.__handler.send_bytes(OPCODE_BINARY, binary)
 
     def close(self, reason: str):
         self.__handler.close(reason)
