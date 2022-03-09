@@ -163,14 +163,9 @@ class WebsocketRequestHandler:
         elif opcode == OPCODE_BINARY and hasattr(self.handler, "on_binary_message") and callable(self.handler.on_binary_message):
             await self.await_func(self.handler.on_binary_message(self.session, bytes(message_bytes)))
 
-    async def on_continuation_frame(self, opcode: int, fin: bool, message_frame: bytearray):
-        if opcode != OPCODE_BINARY:
-            self._continution_cache.message_bytes.extend(message_frame)
-            return
-
-        if hasattr(self.handler, "on_binary_frame") and callable(self.handler.on_binary_frame):
-            should_append_to_cache = await self.await_func(self.handler.on_binary_frame(self.session, fin, bytes(message_frame)))
-            _logger.debug(f"Should append to binary Cache? {should_append_to_cache}")
+    async def on_continuation_frame(self, first_frame_opcode: int, fin: int, message_frame: bytearray):
+        if first_frame_opcode == OPCODE_BINARY and hasattr(self.handler, "on_binary_frame") and callable(self.handler.on_binary_frame):
+            should_append_to_cache = await self.await_func(self.handler.on_binary_frame(self.session, bool(fin), bytes(message_frame)))
             if should_append_to_cache == True:
                 self._continution_cache.message_bytes.extend(message_frame)
         else:
@@ -303,7 +298,7 @@ class WebsocketRequestHandler:
             _logger.warning("A continuation fragment frame is received, but the start fragment is not received yet, ignore this frame.")
             return
 
-        await self.on_continuation_frame(self._continution_cache.opcode, bool(fin), frame_bytes)
+        await self.on_continuation_frame(self._continution_cache.opcode, fin, frame_bytes)
 
         if fin:
             # Fragment message: end of this message.
