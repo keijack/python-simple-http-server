@@ -31,7 +31,7 @@ from typing import Any, Dict, List, Tuple, Type, Union, Callable
 from .logger import get_logger
 
 name = "simple_http_server"
-version = "0.16.0"
+version = "0.16.1"
 
 DEFAULT_ENCODING: str = "UTF-8"
 
@@ -537,6 +537,33 @@ class WebsocketSession:
         pass
 
 
+class WebsocketCloseReason(str):
+
+    def __init__(self,
+                 message: str = "",
+                 code: int = None,
+                 reason: str = '') -> None:
+        self.__message: str = message
+        self.__code: int = code
+        self.__reason: str = reason
+
+    @property
+    def message(self) -> str:
+        return self.__message
+
+    @property
+    def code(self) -> int:
+        return self.__code
+
+    @property
+    def reason(self) -> str:
+        return self.__reason
+
+    def __new__(cls, message: str = "", code: int = "", reason: str = '', **kwargs):
+        obj = super().__new__(cls, message)
+        return obj
+
+
 class WebsocketHandler:
 
     def on_handshake(self, request: WebsocketRequest = None):
@@ -561,7 +588,7 @@ class WebsocketHandler:
         """
         pass
 
-    def on_close(self, session: WebsocketSession = None, reason: str = ""):
+    def on_close(self, session: WebsocketSession = None, reason: WebsocketCloseReason = None):
         """
         "
         " Will be called when the connection closed.

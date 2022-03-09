@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 
 
-from simple_http_server import WebsocketHandler, WebsocketRequest, WebsocketSession, websocket_handler
+from email import message
+from simple_http_server import WebsocketCloseReason, WebsocketHandler, WebsocketRequest, WebsocketSession, websocket_handler
 import simple_http_server.logger as logger
 
 _logger = logger.get_logger("ws_test")
@@ -21,8 +22,8 @@ class WSHandler(WebsocketHandler):
         _logger.info(f">>{session.id}<< on text message: {message}")
         session.send(f"{session.request.path_values['path_val']}-{message}")
 
-    def on_close(self, session: WebsocketSession, reason: str):
-        _logger.info(f">>{session.id}<< close::{reason}")
+    def on_close(self, session: WebsocketSession, reason: WebsocketCloseReason):
+        _logger.info(f">>{session.id}<< close::{reason.message}-{reason.code}-{reason.reason}")
 
     def on_binary_frame(self, session: WebsocketSession = None, fin: bool = False, frame_data: bytes = b''):
         _logger.info(f"Fin => {fin}, Data: {frame_data}")

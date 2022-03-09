@@ -35,7 +35,7 @@ import errno
 
 
 from .logger import get_logger
-from simple_http_server import Headers, WebsocketRequest, WebsocketSession
+from simple_http_server import Headers, WebsocketCloseReason, WebsocketRequest, WebsocketSession
 
 _logger = get_logger("simple_http_server.websocket_request_handler")
 
@@ -43,9 +43,11 @@ _logger = get_logger("simple_http_server.websocket_request_handler")
 '''
 https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_servers
 
+https://datatracker.ietf.org/doc/html/rfc6455
+
 +-+-+-+-+-------+-+-------------+-------------------------------+
- 0                   1                   2                   3
- 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+0                   1                   2                   3
+0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
 +-+-+-+-+-------+-+-------------+-------------------------------+
 |F|R|R|R| opcode|M| Payload len |    Extended payload length    |
 |I|S|S|S|  (4)  |A|     (7)     |             (16/64)           |
@@ -54,6 +56,12 @@ https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocke
 +-+-+-+-+-------+-+-------------+ - - - - - - - - - - - - - - - +
 |     Extended payload length continued, if payload len == 127  |
 + - - - - - - - - - - - - - - - +-------------------------------+
+|                               |Masking-key, if MASK set to 1  |
++-------------------------------+-------------------------------+
+| Masking-key (continued)       |          Payload Data         |
++-------------------------------- - - - - - - - - - - - - - - - +
+:                     Payload Data continued ...                :
++ - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - +
 |                     Payload Data continued ...                |
 +---------------------------------------------------------------+
 '''
@@ -115,7 +123,7 @@ class WebsocketRequestHandler:
         elif "Cookie" in self.ws_request.headers:
             self.ws_request.cookies.load(self.ws_request.headers["Cookie"])
         self.session = WebsocketSessionImpl(self, self.ws_request)
-        self.close_reason: str = ""
+        self.close_reason: WebsocketCloseReason = None
 
         self._continution_cache: _ContinuationMessageCache = None
 
@@ -153,8 +161,18 @@ class WebsocketRequestHandler:
             _logger.warn(f"Endpoint[{self.ws_request.path}]")
         return http_status_code, headers
 
-    async def on_message(self, opcode: int, message_bytes: bytes):
-        if opcode == OPCODE_TEXT and hasattr(self.handler, "on_text_message") and callable(self.handler.on_text_message):
+    async def on_message(self, opcode: int, message_bytes: bytearray):
+        if opcode == OPCODE_CLOSE_CONN:
+            _logger.info("Client asked to close connection.")
+            self.keep_alive = False
+            if len(message_bytes) >= 2:
+                code = struct.unpack(">H", message_bytes[0:2])[0]
+                reason = message_bytes[2:].decode('UTF-8')
+            else:
+                code = None
+                reason = ''
+            self.close_reason = WebsocketCloseReason("Client asked to close connection.", code=code, reason=reason)
+        elif opcode == OPCODE_TEXT and hasattr(self.handler, "on_text_message") and callable(self.handler.on_text_message):
             await self.await_func(self.handler.on_text_message(self.session, self._try_decode_UTF8(message_bytes)))
         elif opcode == OPCODE_PING and hasattr(self.handler, "on_ping_message") and callable(self.handler.on_ping_message):
             await self.await_func(self.handler.on_ping_message(self.session, bytes(message_bytes)))
@@ -232,13 +250,13 @@ class WebsocketRequestHandler:
         except ConnectionResetError as e:
             _logger.info("Client closed connection.")
             self.keep_alive = False
-            self.close_reason = "Client closed connection."
+            self.close_reason = WebsocketCloseReason("Client closed connection.")
             return
         except SocketError as e:
             if e.errno == errno.ECONNRESET:
                 _logger.info("Client closed connection.")
                 self.keep_alive = False
-                self.close_reason = "Client closed connection."
+                self.close_reason = WebsocketCloseReason("Client closed connection.")
                 return
             b1, b2 = 0, 0
         except ValueError as e:
@@ -249,20 +267,21 @@ class WebsocketRequestHandler:
         masked = b2 & MASKED
         payload_length = b2 & PAYLOAD_LEN
 
-        if opcode == OPCODE_CLOSE_CONN:
-            _logger.info("Client asked to close connection.")
-            self.keep_alive = False
-            self.close_reason = "Client asked to close connection."
-            return
         if not masked:
             _logger.warn("Client must always be masked.")
             self.keep_alive = False
-            self.close_reason = "Client is not masked."
+            self.close_reason = WebsocketCloseReason("Client is not masked.")
             return
-        if opcode not in (OPCODE_TEXT, OPCODE_PING, OPCODE_PONG, OPCODE_CONTINUATION, OPCODE_BINARY):
+        if opcode not in (OPCODE_TEXT, OPCODE_PING, OPCODE_PONG, OPCODE_CONTINUATION, OPCODE_BINARY, OPCODE_CLOSE_CONN):
             _logger.warn(f"Unknown opcode {opcode}.")
             self.keep_alive = False
             self.close_reason = f"Unknown opcode {opcode}."
+            return
+
+        if opcode in (OPCODE_PING, OPCODE_PONG) and payload_length > 125:
+            _logger.warn(f"Ping/Pong message payload is too large! The max length of the Ping/Pong messages is 125. but now is {payload_length}")
+            self.keep_alive = False
+            self.close_reason = f"Ping/Pong message payload is too large! The max length of the Ping/Pong messages is 125."
             return
 
         if payload_length == 126:
@@ -272,11 +291,12 @@ class WebsocketRequestHandler:
             qb = await self.reader.read(8)
             payload_length = struct.unpack(">Q", qb)[0]
 
-        masks = await self.read_bytes(4)
         frame_bytes = bytearray()
-        payload = await self.read_bytes(payload_length)
-        for encoded_byte in payload:
-            frame_bytes.append(encoded_byte ^ masks[len(frame_bytes) % 4])
+        if payload_length > 0:
+            masks = await self.read_bytes(4)
+            payload = await self.read_bytes(payload_length)
+            for encoded_byte in payload:
+                frame_bytes.append(encoded_byte ^ masks[len(frame_bytes) % 4])
 
         if fin and opcode != OPCODE_CONTINUATION:
             # A normal frame, handle message.
@@ -285,17 +305,24 @@ class WebsocketRequestHandler:
 
         if not fin and opcode != OPCODE_CONTINUATION:
             # Fragment message: first frame, try to create a cache object.
+            if opcode not in (OPCODE_TEXT, OPCODE_BINARY):
+                _logger.warning(f"Control frames with opcode {opcode} MUST NOT be fragmented")
+                self.keep_alive = False
+                self.close_reason = f"Control frames MUST NOT be fragmented"
+                return
             if self._continution_cache is not None:
                 # Check if another fragment message is being read.
                 _logger.warning("Another continution message is not yet finished. Close connection for this error!")
                 self.keep_alive = False
-                self.close_reason = "Another continuation message is not yet finished. "
+                self.close_reason = WebsocketCloseReason("Another continuation message is not yet finished reading. ")
                 return
             self._continution_cache = _ContinuationMessageCache(opcode)
 
         if self._continution_cache is None:
-            # When the first frame is not send, all the other frames are ignored.
-            _logger.warning("A continuation fragment frame is received, but the start fragment is not received yet, ignore this frame.")
+            # When the first frame is not send, close connection.
+            _logger.warning("A continuation fragment frame is received, but the start fragment is not yet received. ")
+            self.keep_alive = False
+            self.close_reason = WebsocketCloseReason("A continuation fragment frame is received, but the start fragment is not yet received. ")
             return
 
         await self.on_continuation_frame(self._continution_cache.opcode, fin, frame_bytes)
@@ -360,7 +387,7 @@ class WebsocketRequestHandler:
     def close(self, reason: str = ""):
         self.send_bytes(OPCODE_CLOSE_CONN, self._encode_to_UTF8(reason))
         self.keep_alive = False
-        self.close_reason = "Server asked to close connection."
+        self.close_reason = WebsocketCloseReason("Server asked to close connection.")
 
     def _encode_to_UTF8(self, data: str) -> bytes:
         try:
