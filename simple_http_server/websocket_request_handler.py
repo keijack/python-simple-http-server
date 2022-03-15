@@ -24,8 +24,9 @@ SOFTWARE.
 
 
 import asyncio
-import chunk
-import os
+
+from threading import Lock
+
 
 import struct
 from base64 import b64encode
@@ -140,6 +141,8 @@ class WebsocketRequestHandler:
         self.close_reason: WebsocketCloseReason = None
 
         self._continution_cache: _ContinuationMessageCache = None
+        self._send_msg_lock = Lock()
+        self._send_frame_lock = Lock()
 
     @property
     def response_headers(self):
@@ -218,7 +221,7 @@ class WebsocketRequestHandler:
                 else:
                     await self.read_next_message()
             except _WebsocketException as e:
-                if not e.is_graceful():
+                if not e.is_graceful:
                     _logger.warning(f"Something's wrong, close connection: {e.reason}")
                 else:
                     _logger.info(f"Close connection: {e.reason}")
@@ -362,41 +365,54 @@ class WebsocketRequestHandler:
     def send_bytes(self, opcode: int, payload: bytes, chunk_size: int = 0):
         if opcode not in OPTYPES.keys() or opcode == WEBSOCKET_OPCODE_CONTINUATION:
             raise _WebsocketException(reason=WebsocketCloseReason(f"Cannot send message in a opcode {opcode}. "))
+
+        # Control frames MUST NOT be fragmented.
+        c_size = chunk_size if opcode in (WEBSOCKET_OPCODE_BINARY, WEBSOCKET_OPCODE_TEXT) else 0
+
+        if c_size and c_size > 0:
+            with self._send_msg_lock:
+                # Make sure a fragmented message is sent completely.
+                self._send_bytes_no_lock(opcode, payload, chunk_size=c_size)
+        else:
+            self._send_bytes_no_lock(opcode, payload)
+
+    def _send_bytes_no_lock(self, opcode: int, payload: bytes, chunk_size: int = 0):
         frame_size = chunk_size if chunk_size and chunk_size > 0 else None
-        all_payloads = bytearray(payload)
+        all_payloads = payload
         frame_bytes = b''
         while all_payloads:
             op = WEBSOCKET_OPCODE_CONTINUATION if frame_bytes else opcode
             frame_bytes = all_payloads[0: frame_size]
-            del all_payloads[0: frame_size]
+            all_payloads = all_payloads[frame_size:] if frame_size else b''
             fin = 0 if all_payloads else FIN
             self._send_frame(fin, op, frame_bytes)
 
     def _send_frame(self, fin: int, opcode: int, payload: bytes):
-        header = bytearray()
-        payload_length = len(payload)
-        # Normal payload
-        if payload_length <= 125:
-            header.append(fin | opcode)
-            header.append(payload_length)
+        with self._send_frame_lock:
+            header = bytearray()
+            payload_length = len(payload)
+            # Normal payload
+            if payload_length <= 125:
+                header.append(fin | opcode)
+                header.append(payload_length)
 
-        # Extended payload
-        elif payload_length >= 126 and payload_length <= 65535:
-            header.append(fin | opcode)
-            header.append(PAYLOAD_LEN_EXT16)
-            header.extend(struct.pack(">H", payload_length))
+            # Extended payload
+            elif payload_length >= 126 and payload_length <= 65535:
+                header.append(fin | opcode)
+                header.append(PAYLOAD_LEN_EXT16)
+                header.extend(struct.pack(">H", payload_length))
 
-        # Huge extended payload
-        elif payload_length < 18446744073709551616:
-            header.append(fin | opcode)
-            header.append(PAYLOAD_LEN_EXT64)
-            header.extend(struct.pack(">Q", payload_length))
-        else:
-            raise Exception(
-                "Message is too big. Consider breaking it into chunks.")
+            # Huge extended payload
+            elif payload_length < 18446744073709551616:
+                header.append(fin | opcode)
+                header.append(PAYLOAD_LEN_EXT64)
+                header.extend(struct.pack(">Q", payload_length))
+            else:
+                raise Exception(
+                    "Message is too big. Consider breaking it into chunks.")
 
-        self.request_writer.send(header)
-        self.request_writer.send(payload)
+            self.request_writer.send(header)
+            self.request_writer.send(payload)
 
     def close(self, reason: str = ""):
         self.send_bytes(WEBSOCKET_OPCODE_CLOSE, self._encode_to_UTF8(reason))

@@ -31,4 +31,4 @@ class WSHandler(WebsocketHandler):
 
     def on_binary_message(self, session: WebsocketSession = None, message: bytes = b''):
         _logger.info(f'Binary Message:: {message}')
-        session.send(f'{message}')
+        session.send(f'{message}', chunk_size=10)
