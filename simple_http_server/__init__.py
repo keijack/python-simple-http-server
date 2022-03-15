@@ -31,11 +31,18 @@ from typing import Any, Dict, List, Tuple, Type, Union, Callable
 from .logger import get_logger
 
 name = "simple_http_server"
-version = "0.16.1"
+version = "0.16.2"
 
 DEFAULT_ENCODING: str = "UTF-8"
 
 SESSION_COOKIE_NAME: str = "PY_SIM_HTTP_SER_SESSION_ID"
+
+WEBSOCKET_OPCODE_CONTINUATION: int = 0x0
+WEBSOCKET_OPCODE_TEXT: int = 0x1
+WEBSOCKET_OPCODE_BINARY: int = 0x2
+WEBSOCKET_OPCODE_CLOSE: int = 0x8
+WEBSOCKET_OPCODE_PING: int = 0x9
+WEBSOCKET_OPCODE_PONG: int = 0xA
 
 _logger = get_logger("simple_http_server.__init__")
 
@@ -518,13 +525,13 @@ class WebsocketSession:
     def is_closed(self) -> bool:
         return False
 
-    def send(self, message: str):
+    def send(self, message: Union[str, bytes], opcode: int = None, chunk_size: int = 0):
         pass
 
-    def send_text(self, message: str):
+    def send_text(self, message: str, chunk_size: int = 0):
         pass
 
-    def send_binary(self, binary: bytes):
+    def send_binary(self, binary: bytes, chunk_size: int = 0):
         pass
 
     def send_pone(self, message: bytes):
