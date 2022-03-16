@@ -97,7 +97,7 @@ class _ContinuationMessageCache:
 
 class _WebsocketException(Exception):
 
-    def __init__(self, graceful: bool = False,  reason: WebsocketCloseReason = None) -> None:
+    def __init__(self, reason: WebsocketCloseReason = None, graceful: bool = False) -> None:
         super().__init__(reason)
         self.__graceful: bool = graceful
         self.__reason: WebsocketCloseReason = reason
@@ -270,7 +270,7 @@ class WebsocketRequestHandler:
     async def read_bytes(self, num):
         return await self.reader.read(num)
 
-    async def read_next_message(self):
+    async def _read_message_content(self) -> Tuple[int, int, bytearray]:
         _logger.debug(f"Read next websocket[{self.ws_request.path}] message")
         try:
             b1, b2 = await self.read_bytes(2)
@@ -304,15 +304,18 @@ class WebsocketRequestHandler:
             qb = await self.reader.read(8)
             payload_length = struct.unpack(">Q", qb)[0]
 
-        optype = OPTYPES[opcode]
-        _logger.debug(f"Receive a websocket frame: opcode[{opcode}({optype})]::fin?{bool(fin)}::payload length::{payload_length}")
-
         frame_bytes = bytearray()
         if payload_length > 0:
             masks = await self.read_bytes(4)
             payload = await self.read_bytes(payload_length)
             for encoded_byte in payload:
                 frame_bytes.append(encoded_byte ^ masks[len(frame_bytes) % 4])
+
+        return fin, opcode, frame_bytes
+
+    async def read_next_message(self):
+
+        fin, opcode, frame_bytes = await self._read_message_content()
 
         if fin and opcode != WEBSOCKET_OPCODE_CONTINUATION:
             # A normal frame, handle message.
@@ -322,7 +325,7 @@ class WebsocketRequestHandler:
         if not fin and opcode != WEBSOCKET_OPCODE_CONTINUATION:
             # Fragment message: first frame, try to create a cache object.
             if opcode not in (WEBSOCKET_OPCODE_TEXT, WEBSOCKET_OPCODE_BINARY):
-                raise _WebsocketException(reason=WebsocketCloseReason(f"Control({optype}) frames MUST NOT be fragmented"))
+                raise _WebsocketException(reason=WebsocketCloseReason(f"Control({OPTYPES[opcode]}) frames MUST NOT be fragmented"))
 
             if self._continution_cache is not None:
                 # Check if another fragment message is being read.
