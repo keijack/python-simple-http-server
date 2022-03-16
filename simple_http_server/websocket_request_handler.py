@@ -24,18 +24,16 @@ SOFTWARE.
 
 
 import asyncio
+import os
+import struct
+import errno
 
 from threading import Lock
-
-
-import struct
 from base64 import b64encode
 from hashlib import sha1
 from typing import Dict, Tuple, Union
 from uuid import uuid4
 from socket import error as SocketError
-import errno
-
 
 from .logger import get_logger
 from simple_http_server import Headers, WebsocketCloseReason, WebsocketRequest, WebsocketSession, \
@@ -78,6 +76,7 @@ PAYLOAD_LEN = 0x7f
 PAYLOAD_LEN_EXT16 = 0x7e
 PAYLOAD_LEN_EXT64 = 0x7f
 GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
+_BUFFER_SIZE = 1024 * 1024
 
 OPTYPES = {
     WEBSOCKET_OPCODE_CONTINUATION: "CONTINUATION",
@@ -389,30 +388,64 @@ class WebsocketRequestHandler:
 
     def _send_frame(self, fin: int, opcode: int, payload: bytes):
         with self._send_frame_lock:
-            header = bytearray()
-            payload_length = len(payload)
-            # Normal payload
-            if payload_length <= 125:
-                header.append(fin | opcode)
-                header.append(payload_length)
-
-            # Extended payload
-            elif payload_length >= 126 and payload_length <= 65535:
-                header.append(fin | opcode)
-                header.append(PAYLOAD_LEN_EXT16)
-                header.extend(struct.pack(">H", payload_length))
-
-            # Huge extended payload
-            elif payload_length < 18446744073709551616:
-                header.append(fin | opcode)
-                header.append(PAYLOAD_LEN_EXT64)
-                header.extend(struct.pack(">Q", payload_length))
-            else:
-                raise Exception(
-                    "Message is too big. Consider breaking it into chunks.")
-
-            self.request_writer.send(header)
+            self.request_writer.send(self._create_frame_header(fin, opcode, len(payload)))
             self.request_writer.send(payload)
+
+    def _create_frame_header(self, fin: int, opcode: int, payload_length: int) -> bytes:
+        header = bytearray()
+        # Normal payload
+        if payload_length <= 125:
+            header.append(fin | opcode)
+            header.append(payload_length)
+
+        # Extended payload
+        elif payload_length >= 126 and payload_length <= 65535:
+            header.append(fin | opcode)
+            header.append(PAYLOAD_LEN_EXT16)
+            header.extend(struct.pack(">H", payload_length))
+
+        # Huge extended payload
+        elif payload_length < 18446744073709551616:
+            header.append(fin | opcode)
+            header.append(PAYLOAD_LEN_EXT64)
+            header.extend(struct.pack(">Q", payload_length))
+        else:
+            raise Exception(
+                "Message is too big. Consider breaking it into chunks.")
+
+        return header
+
+    def send_file(self, path: str, chunk_size: int = 0):
+        try:
+            file_size = os.path.getsize(path)
+            if not chunk_size or chunk_size < 0 or chunk_size > file_size:
+                self._send_file_no_lock(path, file_size, file_size)
+            else:
+                with self._send_msg_lock:
+                    self._send_file_no_lock(path, file_size, chunk_size)
+        except (OSError, ValueError):
+            raise _WebsocketException(reason=WebsocketCloseReason(f"File in {path} does not exist or is not accessible."))
+
+    def _send_file_no_lock(self, path: str, file_size: int, chunk_size: int):
+        with open(path, 'rb') as in_file:
+            remain_bytes = file_size
+            opcode = WEBSOCKET_OPCODE_BINARY
+            while remain_bytes > 0:
+                with self._send_frame_lock:
+                    frame_size = min(remain_bytes, chunk_size)
+                    remain_bytes -= frame_size
+
+                    fin = 0 if remain_bytes > 0 else FIN
+
+                    self.request_writer.send(self._create_frame_header(fin, opcode, frame_size))
+                    while frame_size > 0:
+                        buff_size = min(_BUFFER_SIZE, frame_size)
+                        frame_size -= buff_size
+
+                        data = in_file.read(buff_size)
+                        self.request_writer.send(data)
+                # After the first frame, the opcode of other frames is continuation forever.
+                opcode = WEBSOCKET_OPCODE_CONTINUATION
 
     def close(self, reason: str = ""):
         self.send_bytes(WEBSOCKET_OPCODE_CLOSE, self._encode_to_UTF8(reason))
@@ -476,6 +509,9 @@ class WebsocketSessionImpl(WebsocketSession):
 
     def send_binary(self, binary: bytes, chunk_size: int = 0):
         self.__handler.send_bytes(WEBSOCKET_OPCODE_BINARY, binary, chunk_size=chunk_size)
+
+    def send_file(self, path: str, chunk_size: int = 0):
+        self.__handler.send_file(path, chunk_size=chunk_size)
 
     def close(self, reason: str):
         self.__handler.close(reason)

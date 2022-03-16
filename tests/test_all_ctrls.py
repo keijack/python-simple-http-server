@@ -160,6 +160,28 @@ class ThreadingServerTest(unittest.TestCase):
         ws.close()
         assert txt == f"{path_val}-{msg0 + msg1 + msg2}"
 
+    def test_ws_bytes_continuation(self):
+        ws = websocket.WebSocket()
+        path_val = "test-ws"
+
+        ws.connect(f"ws://127.0.0.1:{self.PORT}/ws/{path_val}")
+        msg0 = "Hello "
+        frame0 = websocket.ABNF.create_frame(msg0, websocket.ABNF.OPCODE_BINARY, 0)
+        ws.send_frame(frame0)
+        msg1 = "Websocket "
+        frame1 = websocket.ABNF.create_frame(msg1, websocket.ABNF.OPCODE_CONT, 0)
+        ws.send_frame(frame1)
+        msg2 = "Frames!"
+        frame2 = websocket.ABNF.create_frame(msg2, websocket.ABNF.OPCODE_CONT, 1)
+        ws.send_frame(frame2)
+
+        txt: str = ws.recv()
+        bs: bytes = ws.recv()
+        bs2: bytes = ws.recv()
+        ws.close()
+        assert txt == "binary-message-received, and this is some message for the long size."
+        assert bs.decode() == bs2.decode() == msg0 + msg1 + msg2
+
 
 class CoroutineServerTest(ThreadingServerTest):
 

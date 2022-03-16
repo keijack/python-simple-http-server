@@ -534,6 +534,9 @@ class WebsocketSession:
     def send_binary(self, binary: bytes, chunk_size: int = 0):
         pass
 
+    def send_file(self, path: str, chunk_size: int = 0):
+        pass
+
     def send_pone(self, message: bytes):
         pass
 

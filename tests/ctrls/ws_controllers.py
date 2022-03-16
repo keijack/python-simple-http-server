@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 
 
-from email import message
+from dataclasses import is_dataclass
+import os
+import shutil
 from simple_http_server import WebsocketCloseReason, WebsocketHandler, WebsocketRequest, WebsocketSession, websocket_handler
 import simple_http_server.logger as logger
 
@@ -31,4 +33,18 @@ class WSHandler(WebsocketHandler):
 
     def on_binary_message(self, session: WebsocketSession = None, message: bytes = b''):
         _logger.info(f'Binary Message:: {message}')
-        session.send(f'{message}', chunk_size=10)
+        tmp_folder = os.path.dirname(os.path.abspath(__file__)) + "/tmp"
+        is_dir_tmp_folder = os.path.isdir(tmp_folder)
+        if not is_dir_tmp_folder:
+            os.mkdir(tmp_folder)
+        session.send('binary-message-received, and this is some message for the long size.', chunk_size=10)
+        tmp_file_path = f"{tmp_folder}/ws_bi_re.tmp"
+        with open(tmp_file_path, 'wb') as out_file:
+            out_file.write(message)
+
+        session.send_file(tmp_file_path)
+        session.send_file(tmp_file_path, chunk_size=10)
+        if is_dir_tmp_folder:
+            os.remove(tmp_file_path)
+        else:
+            shutil.rmtree(tmp_folder)
