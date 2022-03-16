@@ -531,5 +531,5 @@ class WSGIProxy(RoutingConf):
         return asyncio.run(self.async_app_proxy(environment, start_response))
 
     async def async_app_proxy(self, environment, start_response):
-        requestHandler = WSGIRequestHandler(self, environment, start_response)
-        return await requestHandler.handle_request()
+        request_handler = WSGIRequestHandler(self, environment, start_response)
+        return await request_handler.handle_request()

@@ -188,7 +188,7 @@ class WebsocketRequestHandler:
                 reason = ''
             raise _WebsocketException(graceful=True, reason=WebsocketCloseReason("Client asked to close connection.", code=code, reason=reason))
         elif opcode == WEBSOCKET_OPCODE_TEXT and hasattr(self.handler, "on_text_message") and callable(self.handler.on_text_message):
-            await self.await_func(self.handler.on_text_message(self.session, self._try_decode_UTF8(message_bytes)))
+            await self.await_func(self.handler.on_text_message(self.session, self._try_decode_utf8(message_bytes)))
         elif opcode == WEBSOCKET_OPCODE_PING and hasattr(self.handler, "on_ping_message") and callable(self.handler.on_ping_message):
             await self.await_func(self.handler.on_ping_message(self.session, bytes(message_bytes)))
         elif opcode == WEBSOCKET_OPCODE_PONG and hasattr(self.handler, "on_pong_message") and callable(self.handler.on_pong_message):
@@ -263,8 +263,8 @@ class WebsocketRequestHandler:
         _logger.debug(
             f"Sec-WebSocket-Key: {self.ws_request.headers['Sec-WebSocket-Key']}")
         key: str = self.ws_request.headers["Sec-WebSocket-Key"]
-        hash = sha1(key.encode() + GUID.encode())
-        response_key = b64encode(hash.digest()).strip()
+        key_hash = sha1(key.encode() + GUID.encode())
+        response_key = b64encode(key_hash.digest()).strip()
         return response_key.decode('ASCII')
 
     async def read_bytes(self, num):
@@ -345,7 +345,7 @@ class WebsocketRequestHandler:
         if isinstance(message, bytes):
             self.send_bytes(WEBSOCKET_OPCODE_TEXT, message, chunk_size=chunk_size)
         elif isinstance(message, str):
-            self.send_bytes(WEBSOCKET_OPCODE_TEXT, self._encode_to_UTF8(message), chunk_size=chunk_size)
+            self.send_bytes(WEBSOCKET_OPCODE_TEXT, self._encode_to_utf8(message), chunk_size=chunk_size)
         else:
             _logger.error(f"Cannot send message[{message}. ")
 
@@ -353,13 +353,13 @@ class WebsocketRequestHandler:
         if isinstance(message, bytes):
             self.send_bytes(WEBSOCKET_OPCODE_PING, message)
         elif isinstance(message, str):
-            self.send_bytes(WEBSOCKET_OPCODE_PING, self._encode_to_UTF8(message))
+            self.send_bytes(WEBSOCKET_OPCODE_PING, self._encode_to_utf8(message))
 
     def send_pong(self, message: Union[str, bytes]):
         if isinstance(message, bytes):
             self.send_bytes(WEBSOCKET_OPCODE_PONG, message)
         elif isinstance(message, str):
-            self.send_bytes(WEBSOCKET_OPCODE_PONG, self._encode_to_UTF8(message))
+            self.send_bytes(WEBSOCKET_OPCODE_PONG, self._encode_to_utf8(message))
 
     def send_bytes(self, opcode: int, payload: bytes, chunk_size: int = 0):
         if opcode not in OPTYPES.keys() or opcode == WEBSOCKET_OPCODE_CONTINUATION:
@@ -448,26 +448,23 @@ class WebsocketRequestHandler:
                 opcode = WEBSOCKET_OPCODE_CONTINUATION
 
     def close(self, reason: str = ""):
-        self.send_bytes(WEBSOCKET_OPCODE_CLOSE, self._encode_to_UTF8(reason))
+        self.send_bytes(WEBSOCKET_OPCODE_CLOSE, self._encode_to_utf8(reason))
         self.keep_alive = False
         self.close_reason = WebsocketCloseReason("Server asked to close connection.")
 
-    def _encode_to_UTF8(self, data: str) -> bytes:
+    def _encode_to_utf8(self, data: str) -> bytes:
         try:
             return data.encode('UTF-8')
         except UnicodeEncodeError as e:
             _logger.error("Could not encode data to UTF-8 -- %s" % e)
             return f'{data}'.encode('UTF-8')
-        except Exception as e:
-            raise(e)
 
-    def _try_decode_UTF8(self, data: bytes) -> str:
+    def _try_decode_utf8(self, data: bytes) -> str:
         try:
             return data.decode('utf-8')
         except UnicodeDecodeError:
-            return False
-        except Exception as e:
-            raise(e)
+            _logger.warning(f"Cannot decode {data} to string!!")
+            return f"{data}"
 
 
 class WebsocketSessionImpl(WebsocketSession):
@@ -499,7 +496,7 @@ class WebsocketSessionImpl(WebsocketSession):
         if isinstance(message, bytes):
             msg = message
         elif isinstance(message, str):
-            msg = self.__handler._encode_to_UTF8(message)
+            msg = self.__handler._encode_to_utf8(message)
         else:
             raise _WebsocketException(reason=WebsocketCloseReason(f"message {message} is not a string nor a bytes object, cannot send it to client. "))
         self.__handler.send_bytes(opcode if opcode is None else WEBSOCKET_OPCODE_TEXT, msg, chunk_size=chunk_size)
