@@ -468,12 +468,10 @@ class Cookie(http.cookies.Morsel):
 class FilterContex:
 
     @property
-    @abstractmethod
     def request(self) -> Request:
         return NotImplemented
 
     @property
-    @abstractmethod
     def response(self) -> Response:
         return NotImplemented
 
@@ -522,17 +520,14 @@ class WebsocketRequest:
 class WebsocketSession:
 
     @property
-    @abstractmethod
     def id(self) -> str:
         return NotImplemented
 
     @property
-    @abstractmethod
     def request(self) -> WebsocketRequest:
         return NotImplemented
 
     @property
-    @abstractmethod
     def is_closed(self) -> bool:
         return NotImplemented
 
