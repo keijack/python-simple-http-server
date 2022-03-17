@@ -95,13 +95,13 @@ class CachingLogger(LazyCalledLogger):
 
 class LoggerFactory:
 
-    LOG_FORMAT: str = '[%(asctime)s]-[%(threadName)s]-[%(name)s:%(lineno)d] %(levelname)-4s: %(message)s'
+    DEFAULT_LOG_FORMAT: str = '[%(asctime)s]-[%(threadName)s]-[%(name)s:%(lineno)d] %(levelname)-4s: %(message)s'
 
-    DATE_FORMAT: str = '%Y-%m-%d %H:%M:%S'
+    DEFAULT_DATE_FORMAT: str = '%Y-%m-%d %H:%M:%S'
 
     _LOG_LVELS: Tuple[str] = ("DEBUG", "INFO", "WARN", "ERROR")
 
-    def __init__(self, log_level: str = "INFO", log_format: str = LOG_FORMAT, date_format: str = DATE_FORMAT) -> None:
+    def __init__(self, log_level: str = "INFO", log_format: str = DEFAULT_LOG_FORMAT, date_format: str = DEFAULT_DATE_FORMAT) -> None:
         self.__cache_loggers: Dict[str, CachingLogger] = {}
         self._log_level = log_level.upper() if log_level and log_level.upper() in self._LOG_LVELS else "INFO"
         self.log_format = log_format

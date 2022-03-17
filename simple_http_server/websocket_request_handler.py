@@ -243,8 +243,7 @@ class WebsocketRequestHandler:
                 self.send_response(101, "Switching Protocols")
                 self.send_header("Upgrade", "websocket")
                 self.send_header("Connection", "Upgrade")
-                self.send_header("Sec-WebSocket-Accept",
-                                 self.calculate_response_key())
+                self.send_header("Sec-WebSocket-Accept", self.calculate_response_key())
             if headers:
                 for h_name, h_val in headers.items():
                     self.send_header(h_name, h_val)

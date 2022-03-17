@@ -28,6 +28,8 @@ import http.cookies
 import inspect
 import time
 from typing import Any, Dict, List, Tuple, Type, Union, Callable
+
+
 from .logger import get_logger
 
 name = "simple_http_server"
@@ -53,41 +55,51 @@ class Session:
         self.max_inactive_interval: int = 30 * 60
 
     @property
+    @abstractmethod
     def id(self) -> str:
         return ""
 
     @property
+    @abstractmethod
     def creation_time(self) -> float:
         return 0
 
     @property
+    @abstractmethod
     def last_accessed_time(self) -> float:
         return 0
 
     @property
+    @abstractmethod
     def attribute_names(self) -> Tuple:
         return ()
 
     @property
+    @abstractmethod
     def is_new(self) -> bool:
         return False
 
     @property
+    @abstractmethod
     def is_valid(self) -> bool:
         return time.time() - self.last_accessed_time < self.max_inactive_interval
 
+    @abstractmethod
     def get_attribute(self, name: str) -> Any:
         return None
 
+    @abstractmethod
     def set_attribute(self, name: str, value: str) -> None:
         pass
 
+    @abstractmethod
     def invalidate(self) -> None:
         pass
 
 
 class SessionFactory:
 
+    @abstractmethod
     def get_session(self, session_id: str, create: bool = False) -> Session:
         return None
 
@@ -99,6 +111,9 @@ class Cookies(http.cookies.SimpleCookie):
 class RequestBodyReader:
 
     async def read(self, n: int = -1) -> bytes:
+        """
+        " Read data from request body, this read method will give you a stream like object, you cannot read the data you have been read.
+        """
         pass
 
 

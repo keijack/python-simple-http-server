@@ -71,7 +71,7 @@ class HttpProtocolHandler:
     protocol_version = "HTTP/1.1"
 
     # MessageClass used to parse headers
-    MessageClass = http.client.HTTPMessage
+    _message_class = http.client.HTTPMessage
 
     # hack to maintain backwards compatibility
     responses = {
@@ -227,7 +227,7 @@ class HttpProtocolHandler:
                 break
         hstring = b''.join(headers).decode('iso-8859-1')
 
-        return email.parser.Parser(_class=self.MessageClass).parsestr(hstring)
+        return email.parser.Parser(_class=self._message_class).parsestr(hstring)
 
     def handle_expect_100(self):
         """Decide what to do with an "Expect: 100-continue" header.
