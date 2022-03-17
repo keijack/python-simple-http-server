@@ -80,22 +80,22 @@ class Session:
 
     @abstractmethod
     def get_attribute(self, name: str) -> Any:
-        raise NotImplemented
+        return NotImplemented
 
     @abstractmethod
     def set_attribute(self, name: str, value: str) -> None:
-        raise NotImplemented
+        return NotImplemented
 
     @abstractmethod
     def invalidate(self) -> None:
-        raise NotImplemented
+        return NotImplemented
 
 
 class SessionFactory:
 
     @abstractmethod
     def get_session(self, session_id: str, create: bool = False) -> Session:
-        raise NotImplemented
+        return NotImplemented
 
 
 class Cookies(http.cookies.SimpleCookie):
@@ -106,7 +106,7 @@ class RequestBodyReader:
 
     @abstractmethod
     async def read(self, n: int = -1) -> bytes:
-        raise NotImplemented
+        return NotImplemented
 
 
 class Request:
@@ -175,7 +175,7 @@ class Request:
 
     @abstractmethod
     def get_session(self, create: bool = False) -> Session:
-        raise NotImplemented
+        return NotImplemented
 
 
 class MultipartFile:
@@ -401,15 +401,15 @@ class Response:
 
     @abstractmethod
     def send_error(self, status_code: int, message: str = ""):
-        raise NotImplemented
+        return NotImplemented
 
     @abstractmethod
     def send_redirect(self, url: str):
-        raise NotImplemented
+        return NotImplemented
 
     @abstractmethod
     def send_response(self):
-        raise NotImplemented
+        return NotImplemented
 
 
 class HttpError(Exception):
@@ -470,16 +470,16 @@ class FilterContex:
     @property
     @abstractmethod
     def request(self) -> Request:
-        raise NotImplemented
+        return NotImplemented
 
     @property
     @abstractmethod
     def response(self) -> Response:
-        raise NotImplemented
+        return NotImplemented
 
     @abstractmethod
     def do_chain(self):
-        raise NotImplemented
+        return NotImplemented
 
 
 class WebsocketRequest:
@@ -524,45 +524,45 @@ class WebsocketSession:
     @property
     @abstractmethod
     def id(self) -> str:
-        raise NotImplemented
+        return NotImplemented
 
     @property
     @abstractmethod
     def request(self) -> WebsocketRequest:
-        raise NotImplemented
+        return NotImplemented
 
     @property
     @abstractmethod
     def is_closed(self) -> bool:
-        raise NotImplemented
+        return NotImplemented
 
     @abstractmethod
     def send(self, message: Union[str, bytes], opcode: int = None, chunk_size: int = 0):
-        raise NotImplemented
+        return NotImplemented
 
     @abstractmethod
     def send_text(self, message: str, chunk_size: int = 0):
-        raise NotImplemented
+        return NotImplemented
 
     @abstractmethod
     def send_binary(self, binary: bytes, chunk_size: int = 0):
-        raise NotImplemented
+        return NotImplemented
 
     @abstractmethod
     def send_file(self, path: str, chunk_size: int = 0):
-        raise NotImplemented
+        return NotImplemented
 
     @abstractmethod
     def send_pone(self, message: bytes):
-        raise NotImplemented
+        return NotImplemented
 
     @abstractmethod
     def send_ping(self, message: bytes):
-        raise NotImplemented
+        return NotImplemented
 
     @abstractmethod
     def close(self, reason: str):
-        raise NotImplemented
+        return NotImplemented
 
 
 class WebsocketCloseReason(str):
