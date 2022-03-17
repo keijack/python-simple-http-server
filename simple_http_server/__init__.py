@@ -55,53 +55,47 @@ class Session:
         self.max_inactive_interval: int = 30 * 60
 
     @property
-    @abstractmethod
     def id(self) -> str:
         return ""
 
     @property
-    @abstractmethod
     def creation_time(self) -> float:
         return 0
 
     @property
-    @abstractmethod
     def last_accessed_time(self) -> float:
         return 0
 
     @property
-    @abstractmethod
     def attribute_names(self) -> Tuple:
         return ()
 
     @property
-    @abstractmethod
     def is_new(self) -> bool:
         return False
 
     @property
-    @abstractmethod
     def is_valid(self) -> bool:
         return time.time() - self.last_accessed_time < self.max_inactive_interval
 
     @abstractmethod
     def get_attribute(self, name: str) -> Any:
-        return None
+        raise NotImplemented
 
     @abstractmethod
     def set_attribute(self, name: str, value: str) -> None:
-        pass
+        raise NotImplemented
 
     @abstractmethod
     def invalidate(self) -> None:
-        pass
+        raise NotImplemented
 
 
 class SessionFactory:
 
     @abstractmethod
     def get_session(self, session_id: str, create: bool = False) -> Session:
-        return None
+        raise NotImplemented
 
 
 class Cookies(http.cookies.SimpleCookie):
@@ -112,7 +106,7 @@ class RequestBodyReader:
 
     @abstractmethod
     async def read(self, n: int = -1) -> bytes:
-        pass
+        raise NotImplemented
 
 
 class Request:
@@ -181,8 +175,7 @@ class Request:
 
     @abstractmethod
     def get_session(self, create: bool = False) -> Session:
-        # This is abstract method
-        return None
+        raise NotImplemented
 
 
 class MultipartFile:
@@ -408,18 +401,15 @@ class Response:
 
     @abstractmethod
     def send_error(self, status_code: int, message: str = ""):
-        """abstruct method"""
-        pass
+        raise NotImplemented
 
     @abstractmethod
     def send_redirect(self, url: str):
-        """abstruct method"""
-        pass
+        raise NotImplemented
 
     @abstractmethod
     def send_response(self):
-        """abstruct method"""
-        pass
+        raise NotImplemented
 
 
 class HttpError(Exception):
@@ -480,16 +470,16 @@ class FilterContex:
     @property
     @abstractmethod
     def request(self) -> Request:
-        return None
+        raise NotImplemented
 
     @property
     @abstractmethod
     def response(self) -> Response:
-        return None
+        raise NotImplemented
 
     @abstractmethod
     def do_chain(self):
-        pass
+        raise NotImplemented
 
 
 class WebsocketRequest:
@@ -534,45 +524,45 @@ class WebsocketSession:
     @property
     @abstractmethod
     def id(self) -> str:
-        return ""
+        raise NotImplemented
 
     @property
     @abstractmethod
     def request(self) -> WebsocketRequest:
-        return None
+        raise NotImplemented
 
     @property
     @abstractmethod
     def is_closed(self) -> bool:
-        return False
+        raise NotImplemented
 
     @abstractmethod
     def send(self, message: Union[str, bytes], opcode: int = None, chunk_size: int = 0):
-        pass
+        raise NotImplemented
 
     @abstractmethod
     def send_text(self, message: str, chunk_size: int = 0):
-        pass
+        raise NotImplemented
 
     @abstractmethod
     def send_binary(self, binary: bytes, chunk_size: int = 0):
-        pass
+        raise NotImplemented
 
     @abstractmethod
     def send_file(self, path: str, chunk_size: int = 0):
-        pass
+        raise NotImplemented
 
     @abstractmethod
     def send_pone(self, message: bytes):
-        pass
+        raise NotImplemented
 
     @abstractmethod
     def send_ping(self, message: bytes):
-        pass
+        raise NotImplemented
 
     @abstractmethod
     def close(self, reason: str):
-        pass
+        raise NotImplemented
 
 
 class WebsocketCloseReason(str):
