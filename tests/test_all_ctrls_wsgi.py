@@ -30,38 +30,39 @@ class WSGIHttpRequestTest(unittest.TestCase):
     server_ready = False
 
     @classmethod
-    def start_server(clz):
+    def start_server(cls):
         _logger.info("start server in background. ")
         root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         server.scan(project_dir=root, base_dir="tests/ctrls", regx=r'.*controllers.*')
         wsgi_proxy = server.init_wsgi_proxy(resources={"/public/*": f"{root}/tests/static"})
+
         def wsgi_simple_app(environment, start_response):
             return wsgi_proxy.app_proxy(environment, start_response)
-        clz.httpd = make_server("", clz.PORT, wsgi_simple_app)
-        clz.server_ready = True
-        clz.httpd.serve_forever()
+        cls.httpd = make_server("", cls.PORT, wsgi_simple_app)
+        cls.server_ready = True
+        cls.httpd.serve_forever()
 
     @classmethod
-    def setUpClass(clz):
-        Thread(target=clz.start_server, daemon=False, name="t").start()
+    def setUpClass(cls):
+        Thread(target=cls.start_server, daemon=False, name="t").start()
         retry = 0
-        while not clz.server_ready:
+        while not cls.server_ready:
             sleep(1)
             retry = retry + 1
-            _logger.info(f"server is not ready wait. {retry}/{clz.WAIT_COUNT} ")
-            if retry >= clz.WAIT_COUNT:
+            _logger.info(f"server is not ready wait. {retry}/{cls.WAIT_COUNT} ")
+            if retry >= cls.WAIT_COUNT:
                 raise Exception("Server start wait timeout.")
 
     @classmethod
-    def tearDownClass(clz):
+    def tearDownClass(cls):
         try:
-            clz.httpd.shutdown()
+            cls.httpd.shutdown()
         except:
             pass
 
     @classmethod
-    def visit(clz, ctx_path, headers: Dict[str, str] = {}, data=None, return_type: str = "TEXT"):
-        req: urllib.request.Request = urllib.request.Request(f"http://127.0.0.1:{clz.PORT}/{ctx_path}")
+    def visit(cls, ctx_path, headers: Dict[str, str] = {}, data=None, return_type: str = "TEXT"):
+        req: urllib.request.Request = urllib.request.Request(f"http://127.0.0.1:{cls.PORT}/{ctx_path}")
         for k, v in headers.items():
             req.add_header(k, v)
         res: http.client.HTTPResponse = urllib.request.urlopen(req, data=data)

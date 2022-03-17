@@ -28,40 +28,40 @@ class ThreadingServerTest(unittest.TestCase):
     COROUTINE = False
 
     @classmethod
-    def start_server(clz):
-        clz.tearDownClass()
+    def start_server(cls):
+        cls.tearDownClass()
         _logger.info("start server in background. ")
         root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         server.scan(project_dir=root, base_dir="tests/ctrls",
                     regx=r'.*controllers.*')
         server.start(
-            port=clz.PORT,
+            port=cls.PORT,
             resources={"/public/*": f"{root}/tests/static"},
-            prefer_coroutine=clz.COROUTINE)
+            prefer_coroutine=cls.COROUTINE)
 
     @classmethod
-    def setUpClass(clz):
-        Thread(target=clz.start_server, daemon=True, name="t").start()
+    def setUpClass(cls):
+        Thread(target=cls.start_server, daemon=True, name="t").start()
         retry = 0
         while not server.is_ready():
             sleep(1)
             retry = retry + 1
             _logger.info(
-                f"server is not ready wait. {retry}/{clz.WAIT_COUNT} ")
-            if retry >= clz.WAIT_COUNT:
+                f"server is not ready wait. {retry}/{cls.WAIT_COUNT} ")
+            if retry >= cls.WAIT_COUNT:
                 raise Exception("Server start wait timeout.")
 
     @classmethod
-    def tearDownClass(clz):
+    def tearDownClass(cls):
         try:
             server.stop()
         except:
             pass
 
     @classmethod
-    def visit(clz, ctx_path, headers: Dict[str, str] = {}, data=None, return_type: str = "TEXT"):
+    def visit(cls, ctx_path, headers: Dict[str, str] = {}, data=None, return_type: str = "TEXT"):
         req: urllib.request.Request = urllib.request.Request(
-            f"http://127.0.0.1:{clz.PORT}/{ctx_path}")
+            f"http://127.0.0.1:{cls.PORT}/{ctx_path}")
         for k, v in headers.items():
             req.add_header(k, v)
         res: http.client.HTTPResponse = urllib.request.urlopen(req, data=data)
