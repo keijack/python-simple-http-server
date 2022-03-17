@@ -110,10 +110,8 @@ class Cookies(http.cookies.SimpleCookie):
 
 class RequestBodyReader:
 
+    @abstractmethod
     async def read(self, n: int = -1) -> bytes:
-        """
-        " Read data from request body, this read method will give you a stream like object, you cannot read the data you have been read.
-        """
         pass
 
 
@@ -408,17 +406,20 @@ class Response:
             for k, v in headers.items():
                 self.add_header(k, v)
 
+    @abstractmethod
     def send_error(self, status_code: int, message: str = ""):
         """abstruct method"""
-        raise Exception("Abstruct method, you cannot call this method directly.")
+        pass
 
+    @abstractmethod
     def send_redirect(self, url: str):
         """abstruct method"""
-        raise Exception("Abstruct method, you cannot call this method directly.")
+        pass
 
+    @abstractmethod
     def send_response(self):
         """abstruct method"""
-        raise Exception("Abstruct method, you cannot call this method directly.")
+        pass
 
 
 class HttpError(Exception):
@@ -477,10 +478,12 @@ class Cookie(http.cookies.Morsel):
 class FilterContex:
 
     @property
+    @abstractmethod
     def request(self) -> Request:
         return None
 
     @property
+    @abstractmethod
     def response(self) -> Response:
         return None
 
@@ -529,35 +532,45 @@ class WebsocketRequest:
 class WebsocketSession:
 
     @property
+    @abstractmethod
     def id(self) -> str:
         return ""
 
     @property
+    @abstractmethod
     def request(self) -> WebsocketRequest:
         return None
 
     @property
+    @abstractmethod
     def is_closed(self) -> bool:
         return False
 
+    @abstractmethod
     def send(self, message: Union[str, bytes], opcode: int = None, chunk_size: int = 0):
         pass
 
+    @abstractmethod
     def send_text(self, message: str, chunk_size: int = 0):
         pass
 
+    @abstractmethod
     def send_binary(self, binary: bytes, chunk_size: int = 0):
         pass
 
+    @abstractmethod
     def send_file(self, path: str, chunk_size: int = 0):
         pass
 
+    @abstractmethod
     def send_pone(self, message: bytes):
         pass
 
+    @abstractmethod
     def send_ping(self, message: bytes):
         pass
 
+    @abstractmethod
     def close(self, reason: str):
         pass
 
@@ -591,6 +604,7 @@ class WebsocketCloseReason(str):
 
 class WebsocketHandler:
 
+    @abstractmethod
     def on_handshake(self, request: WebsocketRequest = None):
         """
         "
@@ -605,6 +619,7 @@ class WebsocketHandler:
         """
         return None
 
+    @abstractmethod
     def on_open(self, session: WebsocketSession = None):
         """
         " 
@@ -613,6 +628,7 @@ class WebsocketHandler:
         """
         pass
 
+    @abstractmethod
     def on_close(self, session: WebsocketSession = None, reason: WebsocketCloseReason = None):
         """
         "
@@ -621,6 +637,7 @@ class WebsocketHandler:
         """
         pass
 
+    @abstractmethod
     def on_ping_message(self, session: WebsocketSession = None, message: bytes = b''):
         """
         "
@@ -629,6 +646,7 @@ class WebsocketHandler:
         """
         session.send_pone(message)
 
+    @abstractmethod
     def on_pong_message(self, session: WebsocketSession = None, message: bytes = ""):
         """
         "
@@ -637,6 +655,7 @@ class WebsocketHandler:
         """
         pass
 
+    @abstractmethod
     def on_text_message(self, session: WebsocketSession = None, message: str = ""):
         """
         "
@@ -645,6 +664,7 @@ class WebsocketHandler:
         """
         pass
 
+    @abstractmethod
     def on_binary_message(self, session: WebsocketSession = None, message: bytes = b''):
         """
         "
@@ -654,6 +674,7 @@ class WebsocketHandler:
         """
         pass
 
+    @abstractmethod
     def on_binary_frame(self, session: WebsocketSession = None, fin: bool = False, frame_payload: bytes = b''):
         """
         "
