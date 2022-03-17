@@ -663,12 +663,11 @@ class WebsocketHandler:
     def on_binary_frame(self, session: WebsocketSession = None, fin: bool = False, frame_payload: bytes = b''):
         """
         "
-        " If you are sending a continuation binary message to server, this will be called every time a frame is 
-        " received, you can consumed all the bytes in this method, e.g. save all bytes to a file. By doing so, 
-        " you should not return and value in this method. 
+        " When server receive a fragmented message, this method will be called every time when a frame is received, 
+        " you can consume all the bytes in this method, e.g. save all bytes to a file.  
         "
-        " If you does not implement this method or return a True in this method, all the bytes will be caced in
-        " memory and be sent to your `on_binary_message` method.
+        " If you does not implement this method or return a True in this method, all the bytes will be cached in
+        " memory and sent to your `on_binary_message` method after all frames are received.
         "
         """
         return True
