@@ -15,7 +15,7 @@ Python 3.7+
 * Lightway.
 * Functional programing.
 * Filter chain support.
-* Session support, and can support distributed session by [this extention](https://gitee.com/keijack/python-simple-http-server-redis-session).
+* Session support, and can support distributed session by [this extention](https://github.com/keijack/python-simple-http-server-redis-session).
 * Spring MVC like request mapping.
 * SSL support.
 * Websocket support
