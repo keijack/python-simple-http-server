@@ -33,7 +33,7 @@ from typing import Any, Dict, List, Tuple, Type, Union, Callable
 from .logger import get_logger
 
 name = "simple_http_server"
-version = "0.16.2"
+version = "0.16.3"
 
 DEFAULT_ENCODING: str = "UTF-8"
 
@@ -487,6 +487,7 @@ class WebsocketRequest:
         self.__cookies = Cookies()
         self.query_string: str = ""  # Query String
         self.path_values: Dict[str, str] = {}
+        self.reg_groups = ()  # If controller is matched via regexp, then ,all groups are save here
         self.path: str = ""  # Path
         self.__parameters = {}  # Parameters, key-value array, merged by query string and request body if the `Content-Type` in request header is `application/x-www-form-urlencoded` or `multipart/form-data`
         self.__parameter = {}  # Parameters, key-value, if more than one parameters with the same key, only the first one will be stored.
@@ -703,15 +704,14 @@ class ControllerFunction:
     def __init__(self, url: str = "",
                  regexp: str = "",
                  method: str = "",
-                 ctr_obj: object = None,
                  func: Callable = None) -> None:
         self.__url: str = url
         self.__regexp = regexp
         self.__method: str = method
-        self.singletion: bool = False
+        self.singleton: bool = False
         self.ctr_obj_init_args = None
         self.ctr_obj_init_kwargs = None
-        self.__ctr_obj: object = ctr_obj
+        self.__ctr_obj: object = None
         self.__func: Callable = func
         self.__clz = False
 
@@ -723,7 +723,7 @@ class ControllerFunction:
             assert self.func is not None and (inspect.isfunction(self.func) or inspect.ismethod(self.func))
             return True
         except AssertionError as ae:
-            _logger.warn(f"[{self._url}|{self.regexp}] => {self.func} configurate error: {ae}")
+            _logger.warn(f"[{self.__url}|{self.regexp}] => {self.func} configurate error: {ae}")
             return False
 
     @property
@@ -750,7 +750,7 @@ class ControllerFunction:
 
     @property
     def ctrl_object(self) -> object:
-        if not self.singletion:
+        if not self.singleton:
             obj = self._create_ctrl_obj()
             _logger.debug(f"singleton: create a object -> {obj}")
             return obj
@@ -774,6 +774,66 @@ class ControllerFunction:
         return self.__func
 
 
+class WebsocketHandlerClass:
+
+    def __init__(self, url: str = "",
+                 cls: Callable = None,
+                 regexp: str = "",
+                 singleton: bool = True
+                 ) -> None:
+        self.__url: str = url
+        self.__regexp = regexp
+        self.singleton: bool = singleton
+        self.ctr_obj_init_args = None
+        self.ctr_obj_init_kwargs = None
+        self.__ctr_obj: object = None
+        self.__cls: Callable = cls
+
+    @property
+    def _is_config_ok(self):
+        try:
+            assert self.url or self.regexp, "you should set one of url and regexp"
+            assert not (self.url and self.regexp), "you can only set one of url and regexp, not both"
+            assert self.cls is not None and inspect.isclass(self.cls)
+            return True
+        except AssertionError as ae:
+            _logger.warn(f"[{self.__url}|{self.regexp}] => {self.cls} configurate error: {ae}")
+            return False
+
+    @property
+    def url(self) -> str:
+        return self.__url
+
+    @property
+    def regexp(self) -> str:
+        return self.__regexp
+
+    @property
+    def cls(self) -> str:
+        return self.__cls
+
+    @property
+    def ctrl_object(self) -> object:
+        if not self.singleton:
+            obj = self._create_ctrl_obj()
+            _logger.debug(f"singleton: create a object -> {obj}")
+            return obj
+
+        if self.__ctr_obj is None:
+            self.__ctr_obj = self._create_ctrl_obj()
+            _logger.debug(f"object does not exist, create one -> {self.__ctr_obj} ")
+        else:
+            _logger.debug(f"object[{self.__ctr_obj}] exists, return. ")
+        return self.__ctr_obj
+
+    def _create_ctrl_obj(self) -> object:
+        return _create_object(self.cls, self.ctr_obj_init_args, self.ctr_obj_init_kwargs)
+
+    @ctrl_object.setter
+    def ctrl_object(self, val) -> None:
+        self.__ctr_obj = val
+
+
 _request_mappings: List[ControllerFunction] = []
 _request_clz_mapping: Dict[Any, Tuple[str, Union[str, list]]] = {}
 
@@ -782,7 +842,7 @@ _filters = []
 _ctrls = {}
 _ctrl_singletons = {}
 
-_ws_handlers = {}
+_ws_handlers: List[WebsocketHandlerClass] = []
 
 _error_page = OrderedDict()
 
@@ -871,9 +931,9 @@ def _get_singletion(clz, args, kwargs):
     return _ctrl_singletons[clz]
 
 
-def websocket_handler(endpoint=""):
+def websocket_handler(endpoint: str = "", regexp: str = "", singleton: bool = True) -> Callable:
     def map(ws_class):
-        _ws_handlers[endpoint] = ws_class
+        _ws_handlers.append(WebsocketHandlerClass(url=endpoint, regexp=regexp, cls=ws_class, singleton=singleton))
         return ws_class
 
     return map
@@ -906,7 +966,7 @@ def error_message(*anno_args):
         return map
 
 
-def _get_request_mappings():
+def _get_request_mappings() -> List[ControllerFunction]:
     mappings: List[ControllerFunction] = []
 
     for ctr_fun in _request_mappings:
@@ -943,7 +1003,7 @@ def _get_request_mappings():
         clz = ctr_fun.clz
         if clz is not None and clz in _ctrls:
             singleton, args, kwargs = _ctrls[clz]
-            ctr_fun.singletion = singleton
+            ctr_fun.singleton = singleton
             ctr_fun.ctr_obj_init_args = args
             ctr_fun.ctr_obj_init_kwargs = kwargs
             if singleton:
@@ -960,7 +1020,7 @@ def _get_session_factory() -> SessionFactory:
     return _session_facory
 
 
-def _get_websocket_handlers() -> Dict[str, Type]:
+def _get_websocket_handlers() -> List[WebsocketHandlerClass]:
     return _ws_handlers
 
 

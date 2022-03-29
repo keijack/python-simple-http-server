@@ -36,7 +36,7 @@ from uuid import uuid4
 from socket import error as SocketError
 
 from .logger import get_logger
-from simple_http_server import Headers, WebsocketCloseReason, WebsocketRequest, WebsocketSession, \
+from simple_http_server import Headers, WebsocketCloseReason, WebsocketHandlerClass, WebsocketRequest, WebsocketSession, \
     WEBSOCKET_OPCODE_BINARY, WEBSOCKET_OPCODE_CLOSE, WEBSOCKET_OPCODE_CONTINUATION, WEBSOCKET_OPCODE_PING, WEBSOCKET_OPCODE_PONG, WEBSOCKET_OPCODE_TEXT
 
 
@@ -123,15 +123,15 @@ class WebsocketRequestHandler:
         self.keep_alive = True
         self.handshake_done = False
 
-        handler_class, path_values = self.routing_conf.get_websocket_handler(
-            http_protocol_handler.request_path)
-        self.handler = handler_class() if handler_class else None
+        handler_class, path_values, regroups = self.routing_conf.get_websocket_handler(http_protocol_handler.request_path)
+        self.handler = handler_class.ctrl_object if handler_class else None
         self.ws_request = WebsocketRequest()
         self.ws_request.headers = http_protocol_handler.headers
         self.ws_request.path = http_protocol_handler.request_path
         self.ws_request.query_string = http_protocol_handler.query_string
         self.ws_request.parameters = http_protocol_handler.query_parameters
         self.ws_request.path_values = path_values
+        self.ws_request.reg_groups = regroups
         if "cookie" in self.ws_request.headers:
             self.ws_request.cookies.load(self.ws_request.headers["cookie"])
         elif "Cookie" in self.ws_request.headers:

@@ -43,7 +43,7 @@ from urllib.parse import unquote
 
 from typing import Any, Callable, Dict, List, Tuple
 
-from simple_http_server import ControllerFunction, StaticFile
+from simple_http_server import ControllerFunction, StaticFile, WebsocketHandlerClass
 from .http_protocol_handler import HttpProtocolHandler, SocketServerStreamRequestHandlerWraper
 from .wsgi_request_handler import WSGIRequestHandler
 
@@ -74,8 +74,9 @@ class RoutingConf:
         self._res_conf = []
         self.add_res_conf(res_conf)
 
-        self.ws_mapping = OrderedDict()
-        self.ws_path_val_mapping = OrderedDict()
+        self.ws_mapping: Dict[str, ControllerFunction] = OrderedDict()
+        self.ws_path_val_mapping: Dict[str, ControllerFunction] = OrderedDict()
+        self.ws_regx_mapping: Dict[str, ControllerFunction] = OrderedDict()
 
         self.error_page_mapping = {}
 
@@ -129,8 +130,7 @@ class RoutingConf:
             if path_pattern is None:
                 self.method_url_mapping[_method][_url] = ctrl
             else:
-                self.path_val_url_mapping[_method][path_pattern] = (
-                    ctrl, path_names)
+                self.path_val_url_mapping[_method][path_pattern] = (ctrl, path_names)
 
     def _res_(self, path, res_pre, res_dir):
         fpath = os.path.join(res_dir, path.replace(res_pre, ""))
@@ -177,9 +177,9 @@ class RoutingConf:
             return fun_and_val[0], fun_and_val[1], ()
 
         # regexp
-        func_and_groups = self.__try_get_from_regexp(path, method)
+        func_and_groups = self.__try_get_ctrl_from_regexp(path, method)
         if func_and_groups is None:
-            func_and_groups = self.__try_get_from_regexp(path, "_")
+            func_and_groups = self.__try_get_ctrl_from_regexp(path, "_")
         if func_and_groups is not None:
             return func_and_groups[0], {}, func_and_groups[1]
         # static files
@@ -190,13 +190,16 @@ class RoutingConf:
                 return ControllerFunction(func=static_fun), {}, ()
         return None, {}, ()
 
-    def __try_get_from_regexp(self, path, method):
+    def __try_get_ctrl_from_regexp(self, path, method):
         for regex, ctrl in self.method_regexp_mapping[method].items():
             m = re.match(regex, path)
+            m2 = re.match(regex, f"/{path}")
             _logger.debug(
                 f"regexp::pattern::[{regex}] => path::[{path}] match? {m is not None}")
             if m:
                 return ctrl, tuple([unquote(v) for v in m.groups()])
+            if m2:
+                return ctrl, tuple([unquote(v) for v in m2.groups()])
         return None
 
     def __try_get_from_path_val(self, path, method):
@@ -237,19 +240,43 @@ class RoutingConf:
                 available_filters.append(val)
         return available_filters
 
-    def map_websocket_handler(self, endpoint, handler_class):
-        url = remove_url_first_slash(endpoint)
-        path_pattern, path_names = get_path_reg_pattern(url)
-        if path_pattern is None:
-            self.ws_mapping[url] = handler_class
+    def map_websocket_handler(self, handler: WebsocketHandlerClass):
+        url = handler.url
+        regexp = handler.regexp
+        _logger.debug(f"map url {url}|{regexp} to controller class {handler.cls}")
+        if regexp:
+            self.ws_regx_mapping[regexp] = handler
         else:
-            self.ws_path_val_mapping[path_pattern] = (
-                handler_class, path_names)
+            url = remove_url_first_slash(url)
+            path_pattern, path_names = get_path_reg_pattern(url)
+            if path_pattern is None:
+                self.ws_mapping[url] = handler
+            else:
+                self.ws_path_val_mapping[path_pattern] = (handler, path_names)
 
     def get_websocket_handler(self, path):
+        # explicitly mapping
         if path in self.ws_mapping:
-            return self.ws_mapping[path], {}
-        return self.__try_get_ws_handler_from_path_val(path)
+            return self.ws_mapping[path], {}, ()
+
+        # path value mapping
+        handler, path_vals = self.__try_get_ws_handler_from_path_val(path)
+        if handler is not None:
+            return handler, path_vals, ()
+        # regexp mapping
+        return self.__try_get_ws_hanlder_from_regexp(path)
+
+    def __try_get_ws_hanlder_from_regexp(self, path):
+        for regex, handler in self.ws_regx_mapping.items():
+            m = re.match(regex, path)
+            m2 = re.match(regex, f"/{path}")
+            _logger.debug(
+                f"regexp::pattern::[{regex}] => path::[{path}] match? {m is not None}")
+            if m:
+                return handler, {}, tuple([unquote(v) for v in m.groups()])
+            if m2:
+                return handler, {}, tuple([unquote(v) for v in m2.groups()])
+        return None, {}, ()
 
     def __try_get_ws_handler_from_path_val(self, path):
         for patterns, val in self.ws_path_val_mapping.items():
@@ -257,12 +284,12 @@ class RoutingConf:
             _logger.debug(
                 f"websocket endpoint with path value::pattern::[{patterns}] => path::[{path}] match? {m is not None}")
             if m:
-                clz, path_names = val
+                handler, path_names = val
                 path_values = {}
                 for idx in range(len(path_names)):
                     key = unquote(path_names[idx])
                     path_values[key] = unquote(m.groups()[idx])
-                return clz, path_values
+                return handler, path_values
         return None, {}
 
     def map_error_page(self, code: str, error_page_fun: Callable):
@@ -455,8 +482,8 @@ class SimpleDispatcherHttpServer:
     def map_controller(self, ctrl: ControllerFunction):
         self.server.map_controller(ctrl)
 
-    def map_websocket_handler(self, endpoint, handler_class):
-        self.server.map_websocket_handler(endpoint, handler_class)
+    def map_websocket_handler(self, handler: WebsocketHandlerClass):
+        self.server.map_websocket_handler(handler)
 
     def map_error_page(self, code, func):
         self.server.map_error_page(code, func)

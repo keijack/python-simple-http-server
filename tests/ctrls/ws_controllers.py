@@ -4,6 +4,7 @@
 from dataclasses import is_dataclass
 import os
 import shutil
+from uuid import uuid4
 from simple_http_server import WebsocketCloseReason, WebsocketHandler, WebsocketRequest, WebsocketSession, websocket_handler
 import simple_http_server.logger as logger
 
@@ -13,6 +14,9 @@ _logger = logger.get_logger("ws_test")
 @websocket_handler(endpoint="/ws/{path_val}")
 class WSHandler(WebsocketHandler):
 
+    def __init__(self) -> None:
+        self.uuid: str = uuid4().hex
+
     def on_handshake(self, request: WebsocketRequest):
         return 0, {}
 
@@ -21,7 +25,7 @@ class WSHandler(WebsocketHandler):
         _logger.info(f">>{session.id}<< open! {session.request.path_values}")
 
     def on_text_message(self, session: WebsocketSession, message: str):
-        _logger.info(f">>{session.id}<< on text message: {message}")
+        _logger.info(f">>{session.id}::{self.uuid}<< on text message: {message}")
         session.send(f"{session.request.path_values['path_val']}-{message}")
 
     def on_close(self, session: WebsocketSession, reason: WebsocketCloseReason):
@@ -48,3 +52,15 @@ class WSHandler(WebsocketHandler):
             os.remove(tmp_file_path)
         else:
             shutil.rmtree(tmp_folder)
+
+
+@websocket_handler(regexp="^/websocket/([a-zA-Z0-9]+)", singleton=False)
+class WSRegHander(WebsocketHandler):
+
+    def __init__(self) -> None:
+        self.uuid: str = uuid4().hex
+
+    def on_text_message(self, session: WebsocketSession, message: str):
+        _logger.info(f">>{session.id}::{self.uuid}<< on text message: {message}")
+        _logger.info(f"{session.request.reg_groups}")
+        session.send(f"{session.request.reg_groups}-{message}")

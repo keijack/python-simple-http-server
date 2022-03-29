@@ -142,8 +142,8 @@ def start(host: str = "",
 
     ws_handlers = _get_websocket_handlers()
 
-    for endpoint, clz in ws_handlers.items():
-        _server.map_websocket_handler(endpoint, clz)
+    for wshandler in ws_handlers:
+        _server.map_websocket_handler(wshandler)
 
     err_pages = _get_error_pages()
     for code, func in err_pages.items():
@@ -284,8 +284,8 @@ def init_wsgi_proxy(resources: Dict[str, str] = {}, session_factory=None) -> htt
 
     ws_handlers = _get_websocket_handlers()
 
-    for endpoint, clz in ws_handlers.items():
-        proxy.map_websocket_handler(endpoint, clz)
+    for hander in ws_handlers:
+        proxy.map_websocket_handler(hander)
 
     err_pages = _get_error_pages()
     for code, func in err_pages.items():

@@ -575,8 +575,7 @@ class HTTPRequestHandler:
         req = await self.__prepare_request(mth)
         path = req._path
 
-        ctrl, req.path_values, req.reg_groups = self.routing_conf.get_url_controller(
-            path, mth)
+        ctrl, req.path_values, req.reg_groups = self.routing_conf.get_url_controller(path, mth)
 
         res = ResponseWrapper(self)
         if ctrl is None:

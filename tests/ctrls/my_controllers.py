@@ -18,7 +18,6 @@ from simple_http_server import MultipartFile
 from simple_http_server import Response
 from simple_http_server import Request
 from simple_http_server import Session
-from simple_http_server import filter_map
 from simple_http_server import request_map, route
 from simple_http_server import controller
 from simple_http_server import error_message
