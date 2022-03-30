@@ -182,6 +182,19 @@ class ThreadingServerTest(unittest.TestCase):
         assert txt == "binary-message-received, and this is some message for the long size."
         assert bs.decode() == bs2.decode() == msg0 + msg1 + msg2
 
+    def test_ws_regexp(self):
+        ws = websocket.WebSocket()
+        path_val = "wstest"
+        msg = 'hello, reg'
+
+        ws.connect(f"ws://127.0.0.1:{self.PORT}/ws-reg/{path_val}")
+        ws.send(msg)
+        
+        txt: str = ws.recv()
+        print(txt)
+        ws.close()
+        assert txt == f"{path_val}-{msg}"
+
 
 class CoroutineServerTest(ThreadingServerTest):
 

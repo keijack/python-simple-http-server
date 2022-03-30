@@ -54,7 +54,7 @@ class WSHandler(WebsocketHandler):
             shutil.rmtree(tmp_folder)
 
 
-@websocket_handler(regexp="^/websocket/([a-zA-Z0-9]+)", singleton=False)
+@websocket_handler(regexp="^/ws-reg/([a-zA-Z0-9]+)$", singleton=False)
 class WSRegHander(WebsocketHandler):
 
     def __init__(self) -> None:
@@ -63,4 +63,4 @@ class WSRegHander(WebsocketHandler):
     def on_text_message(self, session: WebsocketSession, message: str):
         _logger.info(f">>{session.id}::{self.uuid}<< on text message: {message}")
         _logger.info(f"{session.request.reg_groups}")
-        session.send(f"{session.request.reg_groups}-{message}")
+        session.send(f"{session.request.reg_groups[0]}-{message}")

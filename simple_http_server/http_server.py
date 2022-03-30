@@ -192,14 +192,11 @@ class RoutingConf:
 
     def __try_get_ctrl_from_regexp(self, path, method):
         for regex, ctrl in self.method_regexp_mapping[method].items():
-            m = re.match(regex, path)
-            m2 = re.match(regex, f"/{path}")
+            m = re.match(regex, f"/{path}") or re.match(regex, path)
             _logger.debug(
                 f"regexp::pattern::[{regex}] => path::[{path}] match? {m is not None}")
             if m:
                 return ctrl, tuple([unquote(v) for v in m.groups()])
-            if m2:
-                return ctrl, tuple([unquote(v) for v in m2.groups()])
         return None
 
     def __try_get_from_path_val(self, path, method):
@@ -268,14 +265,11 @@ class RoutingConf:
 
     def __try_get_ws_hanlder_from_regexp(self, path):
         for regex, handler in self.ws_regx_mapping.items():
-            m = re.match(regex, path)
-            m2 = re.match(regex, f"/{path}")
+            m = re.match(regex, f"/{path}") or re.match(regex, path)
             _logger.debug(
                 f"regexp::pattern::[{regex}] => path::[{path}] match? {m is not None}")
             if m:
                 return handler, {}, tuple([unquote(v) for v in m.groups()])
-            if m2:
-                return handler, {}, tuple([unquote(v) for v in m2.groups()])
         return None, {}, ()
 
     def __try_get_ws_handler_from_path_val(self, path):
