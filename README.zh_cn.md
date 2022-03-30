@@ -566,6 +566,12 @@ def redirect(res=Response()):
 ### Websocket
 
 
+由于 Websocket 有多种事件，使用函数作为配置很多情况下反而不够直观。在 Spring 框架里，其 Websocket 的配置实属不好用，远不如 J2EE（现在是 Jakarta EE [叹气]）好用直观，因此，在本框架实现时，参考了 J2EE 的实现方式。
+
+你需要使用类来处理 websocket 连接而非函数。并且你需要使用 `@websocket_handler` 来标识你的处理类。在你的处理类中，你需要按照制定的格式来定义处理 websocket 各事件的方法。最简单的方式是继承 `simple_http_server.WebsocketHandler` 类，实现其中你需要的事件方法（该继承并不是必需的）。
+
+你可以通过指定 `endpoint` 或者 `regexp` 来匹配需要处理的 url。另外，该装饰器还有一个 `singleton` 的配置，该配置默认为 `True`，所有的请求都会使用一个对象来处理。当你将这个字段设置为 `False` 后，系统将会为每个 `WebsocketSession` 创建一个独立的对象来处理请求。
+
 ```python
 from simple_http_server import WebsocketHandler, WebsocketRequest,WebsocketSession, websocket_handler
 
@@ -617,6 +623,13 @@ class WSHandler(WebsocketHandler):
         """
         _logger.info(f">>{session.id}<< on text message: {message}")
         session.send(message)
+
+@websocket_handler(regexp="^/ws-reg/([a-zA-Z0-9]+)$", singleton=False)
+class WSHandler(WebsocketHandler):
+
+    """
+    " 你的事件处理代码
+    """
 ```
 
 ### 自定义错误信息

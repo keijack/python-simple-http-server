@@ -354,6 +354,12 @@ There is an offical Redis implementation here: https://github.com/keijack/python
 
 ### Websocket
 
+To handle a websocket session, you should handle multiple events, so it's more reasonable to use a class rather than functions to do it. 
+
+In this framework, you should use `@websocket_handler` to decorate the class you want to handle websocket session. Specific event listener methods should be defined in a fixed way. However, the easiest way to do it is to inherit `simple_http_server.WebsocketHandler` class, and choose the event you want to implement. But this inheritance is not compulsory.
+
+You can configure `endpoit` or `regexp` in `@websocket_handler` to setup which url the class should handle. Alongside, there is a `singleton` field, which is set to `True` by default. Which means that all connections are handle by ONE object of this class. If this field is set to `False`, objects will be created when every `WebsocketSession` try to connect.
+
 ```python
 from simple_http_server import WebsocketHandler, WebsocketRequest,WebsocketSession, websocket_handler
 
@@ -437,6 +443,13 @@ class WSHandler(WebsocketHandler):
         "
         """
         return True
+
+@websocket_handler(regexp="^/ws-reg/([a-zA-Z0-9]+)$", singleton=False)
+class WSHandler(WebsocketHandler):
+
+    """
+    " You code here
+    """
 
 ```
 
