@@ -565,6 +565,12 @@ From `0.12.0`, you can use coroutine tasks than threads to handle requests, you 
 
 From `0.13.0`, coroutine mode uses the coroutine server, that means all requests will use the async I/O rather than block I/O. So you can now use `async def` to define all your controllers including the Websocket event callback methods.
 
+If you call the server starting in a async function, you can all its async version, by doing this, there sever will use the same event loop with your other async functions. 
+
+```python
+    await server.start_async(prefer_coroutine=True)
+```
+
 ## Logger
 
 The default logger is try to write logs to the screen, you can specify the logger handler to write it to a file.

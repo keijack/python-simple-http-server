@@ -763,6 +763,12 @@ if __name__ == "__main__":
 
 从 `0.13.0` 开始，协程模式下，整个服务器将使用协程提供的异步I/O来处理请求。所有，即使你可以使用 `asnyc def` 来定义你所有的控制器了，其中也包含了 websocket 相关的回调方法。
 
+如果你调用服务器启动的方法本身就是 `async def` 的，你可以使用启动函数的异步版本。
+
+```python
+    await server.start_async(prefer_coroutine=True)
+```
+
 ## 日志
 
 默认情况下，日志会输出到控制台，你创建自己的 Logging Handler 来将日志输出到别处，例如一个滚动文件中：
