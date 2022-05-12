@@ -24,6 +24,7 @@ SOFTWARE.
 """
 
 
+from abc import abstractmethod
 import json
 import socket
 import os
@@ -53,7 +54,7 @@ from .logger import get_logger
 _logger = get_logger("simple_http_server.http_server")
 
 
-class RoutingConf:
+class RoutingServer:
 
     HTTP_METHODS = ["OPTIONS", "GET", "HEAD",
                     "POST", "PUT", "DELETE", "TRACE", "CONNECT"]
@@ -130,7 +131,8 @@ class RoutingConf:
             if path_pattern is None:
                 self.method_url_mapping[_method][_url] = ctrl
             else:
-                self.path_val_url_mapping[_method][path_pattern] = (ctrl, path_names)
+                self.path_val_url_mapping[_method][path_pattern] = (
+                    ctrl, path_names)
 
     def _res_(self, path, res_pre, res_dir):
         fpath = os.path.join(res_dir, path.replace(res_pre, ""))
@@ -222,7 +224,8 @@ class RoutingConf:
             regexp = get_path_reg_pattern(path)[0]
             if not regexp:
                 regexp = f"^{path}$"
-        _logger.debug(f"[path: {path}] map url regexp {regexp} to function: {filter_fun}")
+        _logger.debug(
+            f"[path: {path}] map url regexp {regexp} to function: {filter_fun}")
         self.filter_mapping[regexp] = filter_fun
 
     def get_matched_filters(self, path):
@@ -232,7 +235,8 @@ class RoutingConf:
         available_filters = []
         for regexp, val in self.filter_mapping.items():
             m = re.match(regexp, path)
-            _logger.debug(f"filter:: [{regexp}], path:: [{path}] match? {m is not None}")
+            _logger.debug(
+                f"filter:: [{regexp}], path:: [{path}] match? {m is not None}")
             if m:
                 available_filters.append(val)
         return available_filters
@@ -240,7 +244,8 @@ class RoutingConf:
     def map_websocket_handler(self, handler: WebsocketHandlerClass):
         url = handler.url
         regexp = handler.regexp
-        _logger.debug(f"map url {url}|{regexp} to controller class {handler.cls}")
+        _logger.debug(
+            f"map url {url}|{regexp} to controller class {handler.cls}")
         if regexp:
             self.ws_regx_mapping[regexp] = handler
         else:
@@ -371,8 +376,20 @@ class RoutingConf:
         else:
             return func()
 
+    @abstractmethod
+    def start(self):
+        pass
 
-class HTTPServer(TCPServer, RoutingConf):
+    @abstractmethod
+    async def start_async(self):
+        pass
+
+    @abstractmethod
+    def shutdown(self):
+        pass
+
+
+class HTTPServer(TCPServer, RoutingServer):
 
     allow_reuse_address = 1    # Seems to make sense in testing environment
 
@@ -387,7 +404,7 @@ class HTTPServer(TCPServer, RoutingConf):
 
     def __init__(self, addr, res_conf={}, max_workers: int = None):
         TCPServer.__init__(self, addr, SocketServerStreamRequestHandlerWraper)
-        RoutingConf.__init__(self, res_conf)
+        RoutingServer.__init__(self, res_conf)
         self.max_workers = max_workers or self._default_max_workers
         self.threadpool: ThreadPoolExecutor = ThreadPoolExecutor(
             thread_name_prefix="ReqThread",
@@ -403,7 +420,8 @@ class HTTPServer(TCPServer, RoutingConf):
 
     # override
     def process_request(self, request, client_address):
-        self.threadpool.submit(self.process_request_thread, request, client_address)
+        self.threadpool.submit(
+            self.process_request_thread, request, client_address)
 
     def server_close(self):
         super().server_close()
@@ -411,6 +429,9 @@ class HTTPServer(TCPServer, RoutingConf):
 
     def start(self):
         self.serve_forever()
+
+    async def start_async(self):
+        self.start()
 
     def _shutdown(self) -> None:
         _logger.debug("shutdown http server in a seperate thread..")
@@ -420,10 +441,10 @@ class HTTPServer(TCPServer, RoutingConf):
         threading.Thread(target=self._shutdown, daemon=False).start()
 
 
-class CoroutineHTTPServer(RoutingConf):
+class CoroutineHTTPServer(RoutingServer):
 
     def __init__(self, host: str = '', port: int = 9090, ssl: SSLContext = None, res_conf={}) -> None:
-        RoutingConf.__init__(self, res_conf)
+        RoutingServer.__init__(self, res_conf)
         self.host: str = host
         self.port: int = port
         self.ssl: SSLContext = ssl
@@ -435,7 +456,7 @@ class CoroutineHTTPServer(RoutingConf):
         _logger.debug("Connection ends, close the writer.")
         writer.close()
 
-    async def start_server(self):
+    async def start_async(self):
         self.server = await asyncio.start_server(
             self.callback, host=self.host, port=self.port, ssl=self.ssl)
         async with self.server:
@@ -448,7 +469,7 @@ class CoroutineHTTPServer(RoutingConf):
                 await self.server.wait_closed()
 
     def start(self):
-        asyncio.run(self.start_server())
+        asyncio.run(self.start_async())
 
     def _shutdown(self):
         _logger.debug("Try to shutdown server.")
@@ -513,12 +534,15 @@ class SimpleDispatcherHttpServer:
             self.ssl_ctx = None
 
         if prefer_corountine:
-            _logger.info(f"Start server in corouting mode, listen to port: {self.host[1]}")
+            _logger.info(
+                f"Start server in corouting mode, listen to port: {self.host[1]}")
             self.server = CoroutineHTTPServer(
                 self.host[0], self.host[1], self.ssl_ctx, resources)
         else:
-            _logger.info(f"Start server in threading mixed mode, listen to port {self.host[1]}")
-            self.server = HTTPServer(self.host, resources, max_workers=max_workers)
+            _logger.info(
+                f"Start server in threading mixed mode, listen to port {self.host[1]}")
+            self.server = HTTPServer(
+                self.host, resources, max_workers=max_workers)
             if self.ssl_ctx:
                 self.server.socket = self.ssl_ctx.wrap_socket(
                     self.server.socket, server_side=True)
@@ -538,12 +562,20 @@ class SimpleDispatcherHttpServer:
             self.__ready = False
             raise
 
+    async def start_async(self):
+        try:
+            self.__ready = True
+            await self.server.start_async()
+        except:
+            self.__ready = False
+            raise
+
     def shutdown(self):
         # shutdown it in a seperate thread.
         self.server.shutdown()
 
 
-class WSGIProxy(RoutingConf):
+class WSGIProxy(RoutingServer):
 
     def __init__(self, res_conf):
         super().__init__(res_conf=res_conf)

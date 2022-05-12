@@ -41,7 +41,7 @@ from simple_http_server.logger import get_logger
 
 __logger = get_logger("simple_http_server.server")
 __lock = threading.Lock()
-_server = None
+_server: http_server.RoutingServer = None
 
 
 def _is_match(string="", regx=r""):
@@ -102,17 +102,17 @@ def scan(base_dir: str = "", regx: str = r"", project_dir: str = "") -> None:
         _import_module(mname)
 
 
-def start(host: str = "",
-          port: int = 9090,
-          ssl: bool = False,
-          ssl_protocol: int = PROTOCOL_TLS_SERVER,
-          ssl_check_hostname: bool = False,
-          keyfile: str = "",
-          certfile: str = "",
-          keypass: str = "",
-          ssl_context: SSLContext = None,
-          resources: Dict[str, str] = {},
-          prefer_coroutine=False) -> None:
+def _prepare_server(host: str = "",
+                    port: int = 9090,
+                    ssl: bool = False,
+                    ssl_protocol: int = PROTOCOL_TLS_SERVER,
+                    ssl_check_hostname: bool = False,
+                    keyfile: str = "",
+                    certfile: str = "",
+                    keypass: str = "",
+                    ssl_context: SSLContext = None,
+                    resources: Dict[str, str] = {},
+                    prefer_coroutine=False) -> None:
     with __lock:
         global _server
         if _server is not None:
@@ -149,8 +149,63 @@ def start(host: str = "",
     for code, func in err_pages.items():
         _server.map_error_page(code, func)
 
+
+def start(host: str = "",
+          port: int = 9090,
+          ssl: bool = False,
+          ssl_protocol: int = PROTOCOL_TLS_SERVER,
+          ssl_check_hostname: bool = False,
+          keyfile: str = "",
+          certfile: str = "",
+          keypass: str = "",
+          ssl_context: SSLContext = None,
+          resources: Dict[str, str] = {},
+          prefer_coroutine=False) -> None:
+    _prepare_server(
+        host=host,
+        port=port,
+        ssl=ssl,
+        ssl_protocol=ssl_protocol,
+        ssl_check_hostname=ssl_check_hostname,
+        keyfile=keyfile,
+        certfile=certfile,
+        keypass=keypass,
+        ssl_context=ssl_context,
+        resources=resources,
+        prefer_coroutine=prefer_coroutine
+    )
+
     # start the server
     _server.start()
+
+
+async def start_async(host: str = "",
+                      port: int = 9090,
+                      ssl: bool = False,
+                      ssl_protocol: int = PROTOCOL_TLS_SERVER,
+                      ssl_check_hostname: bool = False,
+                      keyfile: str = "",
+                      certfile: str = "",
+                      keypass: str = "",
+                      ssl_context: SSLContext = None,
+                      resources: Dict[str, str] = {},
+                      prefer_coroutine=False) -> None:
+    _prepare_server(
+        host=host,
+        port=port,
+        ssl=ssl,
+        ssl_protocol=ssl_protocol,
+        ssl_check_hostname=ssl_check_hostname,
+        keyfile=keyfile,
+        certfile=certfile,
+        keypass=keypass,
+        ssl_context=ssl_context,
+        resources=resources,
+        prefer_coroutine=prefer_coroutine
+    )
+
+    # start the server
+    await _server.start_async()
 
 
 def is_ready() -> bool:
