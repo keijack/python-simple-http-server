@@ -161,7 +161,7 @@ class HttpProtocolHandler:
                     "Bad HTTP/0.9 request type (%r)" % command)
                 return False
         self.command, self.path = command, path
-
+        
         self.request_path = self._get_request_path(self.path)
 
         self.query_string = self.__get_query_string(self.path)
@@ -170,7 +170,6 @@ class HttpProtocolHandler:
 
         # Examine the headers and look for a Connection directive.
         try:
-
             self.headers = await self.parse_headers()
         except http.client.LineTooLong as err:
             self.send_error(
@@ -412,6 +411,9 @@ class SocketServerStreamRequestHandlerWraper(socketserver.StreamRequestHandler, 
 
     def write_eof(self):
         self.wfile.flush()
+    
+    def close(self):
+        self.wfile.close()
 
     def handle(self) -> None:
         handler: HttpProtocolHandler = HttpProtocolHandler(

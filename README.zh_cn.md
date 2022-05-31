@@ -561,6 +561,16 @@ def say_hello(res=Response()):
 @request_map("/")
 def redirect(res=Response()):
     res.send_redirect("/index")
+
+@route("/res/write/bytes")
+def res_writer(response: Response):
+    # 你也可以通过 response 对象分段写入数据。
+    response.status_code = 200
+    response.add_header("Content-Type", "application/octet-stream")
+    response.write_bytes(b'abcd')
+    response.write_bytes(bytearray(b'efg'))
+    response.close()
+    
 ```
 
 ### Websocket

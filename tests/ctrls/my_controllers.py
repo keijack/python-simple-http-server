@@ -270,7 +270,6 @@ curl -X PUT --data-binary "@/data1/clamav/scan/trojans/000.exe" \
     http://10.0.2.16:9090/put/file
 """
 
-
 @request_map("/put/file", method="PUT")
 async def reader_test(
         content_type: Header = Header("Content-Type"),
@@ -289,3 +288,13 @@ async def reader_test(
                 break
             outfile.write(data)
     return None
+
+
+@route("/res/write/bytes")
+def res_writer(response: Response):
+    response.status_code = 200
+    response.add_header("Content-Type", "application/octet-stream")
+    response.write_bytes(b'abcd')
+    response.write_bytes(bytearray(b'efg'))
+    response.close()
+    

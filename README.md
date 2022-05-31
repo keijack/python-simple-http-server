@@ -87,6 +87,7 @@ def show_upload():
     root = os.path.dirname(os.path.abspath(__file__))
     return StaticFile("%s/my_dev/my_test_index.html" % root, "text/html; charset=utf-8")
 
+
 @request_map("/upload", method="POST")
 def my_upload(img=MultipartFile("img")):
     root = os.path.dirname(os.path.abspath(__file__))
@@ -170,6 +171,14 @@ async def say(sth: str = ""):
 @request_map("/中文/coroutine")
 async def coroutine_ctrl(hey: str = "Hey!"):
     return await say(hey)
+
+@route("/res/write/bytes")
+def res_writer(response: Response):
+    response.status_code = 200
+    response.add_header("Content-Type", "application/octet-stream")
+    response.write_bytes(b'abcd')
+    response.write_bytes(bytearray(b'efg'))
+    response.close()
 ```
 
 Beside using the default values, you can also use variable annotations to specify your controller function's variables.

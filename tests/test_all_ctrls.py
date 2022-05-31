@@ -131,6 +131,11 @@ class ThreadingServerTest(unittest.TestCase):
             _logger.info(error_msg)
             assert error_msg == '500-Internal Server Error-some error occurs!'
 
+    
+    def test_res_write_bytes(self):
+        body = self.visit("res/write/bytes")
+        assert body == 'abcdefg'
+
     def test_ws(self):
         ws = websocket.WebSocket()
         path_val = "test-ws"
@@ -189,7 +194,7 @@ class ThreadingServerTest(unittest.TestCase):
 
         ws.connect(f"ws://127.0.0.1:{self.PORT}/ws-reg/{path_val}")
         ws.send(msg)
-        
+
         txt: str = ws.recv()
         print(txt)
         ws.close()

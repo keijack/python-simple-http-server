@@ -126,6 +126,7 @@ class ResponseWrapper(Response):
         super().__init__(status_code=status_code, headers=headers, body="")
         self.__req_handler = handler
         self.__is_sent = False
+        self.__header_sent = False
         self.__send_lock__ = threading.Lock()
 
     @property
@@ -150,7 +151,8 @@ class ResponseWrapper(Response):
             self.__send_response()
 
     def __send_response(self):
-        assert not self.__is_sent, "This response has benn sent"
+        assert not self.__is_sent and not self.__header_sent, "This response has benn sent"
+        self.__header_sent = True
         self.__is_sent = True
         self.__req_handler._send_response({
             "status_code": self.status_code,
@@ -158,6 +160,22 @@ class ResponseWrapper(Response):
             "cookies": self.cookies,
             "body": self.body
         })
+
+    def __send_headers(self):
+        if not self.__header_sent:
+            self.__header_sent = True
+            self.__req_handler._send_res_headers(self.status_code, headers=self.headers, cks=self.cookies)
+
+    def write_bytes(self, data: bytes):
+        assert not self.__is_sent, "This response has benn sent"
+        assert isinstance(data, bytes) or isinstance(data, bytearray), "You can "
+        self.__send_headers()
+        self.__req_handler.writer.write(data)
+
+    def close(self):
+        self.__is_sent = True
+        self.__req_handler.writer.write_eof()
+        self.__req_handler.writer.close()
 
 
 class FilterContexImpl(FilterContex):
@@ -276,7 +294,7 @@ class FilterContexImpl(FilterContex):
                 headers.update(item)
             elif isinstance(item, cookies.BaseCookie):
                 cks.update(item)
-            elif type(item) in (str, dict, StaticFile, bytes):
+            elif type(item) in (str, dict, StaticFile, bytes, bytearray):
                 if body is None:
                     body = item
         return status_code, headers, cks, body
@@ -715,7 +733,7 @@ class HTTPRequestHandler:
         except HttpError as e:
             self.send_error(e.code, e.message, e.explain)
 
-    def _send_res(self, status_code: int, headers: Dict[str, str] = {}, content_type: str = "", cks: Cookies = Cookies(), body: Union[str, bytes, StaticFile] = None):
+    def __send_res_headers(self, status_code: int, headers: Dict[str, str] = {}, content_type: str = "", cks: Cookies = Cookies()):
         if "Content-Type" not in headers.keys() and "content-type" not in headers.keys():
             headers["Content-Type"] = content_type
 
@@ -733,6 +751,16 @@ class HTTPRequestHandler:
             ck = cks[k]
             self.send_header("Set-Cookie", ck.OutputString())
 
+    def _send_res_headers(self, *args, **kwargs):
+        """
+        " For response object to send and writer headers.
+        """
+        self.__send_res_headers(*args, **kwargs)
+        self.end_headers()
+
+    def _send_res(self, status_code: int, headers: Dict[str, str] = {}, content_type: str = "", cks: Cookies = Cookies(), body: Union[str, bytes, bytearray, StaticFile] = None):
+        self.__send_res_headers(status_code, headers, content_type, cks)
+
         if body is None:
             self.send_header("Content-Length", 0)
             self.end_headers()
@@ -742,7 +770,7 @@ class HTTPRequestHandler:
             self.end_headers()
             self.writer.write(data)
 
-        elif isinstance(body, bytes):
+        elif isinstance(body, bytes) or isinstance(body, bytearray):
             self.send_header("Content-Length", len(body))
             self.end_headers()
             self.writer.write(body)
