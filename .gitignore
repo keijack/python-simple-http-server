@@ -106,7 +106,6 @@ v1/
 .mypy_cache/
 
 # for development only
-my_test_main.py
 my_dev/
 upload.sh
 
