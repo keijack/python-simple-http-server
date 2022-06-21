@@ -189,7 +189,7 @@ async def start_async(host: str = "",
                       keypass: str = "",
                       ssl_context: SSLContext = None,
                       resources: Dict[str, str] = {},
-                      prefer_coroutine=False) -> None:
+                      prefer_coroutine=True) -> None:
     _prepare_server(
         host=host,
         port=port,

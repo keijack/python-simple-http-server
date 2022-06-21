@@ -106,8 +106,8 @@ v1/
 .mypy_cache/
 
 # for development only
-my_dev/
 upload.sh
+tests/certs/
 
 # vscode
 .vscode/
