@@ -161,7 +161,7 @@ class HttpProtocolHandler:
                     "Bad HTTP/0.9 request type (%r)" % command)
                 return False
         self.command, self.path = command, path
-        
+
         self.request_path = self._get_request_path(self.path)
 
         self.query_string = self.__get_query_string(self.path)
@@ -387,7 +387,8 @@ class HttpProtocolHandler:
         try:
             http_request_handler = HTTPRequestHandler(self)
             await http_request_handler.handle_request()
-            self.writer.write_eof()
+            if self.writer.can_write_eof():
+                self.writer.write_eof()
         except socket.timeout as e:
             # a read or a write timed out.  Discard this connection
             self.log_error("Request timed out: %r", e)
@@ -409,9 +410,12 @@ class SocketServerStreamRequestHandlerWraper(socketserver.StreamRequestHandler, 
     def write(self, data: bytes):
         self.wfile.write(data)
 
+    def can_write_eof(self) -> bool:
+        return True
+
     def write_eof(self):
         self.wfile.flush()
-    
+
     def close(self):
         self.wfile.close()
 

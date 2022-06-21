@@ -33,7 +33,7 @@ from typing import Any, Dict, List, Tuple, Union, Callable
 from .logger import get_logger
 
 name = "simple_http_server"
-version = "0.17.0"
+version = "0.17.1"
 
 DEFAULT_ENCODING: str = "UTF-8"
 
@@ -372,7 +372,8 @@ class Response:
             or isinstance(val, str) \
             or isinstance(val, dict) \
             or isinstance(val, StaticFile) \
-            or isinstance(val, bytes), \
+            or isinstance(val, bytes) \
+            or isinstance(val, bytearray), \
             "Body type is not supported."
         self.__body = val
 
