@@ -216,9 +216,11 @@ def stop() -> None:
     with __lock:
         global _server
         if _server is not None:
-            __logger.info("shutting down server...")
+            __logger.info("Shutting down server...")
             _server.shutdown()
             _server = None
+        else:
+            __logger.warn("Server is not ready yet.")
 
 
 @request_map("/favicon.ico")

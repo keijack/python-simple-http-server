@@ -1,6 +1,7 @@
 
 import os
 import signal
+from threading import Thread
 import simple_http_server.server as server
 
 
@@ -20,39 +21,42 @@ def stop():
 set_level("DEBUG")
 
 _logger = get_logger("http_test")
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 
 
 def start_server():
     _logger.info("start server in background. ")
-    root = os.path.dirname(os.path.abspath(__file__))
-    server.scan(base_dir="tests/ctrls",
-                regx=r'.*controllers.*')
-    print(root)
+    server.scan(base_dir="tests/ctrls", regx=r'.*controllers.*')
     server.start(
         port=9443,
-        resources={"/public/*": f"{root}/tests/static"},
+        resources={"/public/*": f"{PROJECT_ROOT}/tests/static"},
         ssl=True,
-        certfile=f"{root}/tests/certs/fullchain.pem",
-        keyfile=f"{root}/tests/certs//privkey.pem",
+        certfile=f"{PROJECT_ROOT}/tests/certs/fullchain.pem",
+        keyfile=f"{PROJECT_ROOT}/tests/certs//privkey.pem",
         prefer_coroutine=True)
+
+
+wsgi_server: WSGIServer = None
 
 
 def start_server_wsgi():
     _logger.info("start server in background. ")
-    root = os.path.dirname(os.path.abspath(__file__))
     server.scan(base_dir="tests/ctrls", regx=r'.*controllers.*')
     wsgi_proxy = server.init_wsgi_proxy(
-        resources={"/public/*": f"{root}/tests/static"})
+        resources={"/public/*": f"{PROJECT_ROOT}/tests/static"})
 
-    def wsgi_simple_app(environment, start_response):
-        return wsgi_proxy.app_proxy(environment, start_response)
-    httpd: WSGIServer = make_server("", 9090, wsgi_simple_app)
-    httpd.serve_forever()
+    global wsgi_server
+    wsgi_server = make_server("", 9090, wsgi_proxy.app_proxy)
+    wsgi_server.serve_forever()
 
 
 def on_sig_term(signum, frame):
-    _logger.info(f"Receive signal [{signum}], stop server now...")
-    server.stop()
+    if wsgi_server:
+        _logger.info(f"Receive signal [{signum}], shutdown the wsgi server...")
+        Thread(target=wsgi_server.shutdown).start()
+    else:
+        _logger.info(f"Receive signal [{signum}], stop server now...")
+        server.stop()
 
 
 if __name__ == "__main__":
@@ -60,3 +64,4 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, on_sig_term)
 
     start_server()
+    # start_server_wsgi()
