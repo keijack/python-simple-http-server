@@ -32,7 +32,7 @@ _logger = logger.get_logger("controller")
 
 
 @request_map("/")
-@request_map("/index")
+@request_map("/index", params="a!=b")
 def my_ctrl():
     return {"code": 0, "message": "success"}  # You can return a dictionary, a string or a `simple_http_server.simple_http_server.Response` object.
 
@@ -270,6 +270,7 @@ curl -X PUT --data-binary "@/data1/clamav/scan/trojans/000.exe" \
     http://10.0.2.16:9090/put/file
 """
 
+
 @request_map("/put/file", method="PUT")
 async def reader_test(
         content_type: Header = Header("Content-Type"),
@@ -297,4 +298,3 @@ def res_writer(response: Response):
     response.write_bytes(b'abcd')
     response.write_bytes(bytearray(b'efg'))
     response.close()
-    

@@ -111,3 +111,4 @@ tests/certs/
 
 # vscode
 .vscode/
+**/tmp/**

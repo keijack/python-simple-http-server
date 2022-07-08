@@ -2,14 +2,14 @@
 import os
 import signal
 from threading import Thread
+from simple_http_server.logger import get_logger, set_level
+set_level("DEBUG")
+
 import simple_http_server.server as server
 
 
 from wsgiref.simple_server import WSGIServer, make_server
 from simple_http_server import request_map
-
-
-from simple_http_server.logger import get_logger, set_level
 
 
 @request_map("/stop")
@@ -18,22 +18,27 @@ def stop():
     return "<!DOCTYPE html><html><head><title>关闭</title></head><body>关闭成功！</body></html>"
 
 
-set_level("DEBUG")
+
 
 _logger = get_logger("http_test")
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 
 
+def index_page():
+    return "<!DOCTYPE html><html><head><title>你好</title></head><body>你好，世界！</body></html>"
+
 def start_server():
     _logger.info("start server in background. ")
     server.scan(base_dir="tests/ctrls", regx=r'.*controllers.*')
+    request_map(url="/index2", method="GET", params="a!=b")(index_page)
     server.start(
-        port=9443,
+        # port=9443,
+        port=9090,
         resources={"/public/*": f"{PROJECT_ROOT}/tests/static"},
-        ssl=True,
-        certfile=f"{PROJECT_ROOT}/tests/certs/fullchain.pem",
-        keyfile=f"{PROJECT_ROOT}/tests/certs//privkey.pem",
-        prefer_coroutine=True)
+        # ssl=True,
+        # certfile=f"{PROJECT_ROOT}/tests/certs/fullchain.pem",
+        # keyfile=f"{PROJECT_ROOT}/tests/certs//privkey.pem",
+        prefer_coroutine=False)
 
 
 wsgi_server: WSGIServer = None

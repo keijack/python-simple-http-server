@@ -33,7 +33,7 @@ from typing import Any, Dict, List, Tuple, Union, Callable
 from .logger import get_logger
 
 name = "simple_http_server"
-version = "0.17.2"
+version = "0.18.0"
 
 DEFAULT_ENCODING: str = "UTF-8"
 
@@ -604,10 +604,10 @@ class WebsocketHandler:
         """
         "
         " You can get path/headers/path_values/cookies/query_string/query_parameters from request.
-        " 
+        "
         " You should return a tuple means (http_status_code, headers)
         "
-        " If status code in (0, None, 101), the websocket will be connected, or will return the status you return. 
+        " If status code in (0, None, 101), the websocket will be connected, or will return the status you return.
         "
         " All headers will be send to client
         "
@@ -617,7 +617,7 @@ class WebsocketHandler:
     @abstractmethod
     def on_open(self, session: WebsocketSession = None):
         """
-        " 
+        "
         " Will be called when the connection opened.
         "
         """
@@ -663,7 +663,7 @@ class WebsocketHandler:
     def on_binary_message(self, session: WebsocketSession = None, message: bytes = b''):
         """
         "
-        " Will be called when receive a binary message if you have not consumed all the bytes in `on_binary_frame` 
+        " Will be called when receive a binary message if you have not consumed all the bytes in `on_binary_frame`
         " method.
         "
         """
@@ -673,8 +673,8 @@ class WebsocketHandler:
     def on_binary_frame(self, session: WebsocketSession = None, fin: bool = False, frame_payload: bytes = b''):
         """
         "
-        " When server receive a fragmented message, this method will be called every time when a frame is received, 
-        " you can consume all the bytes in this method, e.g. save all bytes to a file.  
+        " When server receive a fragmented message, this method will be called every time when a frame is received,
+        " you can consume all the bytes in this method, e.g. save all bytes to a file.
         "
         " If you does not implement this method or return a True in this method, all the bytes will be cached in
         " memory and sent to your `on_binary_message` method after all frames are received.
@@ -713,6 +713,10 @@ class ControllerFunction:
     def __init__(self, url: str = "",
                  regexp: str = "",
                  method: str = "",
+                 headers: List[str] = [],
+                 match_all_headers_expressions: bool = None,
+                 params: List[str] = [],
+                 match_all_params_expressions: bool = None,
                  func: Callable = None) -> None:
         self.__url: str = url
         self.__regexp = regexp
@@ -723,6 +727,18 @@ class ControllerFunction:
         self.__ctr_obj: object = None
         self.__func: Callable = func
         self.__clz = False
+        self.headers: List[str] = headers if isinstance(headers, list) else [headers]
+        self._match_all_headers_expressions: bool = match_all_headers_expressions,
+        self.params: List[str] = params if isinstance(params, list) else [params]
+        self._match_all_params_expressions: bool = match_all_params_expressions
+
+    @property
+    def match_all_headers_expressions(self):
+        return self._match_all_headers_expressions if self._match_all_headers_expressions is not None else True
+
+    @property
+    def match_all_params_expressions(self):
+        return self._match_all_params_expressions if self._match_all_params_expressions is not None else True
 
     @property
     def _is_config_ok(self):
@@ -844,7 +860,7 @@ class WebsocketHandlerClass:
 
 
 _request_mappings: List[ControllerFunction] = []
-_request_clz_mapping: Dict[Any, Tuple[str, Union[str, list]]] = {}
+_request_clz_mapping: Dict[Any, ControllerFunction] = {}
 
 _filters = []
 
@@ -868,7 +884,14 @@ def controller(*anno_args, singleton: bool = True, args: List[Any] = [], kwargs:
     return map
 
 
-def request_map(*anno_args, url: str = "", regexp: str = "", method: Union[str, list, tuple] = "") -> Callable:
+def request_map(*anno_args,
+                url: str = "",
+                regexp: str = "",
+                method: Union[str, list, tuple] = "",
+                headers: Union[str, List[str]] = "",
+                match_all_headers_expressions: bool = None,
+                params: Union[str, List[str]] = "",
+                match_all_params_expressions: bool = None) -> Callable:
     _url = url
     len_args = len(anno_args)
     assert len_args <= 1
@@ -890,12 +913,30 @@ def request_map(*anno_args, url: str = "", regexp: str = "", method: Union[str, 
             mths = [m.strip() for m in method.split(',')]
 
         if inspect.isclass(ctrl):
-            _request_clz_mapping[ctrl] = (_url, mths)
+            _request_clz_mapping[ctrl] = ControllerFunction(url=_url,
+                                                            regexp=regexp,
+                                                            method=mths,
+                                                            headers=hs,
+                                                            match_all_headers_expressions=match_all_headers_expressions,
+                                                            params=ps,
+                                                            match_all_params_expressions=match_all_params_expressions,
+                                                            func=ctrl)
+
             return ctrl
 
         for mth in mths:
-            _logger.debug(f"map url {_url} with method[{mth}] to function {ctrl}. ")
-            _request_mappings.append(ControllerFunction(url=_url, regexp=regexp, method=mth, func=ctrl))
+            hs = headers if isinstance(headers, list) else [headers]
+            ps = params if isinstance(params, list) else [params]
+            cf = ControllerFunction(url=_url,
+                                    regexp=regexp,
+                                    method=mth,
+                                    headers=hs,
+                                    match_all_headers_expressions=match_all_headers_expressions,
+                                    params=ps,
+                                    match_all_params_expressions=match_all_params_expressions,
+                                    func=ctrl)
+            _logger.debug(f"map url {_url} with method[{mth}] to function {ctrl}. with headers {cf.headers} and params {cf.params}")
+            _request_mappings.append(cf)
         # return the original function, so you can use a decoration chain
         return ctrl
 
@@ -981,7 +1022,9 @@ def _get_request_mappings() -> List[ControllerFunction]:
     for ctr_fun in _request_mappings:
         clz = ctr_fun.clz
         if clz is not None and clz in _request_clz_mapping:
-            clz_url, methods = _request_clz_mapping[clz]
+            clz_ctrl = _request_clz_mapping[clz]
+            clz_url = clz_ctrl.url
+            methods = clz_ctrl.method
 
             if ctr_fun.regexp:
                 full_url = ctr_fun.url
@@ -996,13 +1039,31 @@ def _get_request_mappings() -> List[ControllerFunction]:
                 else:
                     full_url = clz_url
 
+            hs = ctr_fun.headers + clz_ctrl.headers
+            mhs = ctr_fun._match_all_headers_expressions if ctr_fun._match_all_headers_expressions is not None else clz_ctrl._match_all_headers_expressions
+            ps = ctr_fun.params + clz_ctrl.params
+            mps = ctr_fun._match_all_params_expressions if ctr_fun._match_all_params_expressions is not None else clz_ctrl._match_all_params_expressions
             if not ctr_fun.method and methods:
                 for mth in methods:
                     _logger.debug(f"map url {full_url} included [{clz_url}] with method[{mth}] to function {ctr_fun.func}. ")
-                    mappings.append(ControllerFunction(url=full_url, regexp=ctr_fun.regexp, method=mth, func=ctr_fun.func))
+                    mappings.append(ControllerFunction(url=full_url,
+                                                       regexp=ctr_fun.regexp,
+                                                       method=mth,
+                                                       func=ctr_fun.func,
+                                                       headers=hs,
+                                                       match_all_headers_expressions=mhs,
+                                                       params=ps,
+                                                       match_all_params_expressions=mps))
             else:
                 _logger.debug(f"map url {full_url} included [{clz_url}] with method[{ctr_fun.method}] to function {ctr_fun.func}. ")
-                mappings.append(ControllerFunction(url=full_url, regexp=ctr_fun.regexp, method=ctr_fun.method, func=ctr_fun.func))
+                mappings.append(ControllerFunction(url=full_url,
+                                                   regexp=ctr_fun.regexp,
+                                                   method=ctr_fun.method,
+                                                   func=ctr_fun.func,
+                                                   headers=hs,
+                                                   match_all_headers_expressions=mhs,
+                                                   params=ps,
+                                                   match_all_params_expressions=mps))
         else:
             mappings.append(ctr_fun)
 

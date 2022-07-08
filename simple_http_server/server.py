@@ -39,7 +39,7 @@ from simple_http_server import request_map
 from simple_http_server.logger import get_logger
 
 
-__logger = get_logger("simple_http_server.server")
+_logger = get_logger("simple_http_server.server")
 __lock = threading.Lock()
 _server: http_server.RoutingServer = None
 
@@ -84,7 +84,7 @@ def _import_module(mname):
     try:
         importlib.import_module(mname)
     except:
-        __logger.warning(f"Import moudle [{mname}] error!")
+        _logger.warning(f"Import moudle [{mname}] error!")
 
 
 def scan(base_dir: str = "", regx: str = r"", project_dir: str = "") -> None:
@@ -98,7 +98,7 @@ def scan(base_dir: str = "", regx: str = r"", project_dir: str = "") -> None:
     modules = _load_all_modules(work_dir, base_dir, regx)
 
     for mname in modules:
-        __logger.info(f"Import controllers from module: {mname}")
+        _logger.info(f"Import controllers from module: {mname}")
         _import_module(mname)
 
 
@@ -216,11 +216,11 @@ def stop() -> None:
     with __lock:
         global _server
         if _server is not None:
-            __logger.info("Shutting down server...")
+            _logger.info("Shutting down server...")
             _server.shutdown()
             _server = None
         else:
-            __logger.warn("Server is not ready yet.")
+            _logger.warn("Server is not ready yet.")
 
 
 @request_map("/favicon.ico")

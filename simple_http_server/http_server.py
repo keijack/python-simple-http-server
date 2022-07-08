@@ -119,7 +119,7 @@ class RoutingServer:
         regexp = ctrl.regexp
         method = ctrl.method
         _logger.debug(
-            f"map url {url}|{regexp} with method[{method}] to function {ctrl.func}. ")
+            f"map url {url}|{regexp} with method::{method}, headers::{ctrl.headers} and params::{ctrl.params} to function {ctrl.func}. ")
         assert method is None or method == "" or method.upper() in self.HTTP_METHODS
         _method = method.upper() if method is not None and method != "" else "_"
         if regexp:

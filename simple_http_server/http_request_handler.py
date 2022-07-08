@@ -587,6 +587,66 @@ class HTTPRequestHandler:
         self.writer = http_protocol_handler.writer
         self.environment: Dict[str, Any] = environment
 
+    def __match_one_exp(self, d: Dict[str, Union[List[str], str]], exp: str, where: str) -> bool:
+        if not exp:
+            return True
+        _logger.debug(f"Match controller {where} expression [{exp}] for values: {d}. ")
+        exp_ = str(exp)
+        if exp_.find("=") < 0:
+            _logger.debug(f"cannot find = in exp {exp}")
+            if exp_.startswith('!'):
+                return not exp_[1:] in d.keys()
+            else:
+                return exp_ in d.keys()
+        idx = exp_.find("!=")
+        if idx > 0:
+            k, v = utils.break_into(exp_, '!=')
+            if k not in d.keys():
+                _logger.debug(f"{k} is not in {d}")
+                return False
+            dvals = d[k]
+            if isinstance(dvals, str):
+                dvals = [dvals]
+            for dv in dvals:
+                if dv == v:
+                    _logger.debug(f"There is a {dv} is not in {d}")
+                    return False
+            return True
+
+        idx = exp_.find('=')
+        if idx > 0:
+            k, v = utils.break_into(exp_, '=')
+            if k not in d.keys():
+                return False
+            dvals = d[k]
+            if isinstance(dvals, str):
+                dvals = [dvals]
+            for dv in dvals:
+                if dv == v:
+                    return True
+            return False
+
+        _logger.error(f"Controller {where} expression [{exp}] is not valied, returning False...")
+        return False
+
+    def __match_exps(self, d: Dict[str, Union[List[str], str]], exps: List[str], all: bool, where: str) -> bool:
+        if not exps:
+            return True
+
+        for exp in exps:
+            res = self.__match_one_exp(d, exp, where)
+            if all and not res:
+                return False
+            if not all and res:  # match one
+                return True
+        # return if all True else False
+        return all
+
+    def __is_req_match_ctl(self, req: RequestWrapper, ctrl: ControllerFunction) -> bool:
+        _logger.debug(f"{ctrl.headers} - {ctrl.params}")
+        return self.__match_exps(req.headers, ctrl.headers, ctrl.match_all_headers_expressions, 'headers') \
+            and self.__match_exps(req.parameters, ctrl.params, ctrl.match_all_params_expressions, 'params')
+
     async def handle_request(self):
         mth = self.method.upper()
 
@@ -596,7 +656,7 @@ class HTTPRequestHandler:
         ctrl, req.path_values, req.reg_groups = self.routing_conf.get_url_controller(path, mth)
 
         res = ResponseWrapper(self)
-        if ctrl is None:
+        if ctrl is None or not self.__is_req_match_ctl(req, ctrl):
             res.send_error(404, "Controller Not Found",
                            "Cannot find a controller for your path")
         else:
