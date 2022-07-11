@@ -371,6 +371,44 @@ def star_path(path_val=PathValue()): # 你可以通过 PathValue 通配符取得
     return f"<html><body>{path_val}</body></html>"
 ```
 
+你可以在 `@request_map` 中使用 `headers` 以及 `params` 参数来限制控制器的匹配。以下例子说明了 `params` 参数，`headers` 参数基本相同，不再赘述。
+
+```python
+# 使用等式过滤，当访问不带 a 参数，或者带 a 参数但是结果不是 b 的时候，不会进入该控制器。
+@request("/exact_params", method="GET", params="a=b")
+def exact_params(a: str):
+    print(f"{a}") # b
+    return {"result": "ok"}
+
+# 使用不等式过滤，当访问不带 a 参数，或者 a 参数的结果是 b 时，不会进入该控制器。
+@request("/exact_params", method="GET", params="a!=b")
+def exact_not_params(a: str):
+    print(f"{a}") # b
+    return {"result": "ok"}
+
+# 使用非包含过滤，当参数包含 a 参数时，不会进入该控制器。
+@request("/exact_params", method="GET", params="!a")
+def no_params():
+    return {"result": "ok"}
+
+# 必须包含 a 参数才进入该控制器
+@request("/exact_params", method="GET", params="a")
+def must_has_params():
+    return {"result": "ok"}
+
+# 多表达式匹配，默认请求满足所有表达式才能进入该控制器。
+@request("/exact_params", method="GET", params=["a=b", "c!=d"])
+def multipul_params():
+    return {"result": "ok"}
+
+# 多表达式匹配，默认请求满足所有表达式才能进入该控制器，你也通过参数 `match_all_params_expressions` 设置为 False，该情况下，匹配通过其中一个表达式就会进入该控制器。
+@request("/exact_params", method="GET", params=["a=b", "c!=d"], match_all_params_expressions=False)
+def multipul_params():
+    return {"result": "ok"}
+```
+
+如果是在控制器类中使用，将会取类参表达式会与控制器方法的表达式的并集进行匹配。
+
 在控制器类中使用正则表达式的 request_map:
 
 ```python

@@ -22,7 +22,7 @@ PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 @controller
 @request_map(url="/page", params="a=b")
 class IndexPage:
-    @request_map("/index", method='GET', params="x=y")
+    @request_map("/index", method='GET', params="x=y", match_all_params_expressions=False)
     def index_page():
         return "<!DOCTYPE html><html><head><title>你好</title></head><body>你好，世界！</body></html>"
 

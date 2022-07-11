@@ -197,6 +197,36 @@ def your_ctroller_function(
         session: Session # req.getSession(True)，get the session, if there is no sessions, create one.
     ):
     return "<html><body>Hello, World!</body></html>"
+
+# you can use `params` to narrow the controller mapping, the following examples shows only the `params` mapping, ignoring the 
+# `headers` examples for the usage is almost the same as the `params`. 
+@request("/exact_params", method="GET", params="a=b")
+def exact_params(a: str):
+    print(f"{a}") # b
+    return {"result": "ok"}
+
+@request("/exact_params", method="GET", params="a!=b")
+def exact_not_params(a: str):
+    print(f"{a}") # b
+    return {"result": "ok"}
+
+@request("/exact_params", method="GET", params="!a")
+def no_params():
+    return {"result": "ok"}
+
+@request("/exact_params", method="GET", params="a")
+def must_has_params():
+    return {"result": "ok"}
+
+# If multiple expressions are set, all expressions must be matched to enter this controller function.
+@request("/exact_params", method="GET", params=["a=b", "c!=d"])
+def multipul_params():
+    return {"result": "ok"}
+
+# You can set `match_all_params_expressions` to False to make that the url can enter this controller function even only one expression is matched.
+@request("/exact_params", method="GET", params=["a=b", "c!=d"], match_all_params_expressions=False)
+def multipul_params():
+    return {"result": "ok"}
 ```
 
 We recommend using functional programing to write controller functions. but if you realy want to use Object, you can use `@request_map` in a class method. For doing this, every time a new request comes, a new MyController object will be created.
