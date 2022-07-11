@@ -911,6 +911,9 @@ def request_map(*anno_args,
             mths = list(method)
         else:
             mths = [m.strip() for m in method.split(',')]
+        
+        hs = headers if isinstance(headers, list) else [headers]
+        ps = params if isinstance(params, list) else [params]
 
         if inspect.isclass(ctrl):
             _request_clz_mapping[ctrl] = ControllerFunction(url=_url,
@@ -925,8 +928,6 @@ def request_map(*anno_args,
             return ctrl
 
         for mth in mths:
-            hs = headers if isinstance(headers, list) else [headers]
-            ps = params if isinstance(params, list) else [params]
             cf = ControllerFunction(url=_url,
                                     regexp=regexp,
                                     method=mth,
