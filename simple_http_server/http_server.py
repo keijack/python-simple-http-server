@@ -61,10 +61,10 @@ class RoutingServer:
 
     def __init__(self, res_conf={}):
         self.method_url_mapping: Dict[str,
-                                      Dict[str, ControllerFunction]] = {"_": {}}
-        self.path_val_url_mapping: Dict[str, Dict[str, ControllerFunction]] = {
+                                      Dict[str, List[ControllerFunction]]] = {"_": {}}
+        self.path_val_url_mapping: Dict[str, Dict[str, List[Tuple(ControllerFunction, List[str])]]] = {
             "_": OrderedDict()}
-        self.method_regexp_mapping: Dict[str, Dict[str, ControllerFunction]] = {
+        self.method_regexp_mapping: Dict[str, Dict[str, List[ControllerFunction]]] = {
             "_": OrderedDict()}
         for mth in self.HTTP_METHODS:
             self.method_url_mapping[mth] = {}
@@ -80,6 +80,21 @@ class RoutingServer:
         self.ws_regx_mapping: Dict[str, ControllerFunction] = OrderedDict()
 
         self.error_page_mapping = {}
+
+    def put_to_method_url_mapping(self, method, url, ctrl):
+        if url not in self.method_url_mapping[method]:
+            self.method_url_mapping[method][url] = []
+        self.method_url_mapping[method][url].insert(0, ctrl)
+
+    def put_to_path_val_url_mapping(self, method, path_pattern, ctrl, path_names):
+        if path_pattern not in self.path_val_url_mapping[method]:
+            self.path_val_url_mapping[method][path_pattern] = []
+        self.path_val_url_mapping[method][path_pattern].insert(0, (ctrl, path_names))
+
+    def put_to_method_regexp_mapping(self, method, regexp, ctrl):
+        if regexp not in self.method_regexp_mapping[method]:
+            self.method_regexp_mapping[method][regexp] = []
+        self.method_regexp_mapping[method][regexp].insert(0, ctrl)
 
     @property
     def res_conf(self):
@@ -123,16 +138,15 @@ class RoutingServer:
         assert method is None or method == "" or method.upper() in self.HTTP_METHODS
         _method = method.upper() if method is not None and method != "" else "_"
         if regexp:
-            self.method_regexp_mapping[_method][regexp] = ctrl
+            self.put_to_method_regexp_mapping(_method, regexp, ctrl)
         else:
             _url = remove_url_first_slash(url)
 
             path_pattern, path_names = get_path_reg_pattern(_url)
             if path_pattern is None:
-                self.method_url_mapping[_method][_url] = ctrl
+                self.put_to_method_url_mapping(_method, _url, ctrl)
             else:
-                self.path_val_url_mapping[_method][path_pattern] = (
-                    ctrl, path_names)
+                self.put_to_path_val_url_mapping(_method, path_pattern, ctrl, path_names)
 
     def _res_(self, path, res_pre, res_dir):
         fpath = os.path.join(res_dir, path.replace(res_pre, ""))
@@ -164,41 +178,45 @@ class RoutingServer:
 
         return StaticFile(fpath, content_type)
 
-    def get_url_controller(self, path: str = "", method: str = "") -> Tuple[ControllerFunction, Dict, List]:
+    def get_url_controllers(self, path: str = "", method: str = "") -> List[Tuple[ControllerFunction, Dict, List]]:
         # explicitly url matching
         if path in self.method_url_mapping[method]:
-            return self.method_url_mapping[method][path], {}, ()
+            return [(ctrl, {}, ()) for ctrl in self.method_url_mapping[method][path]]
         elif path in self.method_url_mapping["_"]:
-            return self.method_url_mapping["_"][path], {}, ()
+            return [(ctrl, {}, ()) for ctrl in self.method_url_mapping["_"][path]]
 
         # url with path value matching
-        fun_and_val = self.__try_get_from_path_val(path, method)
-        if fun_and_val is None:
-            fun_and_val = self.__try_get_from_path_val(path, "_")
-        if fun_and_val is not None:
-            return fun_and_val[0], fun_and_val[1], ()
+        path_val_res = self.__try_get_from_path_val(path, method)
+        if path_val_res is None:
+            path_val_res = self.__try_get_from_path_val(path, "_")
+        if path_val_res is not None:
+            return path_val_res
 
         # regexp
-        func_and_groups = self.__try_get_ctrl_from_regexp(path, method)
-        if func_and_groups is None:
-            func_and_groups = self.__try_get_ctrl_from_regexp(path, "_")
-        if func_and_groups is not None:
-            return func_and_groups[0], {}, func_and_groups[1]
+        regexp_res = self.__try_get_ctrl_from_regexp(path, method)
+        if regexp_res is None:
+            regexp_res = self.__try_get_ctrl_from_regexp(path, "_")
+        if regexp_res is not None:
+            return regexp_res
         # static files
         for k, v in self.res_conf:
             if path.startswith(k):
                 def static_fun():
                     return self._res_(path, k, v)
-                return ControllerFunction(func=static_fun), {}, ()
-        return None, {}, ()
+                return [(ControllerFunction(func=static_fun), {}, ())]
+        return []
 
     def __try_get_ctrl_from_regexp(self, path, method):
-        for regex, ctrl in self.method_regexp_mapping[method].items():
+        for regex, ctrls in self.method_regexp_mapping[method].items():
             m = re.match(regex, f"/{path}") or re.match(regex, path)
             _logger.debug(
                 f"regexp::pattern::[{regex}] => path::[{path}] match? {m is not None}")
             if m:
-                return ctrl, tuple([unquote(v) for v in m.groups()])
+                res = []
+                grps = tuple([unquote(v) for v in m.groups()])
+                for ctrl in ctrls:
+                    res.append((ctrl, [], grps))
+                return res
         return None
 
     def __try_get_from_path_val(self, path, method):
@@ -207,12 +225,14 @@ class RoutingServer:
             _logger.debug(
                 f"url with path value::pattern::[{patterns}] => path::[{path}] match? {m is not None}")
             if m:
-                fun, path_names = val
-                path_values = {}
-                for idx in range(len(path_names)):
-                    key = unquote(path_names[idx])
-                    path_values[key] = unquote(m.groups()[idx])
-                return fun, path_values
+                res = []
+                for ctrl_fun, path_names in val:
+                    path_values = {}
+                    for idx in range(len(path_names)):
+                        key = unquote(path_names[idx])
+                        path_values[key] = unquote(m.groups()[idx])
+                    res.append((ctrl_fun, path_values, ()))
+                return res
         return None
 
     def map_filter(self, filter_conf: Dict[str, Any]):

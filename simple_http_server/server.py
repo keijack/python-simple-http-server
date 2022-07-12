@@ -220,7 +220,7 @@ def stop() -> None:
             _server.shutdown()
             _server = None
         else:
-            _logger.warn("Server is not ready yet.")
+            _logger.warning("Server is not ready yet.")
 
 
 @request_map("/favicon.ico")

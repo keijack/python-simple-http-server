@@ -32,7 +32,7 @@ import threading
 import http.cookies as cookies
 import datetime
 
-from typing import Any, Callable, Dict, List, Union
+from typing import Any, Callable, Dict, List, Tuple, Union
 
 from simple_http_server import FilterContex, ModelDict, Environment, RegGroup, RegGroups, HttpError, RequestBodyReader, StaticFile, \
     Headers, Redirect, Response, Cookies, Cookie, JSONBody, BytesBody, Header, Parameters, PathValue, \
@@ -647,16 +647,24 @@ class HTTPRequestHandler:
         return self.__match_exps(req.headers, ctrl.headers, ctrl.match_all_headers_expressions, 'headers') \
             and self.__match_exps(req.parameters, ctrl.params, ctrl.match_all_params_expressions, 'params')
 
+    def __get_ctrl(self, req: RequestWrapper) -> Tuple[ControllerFunction, Dict, List]:
+        mth = self.method.upper()
+        path = req._path
+        ctrls = self.routing_conf.get_url_controllers(path, mth)
+        for ctrl, pvs, regs in ctrls:
+            if self.__is_req_match_ctl(req, ctrl):
+                return ctrl, pvs, regs
+        return None, {}, []
+
     async def handle_request(self):
         mth = self.method.upper()
 
         req = await self.__prepare_request(mth)
-        path = req._path
 
-        ctrl, req.path_values, req.reg_groups = self.routing_conf.get_url_controller(path, mth)
+        ctrl, req.path_values, req.reg_groups = self.__get_ctrl(req)
 
         res = ResponseWrapper(self)
-        if ctrl is None or not self.__is_req_match_ctl(req, ctrl):
+        if ctrl is None:
             res.send_error(404, "Controller Not Found",
                            "Cannot find a controller for your path")
         else:

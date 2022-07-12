@@ -200,6 +200,12 @@ class ThreadingServerTest(unittest.TestCase):
         ws.close()
         assert txt == f"{path_val}-{msg}"
 
+    def test_params_narrowing(self):
+        body = self.visit("param/narrowing?a=b")
+        assert body == 'a=b'
+        body = self.visit("param/narrowing?a=c")
+        assert body == 'a!=b'
+
 
 class CoroutineServerTest(ThreadingServerTest):
 

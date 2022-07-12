@@ -32,7 +32,7 @@ _logger = logger.get_logger("controller")
 
 
 @request_map("/")
-@request_map("/index", params="a!=b")
+@request_map("/index")
 def my_ctrl():
     return {"code": 0, "message": "success"}  # You can return a dictionary, a string or a `simple_http_server.simple_http_server.Response` object.
 
@@ -298,3 +298,11 @@ def res_writer(response: Response):
     response.write_bytes(b'abcd')
     response.write_bytes(bytearray(b'efg'))
     response.close()
+
+@route("/param/narrowing", params="a=b")
+def params_narrowing():
+    return "a=b"
+
+@route("/param/narrowing", params="a!=b")
+def params_narrowing2():
+    return "a!=b"
