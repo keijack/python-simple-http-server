@@ -210,6 +210,11 @@ def exact_not_params(a: str):
     print(f"{a}") # b
     return {"result": "ok"}
 
+@request("/exact_params", method="GET", params="a^=b")
+def exact_startwith_params(a: str):
+    print(f"{a}") # b
+    return {"result": "ok"}
+
 @request("/exact_params", method="GET", params="!a")
 def no_params():
     return {"result": "ok"}

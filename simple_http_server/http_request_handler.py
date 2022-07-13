@@ -592,29 +592,41 @@ class HTTPRequestHandler:
             return True
         _logger.debug(f"Match controller {where} expression [{exp}] for values: {d}. ")
         exp_ = str(exp)
-        if exp_.find("=") < 0:
+        e_idx = exp_.find("=")
+        if e_idx < 0:
             _logger.debug(f"cannot find = in exp {exp}")
             if exp_.startswith('!'):
                 return not exp_[1:] in d.keys()
             else:
                 return exp_ in d.keys()
         idx = exp_.find("!=")
-        if idx > 0:
+        if idx > 0 and idx < e_idx:
             k, v = utils.break_into(exp_, '!=')
             if k not in d.keys():
-                _logger.debug(f"{k} is not in {d}")
                 return False
             dvals = d[k]
             if isinstance(dvals, str):
                 dvals = [dvals]
             for dv in dvals:
                 if dv == v:
-                    _logger.debug(f"There is a {dv} is not in {d}")
                     return False
             return True
 
-        idx = exp_.find('=')
-        if idx > 0:
+        idx = exp_.find("^=")
+        if idx > 0 and idx < e_idx:
+            k, v = utils.break_into(exp_, "^=")
+            if k not in d.keys():
+                return False
+            dvals = d[k]
+            if isinstance(dvals, str):
+                dvals = [dvals]
+            for dv in dvals:
+                _logger.debug(f"^= mapping:: {dv} ... {v}")
+                if dv.startswith(v):
+                    return True
+            return False
+
+        if e_idx > 0:
             k, v = utils.break_into(exp_, '=')
             if k not in d.keys():
                 return False

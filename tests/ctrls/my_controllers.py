@@ -299,10 +299,26 @@ def res_writer(response: Response):
     response.write_bytes(bytearray(b'efg'))
     response.close()
 
+
 @route("/param/narrowing", params="a=b")
 def params_narrowing():
     return "a=b"
 
+
 @route("/param/narrowing", params="a!=b")
 def params_narrowing2():
     return "a!=b"
+
+
+@controller
+@request_map(url="/page", params="a=b")
+class IndexPage:
+
+    @request_map("/index", method='GET', params="x=y", match_all_params_expressions=False)
+    def index_page(self):
+        return "<!DOCTYPE html><html><head><title>你好</title></head><body>你好，世界！</body></html>"
+
+
+@route(url="/header_narrowing", method="POST", headers="Content-Type^=text/")
+def header_narrowing():
+    return "a^=b"

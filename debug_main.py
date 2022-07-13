@@ -18,16 +18,6 @@ def stop():
 _logger = get_logger("http_test")
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 
-
-@controller
-@request_map(url="/page", params="a=b")
-class IndexPage:
-    
-    @request_map("/index", method='GET', params="x=y", match_all_params_expressions=False)
-    def index_page(self):
-        return "<!DOCTYPE html><html><head><title>你好</title></head><body>你好，世界！</body></html>"
-
-
 def start_server():
     _logger.info("start server in background. ")
     server.scan(base_dir="tests/ctrls", regx=r'.*controllers.*')

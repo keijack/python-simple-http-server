@@ -386,6 +386,12 @@ def exact_not_params(a: str):
     print(f"{a}") # b
     return {"result": "ok"}
 
+# 使用起始过滤，当访问带 a 参数，并且 a 参数以 b 开头时才会进入该控制器。
+@request("/exact_params", method="GET", params="a^=b")
+def exact_startswith_params(a: str):
+    print(f"{a}") # b
+    return {"result": "ok"}
+
 # 使用非包含过滤，当参数包含 a 参数时，不会进入该控制器。
 @request("/exact_params", method="GET", params="!a")
 def no_params():
