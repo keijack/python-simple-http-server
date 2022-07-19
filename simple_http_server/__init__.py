@@ -33,7 +33,7 @@ from typing import Any, Dict, List, Tuple, Union, Callable
 from .logger import get_logger
 
 name = "simple_http_server"
-version = "0.18.2"
+version = "0.18.3"
 
 DEFAULT_ENCODING: str = "UTF-8"
 
@@ -884,13 +884,19 @@ def controller(*anno_args, singleton: bool = True, args: List[Any] = [], kwargs:
     return map
 
 
+def __to_str_list(obj: Union[str, list, tuple]):
+    if isinstance(obj, list) or isinstance(obj, tuple):
+        return [str(it) for it in obj]
+    else:
+        return [str(obj)]
+
 def request_map(*anno_args,
                 url: str = "",
                 regexp: str = "",
                 method: Union[str, list, tuple] = "",
-                headers: Union[str, List[str]] = "",
+                headers: Union[str, list, tuple] = "",
                 match_all_headers_expressions: bool = None,
-                params: Union[str, List[str]] = "",
+                params: Union[str, list, tuple] = "",
                 match_all_params_expressions: bool = None) -> Callable:
     _url = url
     len_args = len(anno_args)
@@ -911,9 +917,9 @@ def request_map(*anno_args,
             mths = list(method)
         else:
             mths = [m.strip() for m in method.split(',')]
-        
-        hs = headers if isinstance(headers, list) else [headers]
-        ps = params if isinstance(params, list) else [params]
+
+        hs = __to_str_list(headers)
+        ps = __to_str_list(params)
 
         if inspect.isclass(ctrl):
             _request_clz_mapping[ctrl] = ControllerFunction(url=_url,

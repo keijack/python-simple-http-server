@@ -311,7 +311,7 @@ def params_narrowing2():
 
 
 @controller
-@request_map(url="/page", params="a=b")
+@request_map(url="/page", params=("a=b", ))
 class IndexPage:
 
     @request_map("/index", method='GET', params="x=y", match_all_params_expressions=False)
