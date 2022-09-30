@@ -4,7 +4,7 @@
 import time
 from typing import List, OrderedDict
 
-from simple_http_server import FilterContex, ModelDict, Redirect, RegGroup, RequestBodyReader, request_filter
+from simple_http_server import BytesBody, FilterContex, ModelDict, Redirect, RegGroup, RequestBodyReader, request_filter
 from simple_http_server import Headers
 from simple_http_server import HttpError
 from simple_http_server import JSONBody
@@ -85,9 +85,11 @@ def my_upload(img=MultipartFile("img"), txt=Parameter("中文text", required=Fal
 
 
 @request_map("/post_txt", method=["GET", "POST"])
-def normal_form_post(txt=Parameter("中文txt", required=False, default="DEFAULT"), req=Request()):
+def normal_form_post(txt=Parameter("中文txt", required=False, default="DEFAULT"), req=Request(), bd=BytesBody()):
     for k, v in req.parameter.items():
         print("%s ====> %s " % (k, v))
+    print(req.body)
+    print(bd)
     return f"<!DOCTYPE html><html><body>hi, {txt}</body></html>"
 
 

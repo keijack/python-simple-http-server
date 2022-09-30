@@ -357,8 +357,9 @@ class FilterContexImpl(FilterContex):
         elif arg_type == RequestBodyReader:
             param = self.request.reader
         elif arg_type == BytesBody:
-            req_body = await self.request.reader.read()
-            param = BytesBody(req_body)
+            if not self.request._body:
+                self.request._body = await self.request.reader.read()
+            param = BytesBody(self.request._body)
         elif arg_type == str:
             param = self.__build_str(arg, **kws)
         elif arg_type == bool:
@@ -723,16 +724,16 @@ class HTTPRequestHandler:
 
             content_type = _headers_keys_in_lowers["content-type"]
             if content_type.lower().startswith("application/x-www-form-urlencoded"):
-                req_body = await req.reader.read(content_length)
+                req._body = await req.reader.read(content_length)
                 data_params = utils.decode_query_string(
-                    req_body.decode(DEFAULT_ENCODING))
+                    req._body.decode(DEFAULT_ENCODING))
             elif content_type.lower().startswith("multipart/form-data"):
-                req_body = await req.reader.read(content_length)
+                req._body = await req.reader.read(content_length)
                 data_params = self.__decode_multipart(
-                    content_type, req_body.decode("ISO-8859-1"))
+                    content_type, req._body.decode("ISO-8859-1"))
             elif content_type.lower().startswith("application/json"):
-                req_body = await req.reader.read(content_length)
-                req.json = json.loads(req_body.decode(DEFAULT_ENCODING))
+                req._body = await req.reader.read(content_length)
+                req.json = json.loads(req._body.decode(DEFAULT_ENCODING))
                 data_params = {}
             else:
                 data_params = {}

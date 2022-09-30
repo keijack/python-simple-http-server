@@ -33,7 +33,7 @@ from typing import Any, Dict, List, Tuple, Union, Callable
 from .logger import get_logger
 
 name = "simple_http_server"
-version = "0.18.3"
+version = "0.18.4"
 
 DEFAULT_ENCODING: str = "UTF-8"
 
@@ -152,6 +152,10 @@ class Request:
             return ""
         else:
             return self.headers["Host"]
+
+    @property
+    def body(self) -> bytes:
+        return self._body
 
     @property
     def content_type(self) -> str:
