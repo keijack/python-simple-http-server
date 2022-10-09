@@ -469,6 +469,7 @@ class CoroutineHTTPServer(RoutingServer):
         self.port: int = port
         self.ssl: SSLContext = ssl
         self.server: Server = None
+        self.__thread_local = threading.local()
 
     async def callback(self, reader: StreamReader, writer: StreamWriter):
         handler = HttpProtocolHandler(reader, writer, routing_conf=self)
@@ -488,8 +489,16 @@ class CoroutineHTTPServer(RoutingServer):
             finally:
                 await self.server.wait_closed()
 
+    def _get_event_loop(self) -> asyncio.AbstractEventLoop:
+        if not hasattr(self.__thread_local, "event_loop"):
+            try:
+                self.__thread_local.event_loop = asyncio.new_event_loop()
+            except:
+                self.__thread_local.event_loop = asyncio.get_event_loop()
+        return self.__thread_local.event_loop
+
     def start(self):
-        asyncio.run(self.start_async())
+        self._get_event_loop().run_until_complete(self.start_async())
 
     def _shutdown(self):
         _logger.debug("Try to shutdown server.")
