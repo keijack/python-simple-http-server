@@ -18,13 +18,16 @@ def stop():
 _logger = get_logger("http_test")
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 
+
 def start_server():
     _logger.info("start server in background. ")
     server.scan(base_dir="tests/ctrls", regx=r'.*controllers.*')
     server.start(
         # port=9443,
         port=9090,
-        resources={"/public/*": f"{PROJECT_ROOT}/tests/static"},
+        resources={"/public/*": f"{PROJECT_ROOT}/tests/static",
+                   "/*": f"{PROJECT_ROOT}/tests/static"
+                   },
         # ssl=True,
         # certfile=f"{PROJECT_ROOT}/tests/certs/fullchain.pem",
         # keyfile=f"{PROJECT_ROOT}/tests/certs//privkey.pem",
@@ -38,7 +41,8 @@ def start_server_wsgi():
     _logger.info("start server in background. ")
     server.scan(base_dir="tests/ctrls", regx=r'.*controllers.*')
     wsgi_proxy = server.init_wsgi_proxy(
-        resources={"/public/*": f"{PROJECT_ROOT}/tests/static"})
+        resources={"/public/*": f"{PROJECT_ROOT}/tests/static",
+                   "/*": f"{PROJECT_ROOT}/tests/static"})
 
     global wsgi_server
     wsgi_server = make_server("", 9090, wsgi_proxy.app_proxy)

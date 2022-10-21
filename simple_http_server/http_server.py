@@ -108,19 +108,19 @@ class RoutingServer:
     def add_res_conf(self, val: Dict[str, str]):
         if not val or not isinstance(val, dict):
             return
-        for res_k, v in val.items():
-            if res_k.startswith("/"):
-                k = res_k[1:]
-            else:
-                k = res_k
+        for k, v in val.items():
             if k.endswith("/*"):
-                key = k[0:-1]
+                res_k = k[0:-1]
             elif k.endswith("/**"):
-                key = k[0:-2]
+                res_k = k[0:-2]
             elif k.endswith("/"):
-                key = k
+                res_k = k
             else:
-                key = k + "/"
+                res_k = k + "/"
+            if res_k.startswith("/"):
+                key = res_k[1:]
+            else:
+                key = res_k
 
             if v.endswith(os.path.sep):
                 val = v
@@ -200,7 +200,9 @@ class RoutingServer:
             return regexp_res
         # static files
         for k, v in self.res_conf:
-            if path.startswith(k):
+            match_static_path_conf = path.startswith(k)
+            _logger.debug(f"{path} macth static file conf {k} ? {match_static_path_conf}")
+            if match_static_path_conf:
                 def static_fun():
                     return self._res_(path, k, v)
                 return [(ControllerFunction(func=static_fun), {}, ())]
