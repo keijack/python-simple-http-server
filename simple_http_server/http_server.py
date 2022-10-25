@@ -29,6 +29,7 @@ import json
 import socket
 import os
 import re
+from sys import prefix
 
 import threading
 import asyncio
@@ -109,25 +110,41 @@ class RoutingServer:
         if not val or not isinstance(val, dict):
             return
         for k, v in val.items():
-            if k.endswith("/*"):
-                res_k = k[0:-1]
-            elif k.endswith("/**"):
-                res_k = k[0:-2]
-            elif k.endswith("/"):
-                res_k = k
-            else:
-                res_k = k + "/"
-            if res_k.startswith("/"):
-                key = res_k[1:]
-            else:
-                key = res_k
+            res_k = k
+            if not res_k.startswith("*") and res_k.endswith('/'):
+                # xxx/ equals xxx/*
+                res_k = res_k + "*"
+            if res_k.startswith('*'):
+                suffix = res_k[2:] if res_k.startswith("**") else res_k[1:]
+                assert suffix.find('/') < 0 and suffix.find('*') < 0, "If a resource path starts with *, only suffix can be configurated. "
+            if res_k.startswith('**.'):
+                # **.xxx
+                suffix = res_k[3:]
+                key = f'^[\\w%.\\-@!\\(\\)\\[\\]\\|\\$/]+\\.{suffix}$'
+            elif res_k.startswith('*.'):
+                # *.xxx
+                suffix = res_k[2:]
+                key = f'^[\\w%.\\-@!\\(\\)\\[\\]\\|\\$]+\\.{suffix}$'
+            elif res_k.endswith("/**"):
+                # xx/**
+                prefix = res_k[0:-2]
+                while prefix.startswith('/'):
+                    prefix = prefix[1:]
+                assert prefix.find("*") < 0, "You can only config a * or ** at the start or end of a path."
+                key = f'^{prefix}([\\w%.\\-@!\\(\\)\\[\\]\\|\\$/]+)$'
+            elif res_k.endswith("/*"):
+                # xx/*
+                prefix = res_k[0:-1]
+                while prefix.startswith('/'):
+                    prefix = prefix[1:]
+                assert prefix.find("*") < 0, "You can only config a * or ** at the start or end of a path."
+                key = f'^{prefix}([\\w%.\\-@!\\(\\)\\[\\]\\|\\$]+)$'
 
             if v.endswith(os.path.sep):
                 val = v
             else:
                 val = v + os.path.sep
             self._res_conf.append((key, val))
-        self._res_conf.sort(key=lambda it: -len(it[0]))
 
     def map_controller(self, ctrl: ControllerFunction):
         url = ctrl.url
@@ -148,9 +165,9 @@ class RoutingServer:
             else:
                 self.put_to_path_val_url_mapping(_method, path_pattern, ctrl, path_names)
 
-    def _res_(self, path, res_pre, res_dir):
-        fpath = os.path.join(res_dir, path.replace(res_pre, ""))
-        _logger.debug(f"static file. {path} :: {fpath}")
+    def _res_(self, fpath: str):
+        # fpath = os.path.join(res_dir, path.replace(res_regx, ""))
+        # _logger.debug(f"static file. {path} :: {fpath}")
         fext = os.path.splitext(fpath)[1]
         ext = fext.lower()
         if ext in (".html", ".htm", ".xhtml"):
@@ -200,11 +217,16 @@ class RoutingServer:
             return regexp_res
         # static files
         for k, v in self.res_conf:
-            match_static_path_conf = path.startswith(k)
+            match_static_path_conf = re.match(k, path)
             _logger.debug(f"{path} macth static file conf {k} ? {match_static_path_conf}")
             if match_static_path_conf:
+                if match_static_path_conf.groups():
+                    fpath = f"{v}{match_static_path_conf.group(1)}"
+                else:
+                    fpath = f"{v}{path}"
+
                 def static_fun():
-                    return self._res_(path, k, v)
+                    return self._res_(fpath)
                 return [(ControllerFunction(func=static_fun), {}, ())]
         return []
 

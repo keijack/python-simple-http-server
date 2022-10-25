@@ -26,7 +26,10 @@ def start_server():
         # port=9443,
         port=9090,
         resources={"/public/*": f"{PROJECT_ROOT}/tests/static",
-                   "/*": f"{PROJECT_ROOT}/tests/static"
+                   "/*": f"{PROJECT_ROOT}/tests/static",
+                   '/inn/**': f"{PROJECT_ROOT}/tests/static",
+                   '**.txt': f"{PROJECT_ROOT}/tests/static",
+                   '*.ini': f"{PROJECT_ROOT}/tests/static",
                    },
         # ssl=True,
         # certfile=f"{PROJECT_ROOT}/tests/certs/fullchain.pem",

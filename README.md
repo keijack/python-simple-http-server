@@ -578,11 +578,12 @@ If you want to specify the host and port:
 
 If you want to specify the resources path: 
 
-*Notice: `/path_prefix/`/`/path_prefix/*`/`/path_prefix/**` is the same effect.*
-
 ```python 
-    server.start(resources={"/path_prefix/*", "/absolute/dir/root/path",
-                            "/path_prefix/*", "/absolute/dir/root/path"})
+    server.start(resources={"/path_prefix/*", "/absolute/dir/root/path", # Match the files in the given folder with a special path prefix.
+                            "/path_prefix/**", "/absolute/dir/root/path", # Match all the files in the given folder and its sub-folders with a special path prefix.
+                            "*.suffix", "/absolute/dir/root/path", # Match the specific files in the given folder.
+                            "**.suffix", "/absolute/dir/root/path", # Match the specific files in the given folder and its sub-folders.
+                            })
 ```
 
 If you want to use ssl:

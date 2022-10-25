@@ -769,11 +769,12 @@ if __name__ == "__main__":
 
 如果需要指定静态资源：
 
-*注意: `/path_prefix/`/`/path_prefix/*`/`/path_prefix/**` 具有相同的效果。*
-
 ```python 
-    server.start(resources={"/path_prefix/*", "/absolute/dir/root/path",
-                            "/path_prefix/*", "/absolute/dir/root/path"})
+    server.start(resources={"/path_prefix/*", "/absolute/dir/root/path", # 通过前缀制定匹配的指定目录下的所有文件资源。
+                            "/path_prefix/**", "/absolute/dir/root/path", # 通过前缀制定匹配的指定目录以及其子目录下的所有文件资源。
+                            "*.suffix", "/absolute/dir/root/path", # 匹配指定目录下的特定后缀的文件。
+                            "**.suffix", "/absolute/dir/root/path", # 匹配指定目录以及其子目录下的特定后缀的文件。
+                            })
 ```
 
 如果需要支持 HTTPS（SSL）
