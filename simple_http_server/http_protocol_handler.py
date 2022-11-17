@@ -22,7 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-import html
+import html, re
 import http.client
 import email.parser
 import email.message
@@ -41,6 +41,7 @@ from http import HTTPStatus
 from simple_http_server import version as __version__
 from simple_http_server import RequestBodyReader
 from .logger import get_logger
+from .routing_server import RoutingServer
 from .http_request_handler import HTTPRequestHandler
 from .websocket_request_handler import WebsocketRequestHandler
 
@@ -79,8 +80,8 @@ class HttpProtocolHandler:
         for v in HTTPStatus.__members__.values()
     }
 
-    def __init__(self, reader: StreamReader, writer: StreamWriter, request_writer=None, routing_conf=None) -> None:
-        self.routing_conf = routing_conf
+    def __init__(self, reader: StreamReader, writer: StreamWriter, request_writer=None, routing_conf: RoutingServer = None) -> None:
+        self.routing_conf: RoutingServer = routing_conf
         self.reader: StreamReader = reader
         self.writer: StreamWriter = writer
         self.request_writer: RequestWriter = request_writer if request_writer else RequestWriter(
@@ -96,9 +97,27 @@ class HttpProtocolHandler:
         self.query_string = ''
         self.query_parameters = {}
         self.headers = {}
+        self._connection_idle_time = routing_conf.connection_idle_time
+        self._keep_alive_max_req = routing_conf.keep_alive_max_request
+        self.req_count = 0
+        
 
     async def parse_request(self):
-        raw_requestline = await self.reader.readline()
+        self.req_count += 1
+        try:
+            if hasattr(self.reader, "connection"):
+                # For blocking io. asyncio.wait_for will not raise TimeoutError if the io is blocked.
+                self.reader.connection.settimeout(self._connection_idle_time)
+            raw_requestline = await asyncio.wait_for(self.reader.readline(), self._connection_idle_time)
+            if hasattr(self.reader, "connection") and hasattr(self.reader, "timeout"):
+                # For blocking io. Set the Original timeout to the connection.
+                self.reader.connection.settimeout(self.reader.timeout)
+        except asyncio.exceptions.TimeoutError:
+            _logger.warn("Wait for reading request line timeout. ")
+            return False
+        except TimeoutError:
+            _logger.warn("Wait for reading request line timeout. ")
+            return False
         if len(raw_requestline) > _MAXLINE:
             self.requestline = ''
             self.request_version = ''
@@ -362,10 +381,24 @@ class HttpProtocolHandler:
     def log_message(self, format, *args):
         _logger.info(f"{format % args}")
 
+    def set_prefer_keep_alive_params(self):
+        pass
+
+    def set_alive_params(self):
+        if "Keep-Alive" in self.headers:
+            ka_header = self.headers["Keep-Alive"]
+            timeout_match = re.match(r"^.*timeout=(\d+).*$", ka_header)
+            if timeout_match:
+                self._connection_idle_time = int(timeout_match.group(1))
+            max_match = re.match(r"^.*max=(\d+).*$", ka_header)
+            if max_match:
+                self._keep_alive_max_req = int(max_match.group(1))
+
     async def handle_request(self):
         parse_request_success = await self.parse_request()
         if not parse_request_success:
             return
+        self.set_alive_params()
 
         if self.request_version == "HTTP/1.1" and self.command == "GET" and "Upgrade" in self.headers and self.headers["Upgrade"] == "websocket":
             _logger.debug("This is a websocket connection. ")
@@ -381,6 +414,8 @@ class HttpProtocolHandler:
             if not parse_request_success:
                 _logger.debug("parse request fails, return. ")
                 return
+            if self.req_count >= self._keep_alive_max_req:
+                self.send_response("Connection", "close")
             await self.handle_http_request()
 
     async def handle_http_request(self):

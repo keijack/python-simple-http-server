@@ -112,6 +112,8 @@ def _prepare_server(host: str = "",
                     keypass: str = "",
                     ssl_context: SSLContext = None,
                     resources: Dict[str, str] = {},
+                    connection_idle_time=None,
+                    keep_alive_max_request=None,
                     prefer_coroutine=False) -> None:
     with __lock:
         global _server
@@ -148,6 +150,8 @@ def _prepare_server(host: str = "",
     err_pages = _get_error_pages()
     for code, func in err_pages.items():
         _server.map_error_page(code, func)
+    _server.connection_idle_time = connection_idle_time
+    _server.keep_alive_max_request = keep_alive_max_request
 
 
 def start(host: str = "",
@@ -160,6 +164,8 @@ def start(host: str = "",
           keypass: str = "",
           ssl_context: SSLContext = None,
           resources: Dict[str, str] = {},
+          connection_idle_time=None,
+          keep_alive_max_request=None,
           prefer_coroutine=False) -> None:
     _prepare_server(
         host=host,
@@ -172,9 +178,10 @@ def start(host: str = "",
         keypass=keypass,
         ssl_context=ssl_context,
         resources=resources,
+        connection_idle_time=connection_idle_time,
+        keep_alive_max_request=keep_alive_max_request,
         prefer_coroutine=prefer_coroutine
     )
-
     # start the server
     _server.start()
 
@@ -189,6 +196,8 @@ async def start_async(host: str = "",
                       keypass: str = "",
                       ssl_context: SSLContext = None,
                       resources: Dict[str, str] = {},
+                      connection_idle_time=None,
+                      keep_alive_max_request=None,
                       prefer_coroutine=True) -> None:
     _prepare_server(
         host=host,
@@ -201,6 +210,8 @@ async def start_async(host: str = "",
         keypass=keypass,
         ssl_context=ssl_context,
         resources=resources,
+        connection_idle_time=connection_idle_time,
+        keep_alive_max_request=keep_alive_max_request,
         prefer_coroutine=prefer_coroutine
     )
 
