@@ -40,6 +40,20 @@ python3 -m pip install websocket-client
 python3 -m pip install simple_http_server
 ```
 
+### Minimum code / component requirement setup
+
+Minimum code to get things started should have at least one controller function, using the route and server modules from simple_http_server
+
+```python
+from simple_http_server import route, server
+    
+@route("/")
+def index():
+    return {"hello": "world"}   
+
+server.start(port=9090)
+```
+
 ### Write Controllers
 
 ```python
