@@ -42,7 +42,7 @@ python3 -m pip install simple_http_server
 
 ### Minimum code / component requirement setup
 
-Minimum code to get things started should have at least one controller function, 
+Minimum code to get things started should have at least one controller function,\ 
 the route and server modules from simple_http_server
 
 ```python
