@@ -33,7 +33,7 @@ from typing import Any, Dict, List, Tuple, Union, Callable
 from .logger import get_logger
 
 name = "simple_http_server"
-version = "0.19.2"
+version = "0.19.3"
 
 DEFAULT_ENCODING: str = "UTF-8"
 
@@ -732,7 +732,7 @@ class ControllerFunction:
         self.__func: Callable = func
         self.__clz = False
         self.headers: List[str] = headers if isinstance(headers, list) else [headers]
-        self._match_all_headers_expressions: bool = match_all_headers_expressions,
+        self._match_all_headers_expressions: bool = match_all_headers_expressions
         self.params: List[str] = params if isinstance(params, list) else [params]
         self._match_all_params_expressions: bool = match_all_params_expressions
 
