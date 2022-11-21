@@ -1,5 +1,5 @@
 
-from simple_http_server import controller, request_map
+from simple_http_server import request_map
 from wsgiref.simple_server import WSGIServer, make_server
 import simple_http_server.server as server
 import os

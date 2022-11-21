@@ -69,6 +69,7 @@ class RoutingServer:
         self.ws_regx_mapping: Dict[str, ControllerFunction] = OrderedDict()
 
         self.error_page_mapping = {}
+        self.keep_alive = True
         self.__connection_idle_time: float = 60
         self.__keep_alive_max_request: int = 10
 

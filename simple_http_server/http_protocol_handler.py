@@ -87,8 +87,6 @@ class HttpProtocolHandler:
         self.request_writer: RequestWriter = request_writer if request_writer else RequestWriter(
             writer)
 
-        self.close_connection = True
-
         self.requestline = ''
         self.request_version = ''
         self.command = ''
@@ -97,6 +95,9 @@ class HttpProtocolHandler:
         self.query_string = ''
         self.query_parameters = {}
         self.headers = {}
+
+        self.close_connection = True
+        self._keep_alive = self.routing_conf.keep_alive
         self._connection_idle_time = routing_conf.connection_idle_time
         self._keep_alive_max_req = routing_conf.keep_alive_max_request
         self.req_count = 0
@@ -204,15 +205,13 @@ class HttpProtocolHandler:
             )
             return False
 
-        conntype = self.headers.get('Connection', "")
-        _logger.debug(f"connection type:: {conntype}")
-        if conntype.lower() == 'close':
-            self.close_connection = True
-        elif (conntype.lower() == 'keep-alive' and
-              self.protocol_version >= "HTTP/1.1"):
+        conntype = self.headers.get('Connection', '')
+        if (conntype.lower() == 'keep-alive' and
+              self.protocol_version == "HTTP/1.1" and
+              self._keep_alive):
             self.close_connection = False
         else:
-            self.close_connection = False
+            self.close_connection = True
         # Examine the headers and look for an Expect directive
         expect = self.headers.get('Expect', "")
         if (expect.lower() == "100-continue" and
@@ -333,17 +332,22 @@ class HttpProtocolHandler:
 
     def send_header(self, keyword: str, value: str):
         """Send a MIME header to the headers buffer."""
+        if keyword.lower() == 'connection':
+            if value.lower() == 'close':
+                self.close_connection = True
+            elif value.lower() == 'keep-alive':
+                if self._keep_alive:
+                    self.close_connection = False
+                else:
+                    _logger.warning(f"Keep Alive configuration is set to False, won't send keep-alive header.")
+                    return
+
         if self.request_version != 'HTTP/0.9':
             if not hasattr(self, '_headers_buffer'):
                 self._headers_buffer = []
             self._headers_buffer.append(
                 f"{keyword}: {value}\r\n".encode('latin-1', 'strict'))
 
-        if keyword.lower() == 'connection':
-            if value.lower() == 'close':
-                self.close_connection = True
-            elif value.lower() == 'keep-alive':
-                self.close_connection = False
 
     def end_headers(self):
         """Send the blank line ending the MIME headers."""

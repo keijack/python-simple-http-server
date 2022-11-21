@@ -113,6 +113,7 @@ def _prepare_server(host: str = "",
                     ssl_context: SSLContext = None,
                     resources: Dict[str, str] = {},
                     connection_idle_time=None,
+                    keep_alive=True,
                     keep_alive_max_request=None,
                     prefer_coroutine=False) -> None:
     with __lock:
@@ -150,6 +151,7 @@ def _prepare_server(host: str = "",
     err_pages = _get_error_pages()
     for code, func in err_pages.items():
         _server.map_error_page(code, func)
+    _server.keep_alive = keep_alive
     _server.connection_idle_time = connection_idle_time
     _server.keep_alive_max_request = keep_alive_max_request
 
@@ -165,6 +167,7 @@ def start(host: str = "",
           ssl_context: SSLContext = None,
           resources: Dict[str, str] = {},
           connection_idle_time=None,
+          keep_alive=True,
           keep_alive_max_request=None,
           prefer_coroutine=False) -> None:
     _prepare_server(
@@ -179,6 +182,7 @@ def start(host: str = "",
         ssl_context=ssl_context,
         resources=resources,
         connection_idle_time=connection_idle_time,
+        keep_alive=keep_alive,
         keep_alive_max_request=keep_alive_max_request,
         prefer_coroutine=prefer_coroutine
     )
@@ -197,6 +201,7 @@ async def start_async(host: str = "",
                       ssl_context: SSLContext = None,
                       resources: Dict[str, str] = {},
                       connection_idle_time=None,
+                      keep_alive=True,
                       keep_alive_max_request=None,
                       prefer_coroutine=True) -> None:
     _prepare_server(
@@ -211,6 +216,7 @@ async def start_async(host: str = "",
         ssl_context=ssl_context,
         resources=resources,
         connection_idle_time=connection_idle_time,
+        keep_alive=keep_alive,
         keep_alive_max_request=keep_alive_max_request,
         prefer_coroutine=prefer_coroutine
     )
