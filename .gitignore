@@ -106,7 +106,6 @@ v1/
 .mypy_cache/
 
 # for development only
-upload.sh
 tests/certs/
 
 # vscode
