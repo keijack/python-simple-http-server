@@ -111,7 +111,7 @@ class ThreadingServerTest(unittest.TestCase):
             "code": 0,
             "msg": "xxx"
         }
-        res: str = self.visit(f"post_json", headers={"Content-Type": "application/json"}, data=json.dumps(data_dict).encode())
+        res: str = self.visit(f"post_json", headers={"Content-Type": "application/json"}, data=json.dumps(data_dict).encode(errors="replace"))
         res_dict: dict = json.loads(res)
         assert data_dict["code"] == res_dict["code"]
         assert data_dict["msg"] == res_dict["msg"]

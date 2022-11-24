@@ -113,7 +113,7 @@ class HttpProtocolHandler:
             if hasattr(self.reader, "connection") and hasattr(self.reader, "timeout"):
                 # For blocking io. Set the Original timeout to the connection.
                 self.reader.connection.settimeout(self.reader.timeout)
-        except asyncio.exceptions.TimeoutError:
+        except asyncio.TimeoutError:
             _logger.warn("Wait for reading request line timeout. ")
             return False
         except TimeoutError:
@@ -346,7 +346,7 @@ class HttpProtocolHandler:
             if not hasattr(self, '_headers_buffer'):
                 self._headers_buffer = []
             self._headers_buffer.append(
-                f"{keyword}: {value}\r\n".encode('latin-1', 'strict'))
+                f"{keyword}: {value}\r\n".encode('latin-1', errors='strict'))
 
 
     def end_headers(self):
@@ -360,7 +360,7 @@ class HttpProtocolHandler:
             self.writer.write(b"".join(self._headers_buffer))
             self._headers_buffer = []
 
-    def send_response_only(self, code, message=None):
+    def send_response_only(self, code, message: str = None):
         """Send the response header only."""
         if self.request_version != 'HTTP/0.9':
             if message is None:
@@ -370,8 +370,8 @@ class HttpProtocolHandler:
                     message = ''
             if not hasattr(self, '_headers_buffer'):
                 self._headers_buffer = []
-            self._headers_buffer.append(f"{self.protocol_version} {code} {message}\r\n".encode(
-                'latin-1', 'strict'))
+            self._headers_buffer \
+                .append(f"{self.protocol_version} {code} {message}\r\n".encode('latin-1', errors='strict'))
 
     def log_request(self, code='-', size='-'):
         if isinstance(code, HTTPStatus):

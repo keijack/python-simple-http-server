@@ -123,7 +123,7 @@ class CoroutineHTTPServer(RoutingServer):
         async with self.server:
             try:
                 await self.server.serve_forever()
-            except asyncio.exceptions.CancelledError:
+            except asyncio.CancelledError:
                 _logger.debug(
                     "Some requests are lost for the reason that the server is shutted down.")
             finally:

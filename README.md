@@ -659,11 +659,15 @@ If you want to change the logger level:
 logger.set_level("DEBUG")
 ```
 
-From `0.15.0`, a coroutine thread is used for logging but not a Queue. All logging action will also work in a seperated thread but not in the main thread. 
-
-From `0.15.0`, you can get a stand alone logger which is independent from the framework one via a new class `logger.LoggerFactory`. 
+You can get a stand alone logger which is independent from the framework one via a new class `logger.LoggerFactory`. 
 
 ```python
+import simple_http_server.logger as logger
+
+log = logger.get_logger("my_service", "my_log_fac")
+
+# If you want to set a different log level to this logger factory: 
+
 log_fac = logger.get_logger_factory("my_log_fac")
 log_fac.log_level = "DEBUG"
 log = log_fac.get_logger("my_service")
@@ -671,6 +675,7 @@ log = log_fac.get_logger("my_service")
 log.info(...)
 
 ```
+
 
 ## WSGI Support
 

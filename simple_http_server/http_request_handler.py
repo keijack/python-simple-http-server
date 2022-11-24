@@ -771,17 +771,17 @@ class HTTPRequestHandler:
         line, rest = self.__read_line(field)
 
         kvs = self.__decode_content_disposition(line)
-        kname = kvs["name"].encode("ISO-8859-1").decode(DEFAULT_ENCODING)
+        kname = kvs["name"].encode("ISO-8859-1", errors="replace").decode(DEFAULT_ENCODING, errors="replace")
         if len(kvs) == 1:
             # this is a string field, the second line is an empty line, the rest is the value
-            val = self.__read_line(rest)[1].encode("ISO-8859-1").decode(DEFAULT_ENCODING)
+            val = self.__read_line(rest)[1].encode("ISO-8859-1", errors="replace").decode(DEFAULT_ENCODING, errors="replace")
         elif len(kvs) == 2:
-            filename = kvs["filename"].encode("ISO-8859-1").decode(DEFAULT_ENCODING)
+            filename = kvs["filename"].encode("ISO-8859-1", errors="replace").decode(DEFAULT_ENCODING, errors="replace")
             # the second line is Content-Type line
             ct_line, rest = self.__read_line(rest)
             content_type = ct_line.split(":")[1].strip()
             # the third line is an empty line, the rest is the value
-            content = self.__read_line(rest)[1].encode("ISO-8859-1")
+            content = self.__read_line(rest)[1].encode("ISO-8859-1", errors="replace")
 
             val = MultipartFile(kname, filename=filename,
                                 content_type=content_type, content=content)
@@ -790,7 +790,7 @@ class HTTPRequestHandler:
 
         return kname, val
 
-    def __decode_content_disposition(self, line):
+    def __decode_content_disposition(self, line) -> Dict[str, str]:
         cont_dis = {}
         es = line.split(";")[1:]
         for e in es:
@@ -846,7 +846,7 @@ class HTTPRequestHandler:
             self.send_header("Content-Length", 0)
             self.end_headers()
         elif isinstance(body, str):
-            data = body.encode(DEFAULT_ENCODING)
+            data = body.encode(DEFAULT_ENCODING, errors="replace")
             self.send_header("Content-Length", len(data))
             self.end_headers()
             self.writer.write(data)

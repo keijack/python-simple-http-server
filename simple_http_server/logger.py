@@ -193,5 +193,5 @@ def set_handler(handler: logging.Handler) -> None:
     _default_logger_factory.set_handler(handler)
 
 
-def get_logger(tag: str = "pythone-simple-http-server") -> logging.Logger:
-    return _default_logger_factory.get_logger(tag)
+def get_logger(tag: str = "pythone-simple-http-server", factory: str = "") -> logging.Logger:
+    return get_logger_factory(factory).get_logger(tag)

@@ -36,8 +36,9 @@ from uuid import uuid4
 from socket import error as SocketError
 
 from .logger import get_logger
-from simple_http_server import Headers, WebsocketCloseReason, WebsocketHandlerClass, WebsocketRequest, WebsocketSession, \
-    WEBSOCKET_OPCODE_BINARY, WEBSOCKET_OPCODE_CLOSE, WEBSOCKET_OPCODE_CONTINUATION, WEBSOCKET_OPCODE_PING, WEBSOCKET_OPCODE_PONG, WEBSOCKET_OPCODE_TEXT
+from simple_http_server import Headers, WebsocketCloseReason, WebsocketRequest, WebsocketSession, \
+    WEBSOCKET_OPCODE_BINARY, WEBSOCKET_OPCODE_CLOSE, WEBSOCKET_OPCODE_CONTINUATION, WEBSOCKET_OPCODE_PING, WEBSOCKET_OPCODE_PONG, WEBSOCKET_OPCODE_TEXT, \
+    DEFAULT_ENCODING
 
 
 _logger = get_logger("simple_http_server.websocket_request_handler")
@@ -182,13 +183,13 @@ class WebsocketRequestHandler:
             _logger.info("Client asked to close connection.")
             if len(message_bytes) >= 2:
                 code = struct.unpack(">H", message_bytes[0:2])[0]
-                reason = message_bytes[2:].decode('UTF-8')
+                reason = message_bytes[2:].decode('UTF-8', errors="replace")
             else:
                 code = None
                 reason = ''
             raise _WebsocketException(graceful=True, reason=WebsocketCloseReason("Client asked to close connection.", code=code, reason=reason))
         elif opcode == WEBSOCKET_OPCODE_TEXT and hasattr(self.handler, "on_text_message") and callable(self.handler.on_text_message):
-            await self.await_func(self.handler.on_text_message(self.session, self._try_decode_utf8(message_bytes)))
+            await self.await_func(self.handler.on_text_message(self.session, message_bytes.decode("UTF-8", errors="replace")))
         elif opcode == WEBSOCKET_OPCODE_PING and hasattr(self.handler, "on_ping_message") and callable(self.handler.on_ping_message):
             await self.await_func(self.handler.on_ping_message(self.session, bytes(message_bytes)))
         elif opcode == WEBSOCKET_OPCODE_PONG and hasattr(self.handler, "on_pong_message") and callable(self.handler.on_pong_message):
@@ -262,9 +263,9 @@ class WebsocketRequestHandler:
         _logger.debug(
             f"Sec-WebSocket-Key: {self.ws_request.headers['Sec-WebSocket-Key']}")
         key: str = self.ws_request.headers["Sec-WebSocket-Key"]
-        key_hash = sha1(key.encode() + GUID.encode())
+        key_hash = sha1(key.encode(errors="replace") + GUID.encode(errors="replace"))
         response_key = b64encode(key_hash.digest()).strip()
-        return response_key.decode('ASCII')
+        return response_key.decode('ASCII', errors="replace")
 
     async def read_bytes(self, num):
         return await self.reader.read(num)
@@ -294,7 +295,8 @@ class WebsocketRequestHandler:
             raise _WebsocketException(reason=WebsocketCloseReason(f"Unknown opcode {opcode}."))
 
         if opcode in (WEBSOCKET_OPCODE_PING, WEBSOCKET_OPCODE_PONG) and payload_length > 125:
-            raise _WebsocketException(reason=WebsocketCloseReason(f"Ping/Pong message payload is too large! The max length of the Ping/Pong messages is 125. but now is {payload_length}"))
+            raise _WebsocketException(reason=WebsocketCloseReason(
+                f"Ping/Pong message payload is too large! The max length of the Ping/Pong messages is 125. but now is {payload_length}"))
 
         if payload_length == 126:
             hb = await self.reader.read(2)
@@ -328,13 +330,15 @@ class WebsocketRequestHandler:
 
             if self._continution_cache is not None:
                 # Check if another fragment message is being read.
-                raise _WebsocketException(reason=WebsocketCloseReason("Another continution message is not yet finished. Close connection for this error!"))
+                raise _WebsocketException(reason=WebsocketCloseReason(
+                    "Another continution message is not yet finished. Close connection for this error!"))
 
             self._continution_cache = _ContinuationMessageCache(opcode)
 
         if self._continution_cache is None:
             # When the first frame is not send, close connection.
-            raise _WebsocketException(reason=WebsocketCloseReason("A continuation fragment frame is received, but the start fragment is not yet received. "))
+            raise _WebsocketException(reason=WebsocketCloseReason(
+                "A continuation fragment frame is received, but the start fragment is not yet received. "))
 
         await self.on_continuation_frame(self._continution_cache.opcode, fin, frame_bytes)
 
@@ -347,7 +351,7 @@ class WebsocketRequestHandler:
         if isinstance(message, bytes):
             self.send_bytes(WEBSOCKET_OPCODE_TEXT, message, chunk_size=chunk_size)
         elif isinstance(message, str):
-            self.send_bytes(WEBSOCKET_OPCODE_TEXT, self._encode_to_utf8(message), chunk_size=chunk_size)
+            self.send_bytes(WEBSOCKET_OPCODE_TEXT, message.encode(DEFAULT_ENCODING, errors="replace"), chunk_size=chunk_size)
         else:
             _logger.error(f"Cannot send message[{message}. ")
 
@@ -355,13 +359,13 @@ class WebsocketRequestHandler:
         if isinstance(message, bytes):
             self.send_bytes(WEBSOCKET_OPCODE_PING, message)
         elif isinstance(message, str):
-            self.send_bytes(WEBSOCKET_OPCODE_PING, self._encode_to_utf8(message))
+            self.send_bytes(WEBSOCKET_OPCODE_PING, message.encode(DEFAULT_ENCODING, errors="replace"))
 
     def send_pong(self, message: Union[str, bytes]):
         if isinstance(message, bytes):
             self.send_bytes(WEBSOCKET_OPCODE_PONG, message)
         elif isinstance(message, str):
-            self.send_bytes(WEBSOCKET_OPCODE_PONG, self._encode_to_utf8(message))
+            self.send_bytes(WEBSOCKET_OPCODE_PONG, message.encode(DEFAULT_ENCODING, errors="replace"))
 
     def send_bytes(self, opcode: int, payload: bytes, chunk_size: int = 0):
         if opcode not in OPTYPES.keys() or opcode == WEBSOCKET_OPCODE_CONTINUATION:
@@ -450,23 +454,9 @@ class WebsocketRequestHandler:
                 opcode = WEBSOCKET_OPCODE_CONTINUATION
 
     def close(self, reason: str = ""):
-        self.send_bytes(WEBSOCKET_OPCODE_CLOSE, self._encode_to_utf8(reason))
+        self.send_bytes(WEBSOCKET_OPCODE_CLOSE, reason.encode(DEFAULT_ENCODING, errors="replace"))
         self.keep_alive = False
         self.close_reason = WebsocketCloseReason("Server asked to close connection.")
-
-    def _encode_to_utf8(self, data: str) -> bytes:
-        try:
-            return data.encode('UTF-8')
-        except UnicodeEncodeError as e:
-            _logger.error("Could not encode data to UTF-8 -- %s" % e)
-            return f'{data}'.encode('UTF-8')
-
-    def _try_decode_utf8(self, data: bytes) -> str:
-        try:
-            return data.decode('utf-8')
-        except UnicodeDecodeError:
-            _logger.warning(f"Cannot decode {data} to string!!")
-            return f"{data}"
 
 
 class WebsocketSessionImpl(WebsocketSession):
@@ -498,9 +488,10 @@ class WebsocketSessionImpl(WebsocketSession):
         if isinstance(message, bytes):
             msg = message
         elif isinstance(message, str):
-            msg = self.__handler._encode_to_utf8(message)
+            msg = message.encode(DEFAULT_ENCODING, errors="replace")
         else:
-            raise _WebsocketException(reason=WebsocketCloseReason(f"message {message} is not a string nor a bytes object, cannot send it to client. "))
+            raise _WebsocketException(reason=WebsocketCloseReason(
+                f"message {message} is not a string nor a bytes object, cannot send it to client. "))
         self.__handler.send_bytes(opcode if opcode is None else WEBSOCKET_OPCODE_TEXT, msg, chunk_size=chunk_size)
 
     def send_text(self, message: str, chunk_size: int = 0):
