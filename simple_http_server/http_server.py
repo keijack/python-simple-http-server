@@ -63,12 +63,12 @@ class HTTPServer(TCPServer, RoutingServer):
         self.server_port = port
 
     def __init__(self, addr, res_conf={}, max_workers: int = None):
-        TCPServer.__init__(self, addr, SocketServerStreamRequestHandlerWraper)
         RoutingServer.__init__(self, res_conf)
         self.max_workers = max_workers or self._default_max_workers
         self.threadpool: ThreadPoolExecutor = ThreadPoolExecutor(
             thread_name_prefix="ReqThread",
             max_workers=self.max_workers)
+        TCPServer.__init__(self, addr, SocketServerStreamRequestHandlerWraper)
 
     def process_request_thread(self, request, client_address):
         try:
