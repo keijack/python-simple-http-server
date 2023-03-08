@@ -22,7 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-import html, re
+import html
+import re
 import http.client
 import email.parser
 import email.message
@@ -63,7 +64,7 @@ class RequestWriter:
 
 class HttpProtocolHandler:
 
-    server_version = "simple-http-server/" + __version__
+    server_version = f"simple-http-server/{__version__}"
 
     default_request_version = "HTTP/1.1"
 
@@ -101,7 +102,6 @@ class HttpProtocolHandler:
         self._connection_idle_time = routing_conf.connection_idle_time
         self._keep_alive_max_req = routing_conf.keep_alive_max_request
         self.req_count = 0
-        
 
     async def parse_request(self):
         self.req_count += 1
@@ -206,12 +206,9 @@ class HttpProtocolHandler:
             return False
 
         conntype = self.headers.get('Connection', '')
-        if (conntype.lower() == 'keep-alive' and
-              self.protocol_version == "HTTP/1.1" and
-              self._keep_alive):
-            self.close_connection = False
-        else:
-            self.close_connection = True
+
+        self.close_connection = not self._keep_alive or conntype.lower() != 'keep-alive' or self.protocol_version != "HTTP/1.1"
+
         # Examine the headers and look for an Expect directive
         expect = self.headers.get('Expect', "")
         if (expect.lower() == "100-continue" and
@@ -347,7 +344,6 @@ class HttpProtocolHandler:
                 self._headers_buffer = []
             self._headers_buffer.append(
                 f"{keyword}: {value}\r\n".encode('latin-1', errors='strict'))
-
 
     def end_headers(self):
         """Send the blank line ending the MIME headers."""

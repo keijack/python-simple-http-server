@@ -41,7 +41,7 @@ from simple_http_server.logger import get_logger
 
 _logger = get_logger("simple_http_server.server")
 __lock = threading.Lock()
-_server: http_server.RoutingServer = None
+_server: http_server.SimpleDispatcherHttpServer = None
 
 
 def _is_match(string="", regx=r""):
@@ -151,9 +151,9 @@ def _prepare_server(host: str = "",
     err_pages = _get_error_pages()
     for code, func in err_pages.items():
         _server.map_error_page(code, func)
-    _server.keep_alive = keep_alive
-    _server.connection_idle_time = connection_idle_time
-    _server.keep_alive_max_request = keep_alive_max_request
+    _server.server.keep_alive = keep_alive
+    _server.server.connection_idle_time = connection_idle_time
+    _server.server.keep_alive_max_request = keep_alive_max_request
 
 
 def start(host: str = "",

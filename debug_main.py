@@ -3,8 +3,10 @@ from simple_http_server import request_map
 from wsgiref.simple_server import WSGIServer, make_server
 import simple_http_server.server as server
 import os
+import sys
 import signal
 from threading import Thread
+from simple_http_server.__main__ import main
 from simple_http_server.logger import get_logger, set_level
 set_level("DEBUG")
 
@@ -62,8 +64,9 @@ def on_sig_term(signum, frame):
 
 
 if __name__ == "__main__":
-    signal.signal(signal.SIGTERM, on_sig_term)
-    signal.signal(signal.SIGINT, on_sig_term)
+    # signal.signal(signal.SIGTERM, on_sig_term)
+    # signal.signal(signal.SIGINT, on_sig_term)
 
-    start_server()
+    # start_server()
     # start_server_wsgi()
+    main(sys.argv[1:])
