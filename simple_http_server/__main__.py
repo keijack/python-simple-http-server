@@ -47,7 +47,7 @@ def main(argv):
         server.start(
             host=binding_host,
             port=port,
-            resources={"/*": working_dir},
+            resources={"/**": working_dir},
             keep_alive=False,
             prefer_coroutine=False)
     except Exception:
