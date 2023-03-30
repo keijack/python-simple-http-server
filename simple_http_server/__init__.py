@@ -23,7 +23,7 @@ SOFTWARE.
 """
 
 from .app_conf import *
-from .base_models import *
+from .basic_models import *
 
 name = "simple_http_server"
 version = "0.20.0"

@@ -36,7 +36,7 @@ from uuid import uuid4
 from socket import error as SocketError
 
 from .logger import get_logger
-from .base_models import Headers, WebsocketCloseReason, WebsocketRequest, WebsocketSession, \
+from .basic_models import Headers, WebsocketCloseReason, WebsocketRequest, WebsocketSession, \
     WEBSOCKET_OPCODE_BINARY, WEBSOCKET_OPCODE_CLOSE, WEBSOCKET_OPCODE_CONTINUATION, WEBSOCKET_OPCODE_PING, WEBSOCKET_OPCODE_PONG, WEBSOCKET_OPCODE_TEXT, \
     DEFAULT_ENCODING
 

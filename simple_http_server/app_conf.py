@@ -26,7 +26,7 @@ import sys
 import inspect
 from typing import Any, Dict, List, Union, Callable
 
-from .base_models import SessionFactory
+from .basic_models import SessionFactory
 from .logger import get_logger
 
 _logger = get_logger("simple_http_server.anno")

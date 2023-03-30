@@ -35,7 +35,7 @@ from urllib.parse import unquote
 
 from typing import Any, Callable, Dict, List, Tuple
 
-from .base_models import StaticFile, SessionFactory
+from .basic_models import StaticFile, SessionFactory
 from .app_conf import WebsocketHandlerClass, ControllerFunction
 
 from .__utils import remove_url_first_slash, get_function_args, get_function_kwargs, get_path_reg_pattern
