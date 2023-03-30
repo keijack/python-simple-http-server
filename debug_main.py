@@ -6,8 +6,11 @@ import os
 import sys
 import signal
 from threading import Thread
+from time import sleep
 from simple_http_server.__main__ import main
+from simple_http_server.http_server import HttpServer
 from simple_http_server.logger import get_logger, set_level
+from simple_http_server import get_app_conf
 set_level("DEBUG")
 
 
@@ -20,10 +23,22 @@ def stop():
 _logger = get_logger("http_test")
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 
+_server: HttpServer = None
+
+
+def start_via_class():
+    global _server
+    app = get_app_conf("2")
+    _server = HttpServer(host=('', 9091),
+                         resources={"/p/**": f"{PROJECT_ROOT}/tests/static"},
+                         app_conf=app)
+    _server.start()
+
 
 def start_server():
     _logger.info("start server in background. ")
-    server.scan(base_dir="tests/ctrls", regx=r'.*controllers.*')
+    
+    server.scan(base_dir="tests/ctrls", regx=r'.*controllers.*', project_dir=os.path.dirname(__file__))
     server.start(
         # port=9443,
         port=9090,
@@ -61,12 +76,15 @@ def on_sig_term(signum, frame):
     else:
         _logger.info(f"Receive signal [{signum}], stop server now...")
         server.stop()
+    if _server:
+        _server.shutdown()
 
 
 if __name__ == "__main__":
-    # signal.signal(signal.SIGTERM, on_sig_term)
-    # signal.signal(signal.SIGINT, on_sig_term)
-
-    # start_server()
+    signal.signal(signal.SIGTERM, on_sig_term)
+    signal.signal(signal.SIGINT, on_sig_term)
+    Thread(target=start_server, daemon=True).start()
+    sleep(1)
+    start_via_class()
     # start_server_wsgi()
-    main(sys.argv[1:])
+    # main(sys.argv[1:])

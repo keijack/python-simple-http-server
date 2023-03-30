@@ -38,7 +38,7 @@ from time import sleep
 
 from typing import Dict,  Tuple
 
-from simple_http_server import ControllerFunction, WebsocketHandlerClass
+from .app_conf import ControllerFunction, WebsocketHandlerClass, AppConf, get_app_conf, _get_session_factory
 from .http_protocol_handler import HttpProtocolHandler, SocketServerStreamRequestHandlerWraper
 from .wsgi_request_handler import WSGIRequestHandler
 
@@ -46,10 +46,10 @@ from .wsgi_request_handler import WSGIRequestHandler
 from .logger import get_logger
 from .routing_server import RoutingServer
 
-_logger = get_logger("simple_http_server.http_server")
+_logger = get_logger("simple_httpself.http_server")
 
 
-class HTTPServer(TCPServer, RoutingServer):
+class ThreadingHTTPServer(TCPServer, RoutingServer):
 
     allow_reuse_address = 1    # Seems to make sense in testing environment
 
@@ -157,7 +157,7 @@ class CoroutineHTTPServer(RoutingServer):
                 self._shutdown()
 
 
-class SimpleDispatcherHttpServer:
+class HttpServer:
     """Dispatcher Http server"""
 
     def map_filter(self, filter_conf):
@@ -183,7 +183,11 @@ class SimpleDispatcherHttpServer:
                  ssl_context: SSLContext = None,
                  resources: Dict[str, str] = {},
                  prefer_corountine=False,
-                 max_workers: int = None):
+                 max_workers: int = None,
+                 connection_idle_time=None,
+                 keep_alive=True,
+                 keep_alive_max_request=None,
+                 app_conf: AppConf = None):
         self.host = host
         self.__ready = False
 
@@ -210,11 +214,35 @@ class SimpleDispatcherHttpServer:
         else:
             _logger.info(
                 f"Start server in threading mixed mode, listen to port {self.host[1]}")
-            self.server = HTTPServer(
+            self.server = ThreadingHTTPServer(
                 self.host, resources, max_workers=max_workers)
             if self.ssl_ctx:
                 self.server.socket = self.ssl_ctx.wrap_socket(
                     self.server.socket, server_side=True)
+        appconf = app_conf or get_app_conf()
+
+        filters = appconf._get_filters()
+        # filter configuration
+        for ft in filters:
+            self.map_filter(ft)
+
+        request_mappings = appconf._get_request_mappings()
+        # request mapping
+        for ctr in request_mappings:
+            self.map_controller(ctr)
+
+        ws_handlers = appconf._get_websocket_handlers()
+
+        for wshandler in ws_handlers:
+            self.map_websocket_handler(wshandler)
+
+        err_pages = appconf._get_error_pages()
+        for code, func in err_pages.items():
+            self.map_error_page(code, func)
+        self.server.keep_alive = keep_alive
+        self.server.connection_idle_time = connection_idle_time
+        self.server.keep_alive_max_request = keep_alive_max_request
+        self.server.session_factory = appconf.session_factory or _get_session_factory()
 
     @property
     def ready(self):

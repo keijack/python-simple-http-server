@@ -34,12 +34,13 @@ import datetime
 
 from typing import Any, Callable, Dict, List, Tuple, Union
 
-from simple_http_server import FilterContex, ModelDict, Environment, RegGroup, RegGroups, HttpError, RequestBodyReader, StaticFile, \
+from .base_models import FilterContex, ModelDict, Environment, RegGroup, RegGroups, HttpError, RequestBodyReader, StaticFile, \
     Headers, Redirect, Response, Cookies, Cookie, JSONBody, BytesBody, Header, Parameters, PathValue, \
-    Parameter, MultipartFile, Request, Session, ControllerFunction, _get_session_factory, \
-    DEFAULT_ENCODING, SESSION_COOKIE_NAME
+    Parameter, MultipartFile, Request, Session, SessionFactory, DEFAULT_ENCODING, SESSION_COOKIE_NAME
+from .app_conf import ControllerFunction
 import simple_http_server.__utils as utils
 
+from ._http_session_local_impl import LocalSessionFactory
 from .logger import get_logger
 from .__utils import get_function_args, get_function_kwargs
 
@@ -83,6 +84,7 @@ class RequestWrapper(Request):
         self.__session = None
         self._socket_req = None
         self._coroutine_objects = []
+        self._session_fac: SessionFactory = None
 
     @property
     def host(self) -> str:
@@ -109,7 +111,7 @@ class RequestWrapper(Request):
         if not self.__session:
             sid = self.cookies[SESSION_COOKIE_NAME].value if SESSION_COOKIE_NAME in self.cookies.keys(
             ) else ""
-            session_fac = _get_session_factory()
+            session_fac = self._session_fac or LocalSessionFactory()
             self.__session = session_fac.get_session(sid, create)
         return self.__session
 
@@ -701,6 +703,7 @@ class HTTPRequestHandler:
         req.environment = self.environment or {}
         req.path = "/" + path
         req._path = path
+        req._session_fac = self.routing_conf.session_factory
         headers = {}
         _headers_keys_in_lowers = {}
         for k in self.headers.keys():

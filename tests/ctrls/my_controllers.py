@@ -21,6 +21,7 @@ from simple_http_server import Session
 from simple_http_server import request_map, route
 from simple_http_server import controller
 from simple_http_server import error_message
+from simple_http_server.app_conf import get_app_conf
 import os
 import simple_http_server.logger as logger
 
@@ -30,9 +31,12 @@ _logger = logger.get_logger("my_test_main")
 
 _logger = logger.get_logger("controller")
 
+_app = get_app_conf("2")
+
 
 @request_map("/")
 @request_map("/index")
+@_app.route("/")
 def my_ctrl():
     return {"code": 0, "message": "success"}  # You can return a dictionary, a string or a `simple_http_server.simple_http_server.Response` object.
 

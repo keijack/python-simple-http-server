@@ -36,12 +36,12 @@ import simple_http_server.http_server as http_server
 from simple_http_server.app_conf import get_app_conf, AppConf
 from simple_http_server._http_session_local_impl import LocalSessionFactory
 from simple_http_server.logger import get_logger
-from simple_http_server import set_session_factory, _get_session_factory
+from .app_conf import set_session_factory
 
 
 _logger = get_logger("simple_http_server.server")
 __lock = threading.Lock()
-_server: http_server.SimpleDispatcherHttpServer = None
+_server: http_server.HttpServer = None
 
 
 def _is_match(string="", regx=r""):
@@ -122,41 +122,20 @@ def _prepare_server(host: str = "",
         global _server
         if _server is not None:
             _server.shutdown()
-        if not _get_session_factory():
-            set_session_factory(LocalSessionFactory())
-        _server = http_server.SimpleDispatcherHttpServer(host=(host, port),
-                                                         ssl=ssl,
-                                                         ssl_protocol=ssl_protocol,
-                                                         ssl_check_hostname=ssl_check_hostname,
-                                                         keyfile=keyfile,
-                                                         certfile=certfile,
-                                                         keypass=keypass,
-                                                         ssl_context=ssl_context,
-                                                         resources=resources,
-                                                         prefer_corountine=prefer_coroutine)
-    appconf = app_conf or get_app_conf()
-
-    filters = appconf._get_filters()
-    # filter configuration
-    for ft in filters:
-        _server.map_filter(ft)
-
-    request_mappings = appconf._get_request_mappings()
-    # request mapping
-    for ctr in request_mappings:
-        _server.map_controller(ctr)
-
-    ws_handlers = appconf._get_websocket_handlers()
-
-    for wshandler in ws_handlers:
-        _server.map_websocket_handler(wshandler)
-
-    err_pages = appconf._get_error_pages()
-    for code, func in err_pages.items():
-        _server.map_error_page(code, func)
-    _server.server.keep_alive = keep_alive
-    _server.server.connection_idle_time = connection_idle_time
-    _server.server.keep_alive_max_request = keep_alive_max_request
+        _server = http_server.HttpServer(host=(host, port),
+                                         ssl=ssl,
+                                         ssl_protocol=ssl_protocol,
+                                         ssl_check_hostname=ssl_check_hostname,
+                                         keyfile=keyfile,
+                                         certfile=certfile,
+                                         keypass=keypass,
+                                         ssl_context=ssl_context,
+                                         resources=resources,
+                                         connection_idle_time=connection_idle_time,
+                                         keep_alive=keep_alive,
+                                         keep_alive_max_request=keep_alive_max_request,
+                                         prefer_corountine=prefer_coroutine,
+                                         app_conf=app_conf)
 
 
 def start(host: str = "",
@@ -172,7 +151,8 @@ def start(host: str = "",
           connection_idle_time=None,
           keep_alive=True,
           keep_alive_max_request=None,
-          prefer_coroutine=False) -> None:
+          prefer_coroutine=False,
+          app_conf: AppConf = None) -> None:
     _prepare_server(
         host=host,
         port=port,
@@ -187,7 +167,8 @@ def start(host: str = "",
         connection_idle_time=connection_idle_time,
         keep_alive=keep_alive,
         keep_alive_max_request=keep_alive_max_request,
-        prefer_coroutine=prefer_coroutine
+        prefer_coroutine=prefer_coroutine,
+        app_conf=app_conf
     )
     # start the server
     _server.start()
@@ -206,7 +187,8 @@ async def start_async(host: str = "",
                       connection_idle_time=None,
                       keep_alive=True,
                       keep_alive_max_request=None,
-                      prefer_coroutine=True) -> None:
+                      prefer_coroutine=True,
+                      app_conf: AppConf = None) -> None:
     _prepare_server(
         host=host,
         port=port,
@@ -221,7 +203,8 @@ async def start_async(host: str = "",
         connection_idle_time=connection_idle_time,
         keep_alive=keep_alive,
         keep_alive_max_request=keep_alive_max_request,
-        prefer_coroutine=prefer_coroutine
+        prefer_coroutine=prefer_coroutine,
+        app_conf=app_conf
     )
 
     # start the server
@@ -244,10 +227,9 @@ def stop() -> None:
 
 
 def init_wsgi_proxy(resources: Dict[str, str] = {}, session_factory=None, app_conf: AppConf = None) -> http_server.WSGIProxy:
-
-    set_session_factory(session_factory or LocalSessionFactory())
     proxy = http_server.WSGIProxy(res_conf=resources)
     appconf = app_conf or get_app_conf()
+    set_session_factory(session_factory or appconf.session_factory or LocalSessionFactory())
     filters = appconf._get_filters()
     # filter configuration
     for ft in filters:

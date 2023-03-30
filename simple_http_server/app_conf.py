@@ -26,12 +26,13 @@ import sys
 import inspect
 from typing import Any, Dict, List, Union, Callable
 
+from .base_models import SessionFactory
 from .logger import get_logger
 
 _logger = get_logger("simple_http_server.anno")
 
 
-def get_class_of_method(method_defind):
+def _get_class_of_method(method_defind):
     vals = vars(sys.modules[method_defind.__module__])
     for attr in method_defind.__qualname__.split('.')[:-1]:
         if attr in vals:
@@ -42,7 +43,7 @@ def get_class_of_method(method_defind):
         return vals
 
 
-def create_object(clz, args=[], kwargs={}):
+def _create_object(clz, args=[], kwargs={}):
 
     if clz is None:
         return None
@@ -56,7 +57,7 @@ def create_object(clz, args=[], kwargs={}):
         return clz()
 
 
-def to_str_list(obj: Union[str, list, tuple]):
+def _to_str_list(obj: Union[str, list, tuple]):
     if isinstance(obj, list) or isinstance(obj, tuple):
         return [str(it) for it in obj]
     else:
@@ -123,7 +124,7 @@ class ControllerFunction:
         if self.__clz != False:
             return self.__clz
         if inspect.isfunction(self.func):
-            self.__clz = get_class_of_method(self.func)
+            self.__clz = _get_class_of_method(self.func)
         else:
             self.__clz = None
         return self.__clz
@@ -143,7 +144,7 @@ class ControllerFunction:
         return self.__ctr_obj
 
     def _create_ctrl_obj(self) -> object:
-        return create_object(self.clz, self.ctr_obj_init_args, self.ctr_obj_init_kwargs)
+        return _create_object(self.clz, self.ctr_obj_init_args, self.ctr_obj_init_kwargs)
 
     @ctrl_object.setter
     def ctrl_object(self, val) -> None:
@@ -207,7 +208,7 @@ class WebsocketHandlerClass:
         return self.__ctr_obj
 
     def _create_ctrl_obj(self) -> object:
-        return create_object(self.cls, self.ctr_obj_init_args, self.ctr_obj_init_kwargs)
+        return _create_object(self.cls, self.ctr_obj_init_args, self.ctr_obj_init_kwargs)
 
     @ctrl_object.setter
     def ctrl_object(self, val) -> None:
@@ -332,7 +333,11 @@ class AppConf:
         self._ws_handlers: List[WebsocketHandlerClass] = []
 
         self._error_page = {}
+
+        self.session_factory: SessionFactory = None
+
         self.request_map("/favicon.ico")(_favicon)
+        self.route = self.request_map
 
     def controller(self, *anno_args, singleton: bool = True, args: List[Any] = [], kwargs: Dict[str, Any] = {}):
         def map(ctr_obj_class):
@@ -371,8 +376,8 @@ class AppConf:
             else:
                 mths = [m.strip() for m in method.split(',')]
 
-            hs = to_str_list(headers)
-            ps = to_str_list(params)
+            hs = _to_str_list(headers)
+            ps = _to_str_list(params)
 
             if inspect.isclass(ctrl):
                 self._request_clz_mapping[ctrl] = ControllerFunction(url=_url,
@@ -426,7 +431,7 @@ class AppConf:
 
     def _get_singletion(self, clz, args, kwargs):
         if clz not in self._ctrl_singletons:
-            self._ctrl_singletons[clz] = create_object(clz, args, kwargs)
+            self._ctrl_singletons[clz] = _create_object(clz, args, kwargs)
         return self._ctrl_singletons[clz]
 
     def websocket_handler(self, endpoint: str = "", regexp: str = "", singleton: bool = True) -> Callable:
@@ -538,6 +543,7 @@ class AppConf:
 
 
 _default_app_conf = AppConf()
+_app_confs: Dict[str, AppConf] = {}
 
 
 def controller(*anno_args, singleton: bool = True, args: List[Any] = [], kwargs: Dict[str, Any] = {}):
@@ -582,4 +588,20 @@ def error_message(*anno_args):
 
 
 def get_app_conf(tag: str = "") -> AppConf:
-    return _default_app_conf
+    if not tag:
+        return _default_app_conf
+    if tag not in _app_confs:
+        _app_confs[tag] = AppConf()
+    return _app_confs[tag]
+
+
+_session_facory: SessionFactory = None
+
+
+def set_session_factory(session_factory: SessionFactory):
+    global _session_facory
+    _session_facory = session_factory
+
+
+def _get_session_factory() -> SessionFactory:
+    return _session_facory

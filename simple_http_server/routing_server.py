@@ -35,7 +35,8 @@ from urllib.parse import unquote
 
 from typing import Any, Callable, Dict, List, Tuple
 
-from simple_http_server import ControllerFunction, StaticFile, WebsocketHandlerClass
+from .base_models import StaticFile, SessionFactory
+from .app_conf import WebsocketHandlerClass, ControllerFunction
 
 from .__utils import remove_url_first_slash, get_function_args, get_function_kwargs, get_path_reg_pattern
 from .logger import get_logger
@@ -72,6 +73,7 @@ class RoutingServer:
         self.keep_alive = True
         self.__connection_idle_time: float = 60
         self.__keep_alive_max_request: int = 10
+        self.session_factory: SessionFactory = None
 
     @property
     def connection_idle_time(self):
