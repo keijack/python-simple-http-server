@@ -47,7 +47,7 @@ from .http_request_handler import HTTPRequestHandler
 from .websocket_request_handler import WebsocketRequestHandler
 
 
-_MAXLINE = 65536
+_LINE_MAX_BYTES = 65536
 _MAXHEADERS = 100
 
 _logger = get_logger("simple_http_server.http_protocol_handler")
@@ -119,7 +119,7 @@ class HttpProtocolHandler:
         except TimeoutError:
             _logger.warn("Wait for reading request line timeout. ")
             return False
-        if len(raw_requestline) > _MAXLINE:
+        if len(raw_requestline) > _LINE_MAX_BYTES:
             self.requestline = ''
             self.request_version = ''
             self.command = ''
@@ -231,7 +231,7 @@ class HttpProtocolHandler:
         headers = []
         while True:
             line = await self.reader.readline()
-            if len(line) > _MAXLINE:
+            if len(line) > _LINE_MAX_BYTES:
                 raise http.client.LineTooLong("header line")
             headers.append(line)
             if len(headers) > _MAXHEADERS:
@@ -437,7 +437,7 @@ class SocketServerStreamRequestHandlerWraper(socketserver.StreamRequestHandler, 
 
     # Wrapper method for readline
     async def readline(self):
-        return self.rfile.readline(_MAXLINE)
+        return self.rfile.readline(_LINE_MAX_BYTES)
 
     async def read(self, n: int = -1):
         return self.rfile.read(n)
