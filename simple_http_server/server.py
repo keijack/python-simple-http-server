@@ -63,10 +63,22 @@ def _to_module_name(fpath="", regx=r""):
 
 
 def _load_all_modules(work_dir, pkg, regx):
-    abs_folder = work_dir + "/" + pkg
-    all_files = os.listdir(abs_folder)
+    abs_folder = os.path.join(work_dir, pkg)
+    if os.path.isfile(abs_folder):
+        return [_to_module_name(pkg, regx)]
+    if not os.path.exists(abs_folder):
+        if abs_folder.endswith(".py"):
+            _logger.warning(f"Cannot find package {pkg}, file [{abs_folder}] is not exist")
+            return []
+        if os.path.isfile(abs_folder + ".py"):
+            return [_to_module_name(pkg + ".py", regx)]
+        else:
+            _logger.warning(f"Cannot find package {pkg}, file [{abs_folder}] is not exist")
+            return []
+
     modules = []
     folders = []
+    all_files = os.listdir(abs_folder)
     for f in all_files:
         if os.path.isfile(os.path.join(abs_folder, f)):
             mname = _to_module_name(os.path.join(pkg, f), regx)
@@ -88,6 +100,14 @@ def _import_module(mname):
 
 
 def scan(base_dir: str = "", regx: str = r"", project_dir: str = "") -> None:
+    """
+    Scan the given directory to import controllers. 
+
+    - base_dir: the directory to scan. 
+    - regx: only include the modules that match this regular expression, if absent, all files will be included.
+    - project_dir: the project directory, default to the entrance file directory. 
+
+    """
     if project_dir:
         work_dir = project_dir
     else:

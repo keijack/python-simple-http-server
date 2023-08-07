@@ -38,7 +38,7 @@ def start_via_class():
 def start_server():
     _logger.info("start server in background. ")
     
-    server.scan(base_dir="tests/ctrls", regx=r'.*controllers.*', project_dir=os.path.dirname(__file__))
+    server.scan(base_dir="tests/ctrls", regx=r'.*controllers.*')
     server.start(
         # port=9443,
         port=9090,
