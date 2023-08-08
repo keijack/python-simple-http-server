@@ -95,8 +95,8 @@ def _load_all_modules(work_dir, pkg, regx):
 def _import_module(mname):
     try:
         importlib.import_module(mname)
-    except:
-        _logger.warning(f"Import moudle [{mname}] error!")
+    except Exception as e:
+        _logger.warning(f"Import moudle [{mname}] error! {e}")
 
 
 def scan(base_dir: str = "", regx: str = r"", project_dir: str = "") -> None:

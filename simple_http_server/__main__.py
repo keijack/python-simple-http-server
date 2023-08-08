@@ -32,7 +32,7 @@ def on_sig_term(signum, frame):
 def main(argv):
     try:
         opts = getopt.getopt(argv, "p:b:s:r:h",
-                             ["port=", "bind=", "scan=", "resources=", "--regex=", "loglevel=", "help"])[0]
+                             ["port=", "bind=", "scan=", "resources=", "regex=", "loglevel=", "help"])[0]
         opts = dict(opts)
         if "-h" in opts or "--help" in opts:
             print_help()
@@ -55,7 +55,7 @@ def main(argv):
             resources={"/**": res_dir},
             keep_alive=False,
             prefer_coroutine=False)
-    except Exception:
+    except Exception as e:
         print_help()
 
 
