@@ -25,10 +25,17 @@ PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 
 _server: HttpServer = None
 
+app = get_app_conf("2")
+
+
+@app.route("/")
+def idx():
+    return {"msg": "hello, world!"}
+
 
 def start_via_class():
     global _server
-    app = get_app_conf("2")
+
     _server = HttpServer(host=('', 9091),
                          resources={"/p/**": f"{PROJECT_ROOT}/tests/static"},
                          app_conf=app)
@@ -37,7 +44,7 @@ def start_via_class():
 
 def start_server():
     _logger.info("start server in background. ")
-    
+
     server.scan(base_dir="tests/ctrls", regx=r'.*controllers.*')
     server.start(
         # port=9443,
@@ -83,9 +90,9 @@ def on_sig_term(signum, frame):
 if __name__ == "__main__":
     signal.signal(signal.SIGTERM, on_sig_term)
     signal.signal(signal.SIGINT, on_sig_term)
-    #Thread(target=start_server, daemon=True).start()
-    #sleep(1)
-    #start_via_class()
-    #start_server_wsgi()
-    #main(sys.argv[1:])
+    Thread(target=start_via_class, daemon=True).start()
+    # sleep(1)
+    # start_via_class()
+    # start_server_wsgi()
+    # main(sys.argv[1:])
     start_server()
