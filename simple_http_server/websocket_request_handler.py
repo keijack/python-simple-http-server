@@ -260,9 +260,9 @@ class WebsocketRequestHandler:
             await self.on_open()
 
     def calculate_response_key(self):
+        key: str = self.ws_request.headers["Sec-WebSocket-Key"] if "Sec-WebSocket-Key" in self.ws_request.headers else self.ws_request.headers["Sec-Websocket-Key"]
         _logger.debug(
-            f"Sec-WebSocket-Key: {self.ws_request.headers['Sec-WebSocket-Key']}")
-        key: str = self.ws_request.headers["Sec-WebSocket-Key"]
+            f"Sec-WebSocket-Key: {key}")
         key_hash = sha1(key.encode(errors="replace") + GUID.encode(errors="replace"))
         response_key = b64encode(key_hash.digest()).strip()
         return response_key.decode('ASCII', errors="replace")

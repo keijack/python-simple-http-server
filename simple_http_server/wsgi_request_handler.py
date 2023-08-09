@@ -31,6 +31,7 @@ from http import HTTPStatus
 from .http_request_handler import HTTPRequestHandler
 from .logger import get_logger
 
+
 _logger = get_logger("simple_http_server.wsgi_request_server")
 
 
@@ -105,9 +106,14 @@ class WSGIRequestHandler:
         pass
 
     async def handle_request(self) -> List[bytes]:
-        handler = HTTPRequestHandler(self, environment=self.env)
-        await handler.handle_request()
-        self.start_response(self.status, self.response_headers)
+        _logger.debug(f"Headers: {self.headers}")
+        if self.command == "GET" and "Upgrade" in self.headers and self.headers["Upgrade"] == "websocket":
+            self.send_error(501)
+            self.start_response(self.status, self.response_headers)
+        else:
+            handler = HTTPRequestHandler(self, environment=self.env)
+            await handler.handle_request()
+            self.start_response(self.status, self.response_headers)
         return self.body
 
     def send_header(self, key, val):

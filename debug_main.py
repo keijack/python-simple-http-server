@@ -8,6 +8,7 @@ import signal
 from threading import Thread
 from time import sleep
 from simple_http_server.__main__ import main
+# from werkzeug.serving import make_server as mk_server
 from simple_http_server.http_server import HttpServer
 from simple_http_server.logger import get_logger, set_level
 from simple_http_server import get_app_conf
@@ -75,6 +76,18 @@ def start_server_wsgi():
     wsgi_server = make_server("", 9090, wsgi_proxy.app_proxy)
     wsgi_server.serve_forever()
 
+"""
+def start_server_werkzeug():
+    server.scan(base_dir="tests/ctrls", regx=r'.*controllers.*')
+    wsgi_proxy = server.init_wsgi_proxy(
+        resources={"/public/*": f"{PROJECT_ROOT}/tests/static",
+                   "/*": f"{PROJECT_ROOT}/tests/static"})
+
+    global wsgi_server
+    wsgi_server = mk_server("", 9090, wsgi_proxy.app_proxy)
+    wsgi_server.serve_forever()
+"""
+
 
 def on_sig_term(signum, frame):
     if wsgi_server:
@@ -90,9 +103,10 @@ def on_sig_term(signum, frame):
 if __name__ == "__main__":
     signal.signal(signal.SIGTERM, on_sig_term)
     signal.signal(signal.SIGINT, on_sig_term)
-    Thread(target=start_via_class, daemon=True).start()
+    # Thread(target=start_via_class, daemon=True).start()
     # sleep(1)
     # start_via_class()
-    # start_server_wsgi()
     # main(sys.argv[1:])
-    start_server()
+    # start_server()
+    start_server_wsgi()
+    # start_server_werkzeug()
