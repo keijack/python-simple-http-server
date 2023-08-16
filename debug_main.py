@@ -82,6 +82,17 @@ def start_server_wsgi():
     wsgi_server.serve_forever()
 
 
+def start_server_werkzeug():
+    server.scan(base_dir="tests/ctrls", regx=r'.*controllers.*')
+    wsgi_proxy = server.init_wsgi_proxy(
+        resources={"/public/*": f"{PROJECT_ROOT}/tests/static",
+                   "/*": f"{PROJECT_ROOT}/tests/static"})
+
+    global wsgi_server
+    wsgi_server = mk_server("", 9090, wsgi_proxy.app_proxy)
+    wsgi_server.serve_forever()
+
+
 asgi_server: uvicorn.Server = None
 
 asgi_proxy: ASGIProxy = None
@@ -105,17 +116,6 @@ def start_server_uvicorn():
     global asgi_server
     asgi_server = uvicorn.Server(config)
     asgi_server.run()
-
-
-def start_server_werkzeug():
-    server.scan(base_dir="tests/ctrls", regx=r'.*controllers.*')
-    wsgi_proxy = server.init_wsgi_proxy(
-        resources={"/public/*": f"{PROJECT_ROOT}/tests/static",
-                   "/*": f"{PROJECT_ROOT}/tests/static"})
-
-    global wsgi_server
-    wsgi_server = mk_server("", 9090, wsgi_proxy.app_proxy)
-    wsgi_server.serve_forever()
 
 
 def on_sig_term(signum, frame):

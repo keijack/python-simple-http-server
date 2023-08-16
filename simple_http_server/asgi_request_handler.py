@@ -27,16 +27,21 @@ import html
 import io
 import simple_http_server.__utils as utils
 
-from typing import Any, Dict, List, Union, Coroutine
+from typing import Any, Dict, List, Tuple, Union, Coroutine
 from http import HTTPStatus
 from .http_request_handler import HTTPRequestHandler
 from .logger import get_logger
-
+from .websocket_request_handler import *
 
 _logger = get_logger("simple_http_server.asgi_request_server")
 
 
 class ASGIRequestHandler:
+
+    res_code_msg = {
+        v: (v.phrase, v.description)
+        for v in HTTPStatus.__members__.values()
+    }
 
     def __init__(self, routing_conf, scope, receive, send) -> None:
         self.scope: Dict[str, Union[str, bytes]] = scope
@@ -44,7 +49,7 @@ class ASGIRequestHandler:
         self.send: Coroutine = send
 
         self.status = 200
-        self.__res_headers: Dict[str, List[str]] = {}
+        self._res_headers: Dict[str, List[str]] = {}
 
         self.routing_conf = routing_conf
         self.headers = self._parse_headers()
@@ -58,6 +63,7 @@ class ASGIRequestHandler:
         self.req_body_reader: io.BytesIO = None
 
         self.res_body_writer: io.BytesIO = io.BytesIO(b'')
+        self.request_writer = None
 
     @property
     def command(self):
@@ -94,11 +100,7 @@ class ASGIRequestHandler:
         pass
 
     async def handle_request(self):
-        if self.scope["type"] == "websocket":
-            self.send_error(501)
-            # TODO
-            await self.send({"type": "http.response.body"})
-        elif self.scope["type"] == "http":
+        if self.scope["type"] == "http":
             if "Content-Length" in self.headers:
                 while True:
                     recv: dict = await self.receive()
@@ -112,27 +114,34 @@ class ASGIRequestHandler:
                         break
             handler = HTTPRequestHandler(self, environment=self.scope)
             await handler.handle_request()
-            res_start = {
+
+            res_headers: List[List] = []
+            for name, val_arr in self._res_headers.items():
+                for val in val_arr:
+                    res_headers.append([name.encode(), val.encode()])
+
+            await self.send({
                 "type": "http.response.start",
                 "status": self.status,
-                "headers": []
-            }
-            for name, val_arr in self.__res_headers.items():
-                for val in val_arr:
-                    res_start["headers"].append([name.encode(), val.encode()])
-            await self.send(res_start)
+                "headers": res_headers
+            })
             await self.send({
                 "type": "http.response.body",
                 "body": self.res_body_writer.getvalue()
             })
+        elif self.scope["type"] == "websocket":
+            handler = ASGIWebsocketRequestHandler(self)
+            await handler.handle_request()
+        else:
+            _logger.error(f"Do nost support scope type:: {self.scope['type']}")
 
     def send_header(self, name, val):
         name = str(name)
         val = str(val)
-        if name not in self.__res_headers:
-            self.__res_headers[name] = [val]
+        if name not in self._res_headers:
+            self._res_headers[name] = [val]
         else:
-            self.__res_headers[name].append(val)
+            self._res_headers[name].append(val)
 
     def end_headers(self):
         pass
@@ -209,3 +218,161 @@ class ASGIRequestHandler:
 
         if self.command != 'HEAD' and body:
             self.write(body)
+
+
+class ASGIWebsocketRequestHandler(WebsocketRequestHandler):
+
+    def __init__(self, http_protocol_handler: ASGIRequestHandler) -> None:
+        super().__init__(http_protocol_handler)
+        self.http_protocol_handler = http_protocol_handler
+
+        self.out_msg_queue: asyncio.Queue = asyncio.Queue()
+
+    @property
+    def response_headers(self) -> Dict[str, List[str]]:
+        return ""
+
+    async def handle_request(self):
+        await self.handshake()
+        if not self.keep_alive:
+            return
+
+        async with asyncio.TaskGroup() as task_group:
+            task_group.create_task(self._receive())
+            task_group.create_task(self._send())
+
+        await self.on_close()
+
+    async def handshake(self):
+        subprotocol: str = None
+        headers: List[List[str]] = []
+        if self.handler:
+            code, hs = await self.on_handshake()
+            if code and code != 101:
+                self.keep_alive = False
+                self.send_response(code)
+            else:
+                self.send_response(101)
+            if hs:
+                for h_name, h_val in hs.items():
+                    if h_name.lower() == "sec-websocket-protocol":
+                        subprotocol = str(h_val)
+                        continue
+                    name = h_name.encode()
+                    if isinstance(h_val, bytes):
+                        headers.append[name, h_val]
+                    elif isinstance(h_val, list):
+                        for val in h_val:
+                            headers.append[name, str(val).encode()]
+                    else:
+                        headers.append([name, str(h_val).encode()])
+
+        else:
+            self.keep_alive = False
+            self.send_response(404)
+
+        if self.keep_alive:
+            await self.http_protocol_handler.send({
+                "type": "websocket.accept",
+                "subprotocol": subprotocol,
+                "headers": headers
+            })
+            await self.on_open()
+        else:
+            await self.http_protocol_handler.send({
+                "type": "websocket.close",
+                "code": self.http_protocol_handler.status,
+                "reason": "Handshake error!"
+            })
+
+    async def _receive(self):
+        while self.keep_alive:
+            msg: dict = await self.http_protocol_handler.receive()
+            if msg["type"] == "websocket.connect":
+                _logger.debug(f"Websocket is connected.")
+            elif msg["type"] == "websocket.disconnect":
+                self.keep_alive = False
+                self.close_reason = WebsocketCloseReason("Client asked to close connection.", code=msg.get("code", 1005), reason='')
+                self.out_msg_queue.put_nowait({
+                    "type": "websocket.close.server"
+                })
+            elif msg["type"] == "websocket.receive":
+                if "text" in msg and msg["text"] is not None and hasattr(self.handler, "on_text_message") and callable(self.handler.on_text_message):
+                    await self.await_func(self.handler.on_text_message(self.session, msg["text"]))
+                elif "bytes" in msg and msg["bytes"] is not None and hasattr(self.handler, "on_binary_message") and callable(self.handler.on_binary_message):
+                    await self.await_func(self.handler.on_binary_message(self.session, msg["bytes"]))
+                else:
+                    _logger.error(f"Cannot read message from ASGI receive event")
+            else:
+                _logger.error(f"Cannot handle message type {msg['type']}")
+
+    async def _send(self):
+        while self.keep_alive:
+            msg = await self.out_msg_queue.get()
+            if msg["type"] != "websocket.close.server":
+                await self.http_protocol_handler.send(msg)
+
+    def calculate_response_key(self):
+        return NotImplemented
+
+    async def read_bytes(self, num):
+        return NotImplemented
+
+    async def _read_message_content(self) -> Tuple[int, int, bytearray]:
+        return NotImplemented
+
+    async def read_next_message(self):
+        return NotImplemented
+
+    def send_ping(self, message: Union[str, bytes]):
+        raise WebsocketException(WebsocketCloseReason(reason="ASGI cannot send ping message."))
+
+    def send_pong(self, message: Union[str, bytes]):
+        raise WebsocketException(WebsocketCloseReason(reason="ASGI cannot send pong message."))
+
+    def _send_bytes_no_lock(self, opcode: int, payload: bytes, chunk_size: int = 0):
+        return NotImplemented
+
+    def _send_frame(self, fin: int, opcode: int, payload: bytes):
+        return NotImplemented
+
+    def _create_frame_header(self, fin: int, opcode: int, payload_length: int) -> bytes:
+        return NotImplemented
+
+    def send_file(self, path: str, chunk_size: int = 0):
+        raise WebsocketException(WebsocketCloseReason(reason="ASGI cannot send file message."))
+
+    def _send_file_no_lock(self, path: str, file_size: int, chunk_size: int):
+        return NotImplemented
+
+    def send_bytes(self, opcode: int, payload: bytes, chunk_size: int = 0):
+        if opcode == WEBSOCKET_OPCODE_TEXT:
+            self.send_message(payload.decode(DEFAULT_ENCODING), chunk_size=chunk_size)
+        elif opcode == WEBSOCKET_OPCODE_BINARY:
+            self.send_message(payload, chunk_size=chunk_size)
+        else:
+            _logger.error(f"Cannot send websocket with opcode [{opcode}]")
+
+    def send_message(self, message: Union[str, bytes], chunk_size: int = 0):
+        if chunk_size != 0:
+            _logger.warning(f"chunk_size is not supported in ASGI mode, ignore it.")
+        if isinstance(message, bytes):
+            self.out_msg_queue.put_nowait({
+                "type": "websocket.send",
+                "bytes": message
+            })
+        elif isinstance(message, str):
+            self.out_msg_queue.put_nowait({
+                "type": "websocket.send",
+                "text": message
+            })
+        else:
+            _logger.error(f"Cannot send message[{message}. ")
+
+    def close(self, reason: str = ""):
+        self.keep_alive = False
+        self.close_reason = WebsocketCloseReason("Server asked to close connection.")
+        self.out_msg_queue.put_nowait({
+            "type": "websocket.close",
+            "reason": reason
+        })
