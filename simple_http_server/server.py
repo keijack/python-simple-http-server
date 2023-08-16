@@ -31,17 +31,19 @@ import re
 from ssl import PROTOCOL_TLS_SERVER, SSLContext
 from typing import Dict
 
-import simple_http_server.http_server as http_server
+from simple_http_server.http_server import HttpServer, ASGIProxy, WSGIProxy
 
 from simple_http_server.app_conf import get_app_conf, AppConf
+from .routing_server import RoutingServer
 from simple_http_server._http_session_local_impl import LocalSessionFactory
 from simple_http_server.logger import get_logger
 from .app_conf import set_session_factory
+from .basic_models import SessionFactory
 
 
 _logger = get_logger("simple_http_server.server")
 __lock = threading.Lock()
-_server: http_server.HttpServer = None
+_server: HttpServer = None
 
 
 def _is_match(string="", regx=r""):
@@ -142,20 +144,20 @@ def _prepare_server(host: str = "",
         global _server
         if _server is not None:
             _server.shutdown()
-        _server = http_server.HttpServer(host=(host, port),
-                                         ssl=ssl,
-                                         ssl_protocol=ssl_protocol,
-                                         ssl_check_hostname=ssl_check_hostname,
-                                         keyfile=keyfile,
-                                         certfile=certfile,
-                                         keypass=keypass,
-                                         ssl_context=ssl_context,
-                                         resources=resources,
-                                         connection_idle_time=connection_idle_time,
-                                         keep_alive=keep_alive,
-                                         keep_alive_max_request=keep_alive_max_request,
-                                         prefer_corountine=prefer_coroutine,
-                                         app_conf=app_conf)
+        _server = HttpServer(host=(host, port),
+                             ssl=ssl,
+                             ssl_protocol=ssl_protocol,
+                             ssl_check_hostname=ssl_check_hostname,
+                             keyfile=keyfile,
+                             certfile=certfile,
+                             keypass=keypass,
+                             ssl_context=ssl_context,
+                             resources=resources,
+                             connection_idle_time=connection_idle_time,
+                             keep_alive=keep_alive,
+                             keep_alive_max_request=keep_alive_max_request,
+                             prefer_corountine=prefer_coroutine,
+                             app_conf=app_conf)
 
 
 def start(host: str = "",
@@ -246,8 +248,7 @@ def stop() -> None:
             _logger.warning("Server is not ready yet.")
 
 
-def init_wsgi_proxy(resources: Dict[str, str] = {}, session_factory=None, app_conf: AppConf = None) -> http_server.WSGIProxy:
-    proxy = http_server.WSGIProxy(res_conf=resources)
+def __fill_proxy(proxy: RoutingServer, session_factory: SessionFactory, app_conf: AppConf):
     appconf = app_conf or get_app_conf()
     set_session_factory(session_factory or appconf.session_factory or LocalSessionFactory())
     filters = appconf._get_filters()
@@ -269,4 +270,14 @@ def init_wsgi_proxy(resources: Dict[str, str] = {}, session_factory=None, app_co
     for code, func in err_pages.items():
         proxy.map_error_page(code, func)
 
+
+def init_wsgi_proxy(resources: Dict[str, str] = {}, session_factory: SessionFactory = None, app_conf: AppConf = None) -> WSGIProxy:
+    proxy = WSGIProxy(res_conf=resources)
+    __fill_proxy(proxy, session_factory, app_conf)
+    return proxy
+
+
+def init_asgi_proxy(resources: Dict[str, str] = {}, session_factory: SessionFactory = None, app_conf: AppConf = None) -> ASGIProxy:
+    proxy = ASGIProxy(res_conf=resources)
+    __fill_proxy(proxy, session_factory, app_conf)
     return proxy

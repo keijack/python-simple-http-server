@@ -2,15 +2,20 @@
 from simple_http_server import request_map
 from wsgiref.simple_server import WSGIServer, make_server
 import simple_http_server.server as server
+from simple_http_server.server import ASGIProxy
 import os
-import sys
 import signal
+
+import uvicorn
+
 from threading import Thread
 from time import sleep
 from simple_http_server.__main__ import main
-# from werkzeug.serving import make_server as mk_server
 from simple_http_server.http_server import HttpServer
 from simple_http_server.logger import get_logger, set_level
+
+from werkzeug.serving import make_server as mk_server
+
 from simple_http_server import get_app_conf
 set_level("DEBUG")
 
@@ -76,7 +81,32 @@ def start_server_wsgi():
     wsgi_server = make_server("", 9090, wsgi_proxy.app_proxy)
     wsgi_server.serve_forever()
 
-"""
+
+asgi_server: uvicorn.Server = None
+
+asgi_proxy: ASGIProxy = None
+
+
+async def asgi_app(scope, receive, send):
+    global asgi_proxy
+    if not asgi_proxy:
+        _logger.info("init asgi proxy... ")
+        server.scan(base_dir="tests/ctrls", regx=r'.*controllers.*')
+        asgi_proxy = server.init_asgi_proxy(
+            resources={"/public/*": f"{PROJECT_ROOT}/tests/static",
+                       "/*": f"{PROJECT_ROOT}/tests/static"})
+    await asgi_proxy.app_proxy(scope, receive, send)
+
+
+def start_server_uvicorn():
+
+    config = uvicorn.Config("debug_main:asgi_app", host="0.0.0.0", port=9090, log_level="info")
+
+    global asgi_server
+    asgi_server = uvicorn.Server(config)
+    asgi_server.run()
+
+
 def start_server_werkzeug():
     server.scan(base_dir="tests/ctrls", regx=r'.*controllers.*')
     wsgi_proxy = server.init_wsgi_proxy(
@@ -86,13 +116,15 @@ def start_server_werkzeug():
     global wsgi_server
     wsgi_server = mk_server("", 9090, wsgi_proxy.app_proxy)
     wsgi_server.serve_forever()
-"""
 
 
 def on_sig_term(signum, frame):
     if wsgi_server:
         _logger.info(f"Receive signal [{signum}], shutdown the wsgi server...")
         Thread(target=wsgi_server.shutdown).start()
+    elif asgi_server:
+        _logger.info(f"Receive signal [{signum}], shutdown the wsgi server...")
+        Thread(target=asgi_server.shutdown).start()
     else:
         _logger.info(f"Receive signal [{signum}], stop server now...")
         server.stop()
@@ -108,5 +140,6 @@ if __name__ == "__main__":
     # start_via_class()
     # main(sys.argv[1:])
     # start_server()
-    start_server_wsgi()
+    # start_server_wsgi()
     # start_server_werkzeug()
+    start_server_uvicorn()

@@ -467,15 +467,15 @@ class WebsocketSessionImpl(WebsocketSession):
         self.__request = request
 
     @ property
-    def id(self):
+    def id(self) -> str:
         return self.__id
 
     @ property
-    def request(self):
+    def request(self) -> WebsocketRequest:
         return self.__request
 
     @ property
-    def is_closed(self):
+    def is_closed(self) -> bool:
         return not self.__handler.keep_alive
 
     def send_ping(self, message: str):

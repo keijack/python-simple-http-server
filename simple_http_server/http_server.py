@@ -39,12 +39,13 @@ from time import sleep
 from typing import Dict,  Tuple
 
 from .app_conf import ControllerFunction, WebsocketHandlerClass, AppConf, get_app_conf, _get_session_factory
+from .routing_server import RoutingServer
 from .http_protocol_handler import HttpProtocolHandler, SocketServerStreamRequestHandlerWraper
 from .wsgi_request_handler import WSGIRequestHandler
-
+from .asgi_request_handler import ASGIRequestHandler
 
 from .logger import get_logger
-from .routing_server import RoutingServer
+
 
 _logger = get_logger("simple_httpself.http_server")
 
@@ -283,3 +284,13 @@ class WSGIProxy(RoutingServer):
     async def async_app_proxy(self, environment, start_response):
         request_handler = WSGIRequestHandler(self, environment, start_response)
         return await request_handler.handle_request()
+
+
+class ASGIProxy(RoutingServer):
+
+    def __init__(self, res_conf):
+        super().__init__(res_conf=res_conf)
+
+    async def app_proxy(self, scope, receive, send):
+        request_handler = ASGIRequestHandler(self, scope, receive, send)
+        await request_handler.handle_request()
