@@ -237,9 +237,9 @@ class ASGIWebsocketRequestHandler(WebsocketRequestHandler):
         if not self.keep_alive:
             return
 
-        async with asyncio.TaskGroup() as task_group:
-            task_group.create_task(self._receive())
-            task_group.create_task(self._send())
+        await asyncio.gather(
+            self._receive(),
+            self._send())
 
         await self.on_close()
 
