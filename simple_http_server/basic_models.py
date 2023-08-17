@@ -552,15 +552,15 @@ class WebsocketSession:
         return NotImplemented
 
     @abstractmethod
-    def send_pone(self, message: bytes):
+    def send_pone(self, message: bytes = b''):
         return NotImplemented
 
     @abstractmethod
-    def send_ping(self, message: bytes):
+    def send_ping(self, message: bytes = b''):
         return NotImplemented
 
     @abstractmethod
-    def close(self, reason: str):
+    def close(self, reason: str = ""):
         return NotImplemented
 
 

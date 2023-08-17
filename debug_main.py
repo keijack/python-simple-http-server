@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+#
+# If you want to run this file, please install following package to run.
+# python3 -m pip install werkzeug 'uvicorn[standard]'
+#
 
 from simple_http_server import request_map
 from wsgiref.simple_server import WSGIServer, make_server
@@ -5,6 +10,7 @@ import simple_http_server.server as server
 from simple_http_server.server import ASGIProxy
 import os
 import signal
+import asyncio
 
 import uvicorn
 
@@ -96,23 +102,28 @@ def start_server_werkzeug():
 asgi_server: uvicorn.Server = None
 
 asgi_proxy: ASGIProxy = None
+init_asgi_proxy_lock: asyncio.Lock = asyncio.Lock()
+
+
+async def init_asgi_proxy():
+    global asgi_proxy
+    if asgi_proxy == None:
+        async with init_asgi_proxy_lock:
+            if asgi_proxy == None:
+                _logger.info("init asgi proxy... ")
+                server.scan(base_dir="tests/ctrls", regx=r'.*controllers.*')
+                asgi_proxy = server.init_asgi_proxy(
+                    resources={"/public/*": f"{PROJECT_ROOT}/tests/static",
+                               "/*": f"{PROJECT_ROOT}/tests/static"})
 
 
 async def asgi_app(scope, receive, send):
-    global asgi_proxy
-    if not asgi_proxy:
-        _logger.info("init asgi proxy... ")
-        server.scan(base_dir="tests/ctrls", regx=r'.*controllers.*')
-        asgi_proxy = server.init_asgi_proxy(
-            resources={"/public/*": f"{PROJECT_ROOT}/tests/static",
-                       "/*": f"{PROJECT_ROOT}/tests/static"})
+    await init_asgi_proxy()
     await asgi_proxy.app_proxy(scope, receive, send)
 
 
 def start_server_uvicorn():
-
     config = uvicorn.Config("debug_main:asgi_app", host="0.0.0.0", port=9090, log_level="info")
-
     global asgi_server
     asgi_server = uvicorn.Server(config)
     asgi_server.run()

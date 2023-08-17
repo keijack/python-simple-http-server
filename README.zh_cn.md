@@ -21,7 +21,8 @@ Python 3.7+
 * 支持 SSL
 * 支持 websocket
 * 编写风格自由
-* 可嵌入到 WSGI 标准当中
+* 可嵌入到 WSGI 标准的服务器当中
+* 可嵌入到 ASGI 标准的服务器当中，本框架完全支持 ASGI 的 HTTP 与 Websocket 事件。
 * 支持协程模式，该模式下，你的所有控制器均运行在一个线程当中。
 
 ## 依赖
@@ -895,6 +896,46 @@ wsgi_proxy = server.init_wsgi_proxy(resources={"/public/*": f"/you/static/files/
 # WSGI 标准入口
 def handler(environ, start_response):
     return wsgi_proxy.app_proxy(environ, start_response)
+```
+
+## ASGI 支持
+
+可以在 ASGI 的框架上（例如 `uvicorn`）使用本框架。
+
+*由于 ASGI 框架的标准，在 ASGI 框架上，websocket 仅支持发送`文字`以及`二进制`消息，不支持发送 ping/pone/frame 等高级功能。*
+
+```python
+
+import asyncio
+import uvicorn
+import simple_http_server.server as server
+from simple_http_server.server import ASGIProxy
+
+
+asgi_proxy: ASGIProxy = None
+init_asgi_proxy_lock: asyncio.Lock = asyncio.Lock()
+
+
+async def init_asgi_proxy():
+    global asgi_proxy
+    if asgi_proxy == None:
+        async with init_asgi_proxy_lock:
+            if asgi_proxy == None:
+                server.scan(base_dir="tests/ctrls", regx=r'.*controllers.*')
+                asgi_proxy = server.init_asgi_proxy(resources={"/public/*": "tests/static"})
+
+async def app(scope, receive, send):
+    await init_asgi_proxy()
+    await asgi_proxy.app_proxy(scope, receive, send)
+
+def main():
+    config = uvicorn.Config("main:app", host="0.0.0.0", port=9090, log_level="info")
+    asgi_server = uvicorn.Server(config)
+    asgi_server.run()
+
+if __name__ == "__main__":
+    main()
+
 ```
 
 ## 感谢

@@ -294,22 +294,26 @@ class ASGIWebsocketRequestHandler(WebsocketRequestHandler):
                 self.keep_alive = False
                 self.close_reason = WebsocketCloseReason("Client asked to close connection.", code=msg.get("code", 1005), reason='')
                 self.out_msg_queue.put_nowait({
-                    "type": "websocket.close.server"
+                    "type": "websocket.close.client"
                 })
             elif msg["type"] == "websocket.receive":
-                if "text" in msg and msg["text"] is not None and hasattr(self.handler, "on_text_message") and callable(self.handler.on_text_message):
-                    await self.await_func(self.handler.on_text_message(self.session, msg["text"]))
-                elif "bytes" in msg and msg["bytes"] is not None and hasattr(self.handler, "on_binary_message") and callable(self.handler.on_binary_message):
-                    await self.await_func(self.handler.on_binary_message(self.session, msg["bytes"]))
-                else:
-                    _logger.error(f"Cannot read message from ASGI receive event")
+                try:
+                    if "text" in msg and msg["text"] is not None and hasattr(self.handler, "on_text_message") and callable(self.handler.on_text_message):
+                        await self.await_func(self.handler.on_text_message(self.session, msg["text"]))
+                    elif "bytes" in msg and msg["bytes"] is not None and hasattr(self.handler, "on_binary_message") and callable(self.handler.on_binary_message):
+                        await self.await_func(self.handler.on_binary_message(self.session, msg["bytes"]))
+                    else:
+                        _logger.error(f"Cannot read message from ASGI receive event")
+                except Exception as e:
+                    _logger.error(f"Error occurs when on message!", exc_info=True)
+                    self.close(f"Error occurs when on_message. {e}")
             else:
                 _logger.error(f"Cannot handle message type {msg['type']}")
 
     async def _send(self):
         while self.keep_alive:
             msg = await self.out_msg_queue.get()
-            if msg["type"] != "websocket.close.server":
+            if msg["type"] != "websocket.close.client":
                 await self.http_protocol_handler.send(msg)
 
     def calculate_response_key(self):

@@ -27,6 +27,8 @@ class WSHandler(WebsocketHandler):
     def on_text_message(self, session: WebsocketSession, message: str):
         _logger.info(f">>{session.id}::{self.uuid}<< on text message: {message}")
         session.send(f"{session.request.path_values['path_val']}-{message}")
+        if message == "close":
+            session.close()
 
     def on_close(self, session: WebsocketSession, reason: WebsocketCloseReason):
         _logger.info(f">>{session.id}<< close::{reason.message}-{reason.code}-{reason.reason}")

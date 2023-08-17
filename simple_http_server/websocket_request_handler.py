@@ -157,61 +157,80 @@ class WebsocketRequestHandler:
         return obj
 
     async def on_handshake(self) -> Tuple[int, Dict[str, List[str]]]:
-        if not hasattr(self.handler, "on_handshake") or not callable(self.handler.on_handshake):
-            return None, {}
-        res = await self.await_func(self.handler.on_handshake(self.ws_request))
-        http_status_code = None
-        headers = {}
-        if not res:
-            pass
-        elif isinstance(res, int):
-            http_status_code = res
-        elif isinstance(res, dict) or isinstance(res, Headers):
-            headers = res
-        elif isinstance(res, tuple):
-            for item in res:
-                if isinstance(item, int) and not http_status_code:
-                    http_status_code = item
-                elif isinstance(item, dict) or isinstance(item, Headers):
-                    headers.update(item)
-        else:
-            _logger.warn(f"Endpoint[{self.ws_request.path}]")
-        return http_status_code, headers
+        try:
+            if not hasattr(self.handler, "on_handshake") or not callable(self.handler.on_handshake):
+                return None, {}
+            res = await self.await_func(self.handler.on_handshake(self.ws_request))
+            http_status_code = None
+            headers = {}
+            if not res:
+                pass
+            elif isinstance(res, int):
+                http_status_code = res
+            elif isinstance(res, dict) or isinstance(res, Headers):
+                headers = res
+            elif isinstance(res, tuple):
+                for item in res:
+                    if isinstance(item, int) and not http_status_code:
+                        http_status_code = item
+                    elif isinstance(item, dict) or isinstance(item, Headers):
+                        headers.update(item)
+            else:
+                _logger.warn(f"Endpoint[{self.ws_request.path}]")
+            return http_status_code, headers
+        except Exception as e:
+            _logger.error(f"Error occurs when handshake. ")
+            return 500, {}
 
     async def on_message(self, opcode: int, message_bytes: bytearray):
-        if opcode == WEBSOCKET_OPCODE_CLOSE:
-            _logger.info("Client asked to close connection.")
-            if len(message_bytes) >= 2:
-                code = struct.unpack(">H", message_bytes[0:2])[0]
-                reason = message_bytes[2:].decode('UTF-8', errors="replace")
-            else:
-                code = None
-                reason = ''
-            raise WebsocketException(graceful=True, reason=WebsocketCloseReason("Client asked to close connection.", code=code, reason=reason))
-        elif opcode == WEBSOCKET_OPCODE_TEXT and hasattr(self.handler, "on_text_message") and callable(self.handler.on_text_message):
-            await self.await_func(self.handler.on_text_message(self.session, message_bytes.decode("UTF-8", errors="replace")))
-        elif opcode == WEBSOCKET_OPCODE_PING and hasattr(self.handler, "on_ping_message") and callable(self.handler.on_ping_message):
-            await self.await_func(self.handler.on_ping_message(self.session, bytes(message_bytes)))
-        elif opcode == WEBSOCKET_OPCODE_PONG and hasattr(self.handler, "on_pong_message") and callable(self.handler.on_pong_message):
-            await self.await_func(self.handler.on_pong_message(self.session, bytes(message_bytes)))
-        elif opcode == WEBSOCKET_OPCODE_BINARY and self._continution_cache.message_bytes and hasattr(self.handler, "on_binary_message") and callable(self.handler.on_binary_message):
-            await self.await_func(self.handler.on_binary_message(self.session, bytes(message_bytes)))
+        try:
+            if opcode == WEBSOCKET_OPCODE_CLOSE:
+                _logger.info("Client asked to close connection.")
+                if len(message_bytes) >= 2:
+                    code = struct.unpack(">H", message_bytes[0:2])[0]
+                    reason = message_bytes[2:].decode('UTF-8', errors="replace")
+                else:
+                    code = None
+                    reason = ''
+                raise WebsocketException(graceful=True, reason=WebsocketCloseReason("Client asked to close connection.", code=code, reason=reason))
+            elif opcode == WEBSOCKET_OPCODE_TEXT and hasattr(self.handler, "on_text_message") and callable(self.handler.on_text_message):
+                await self.await_func(self.handler.on_text_message(self.session, message_bytes.decode("UTF-8", errors="replace")))
+            elif opcode == WEBSOCKET_OPCODE_PING and hasattr(self.handler, "on_ping_message") and callable(self.handler.on_ping_message):
+                await self.await_func(self.handler.on_ping_message(self.session, bytes(message_bytes)))
+            elif opcode == WEBSOCKET_OPCODE_PONG and hasattr(self.handler, "on_pong_message") and callable(self.handler.on_pong_message):
+                await self.await_func(self.handler.on_pong_message(self.session, bytes(message_bytes)))
+            elif opcode == WEBSOCKET_OPCODE_BINARY and self._continution_cache.message_bytes and hasattr(self.handler, "on_binary_message") and callable(self.handler.on_binary_message):
+                await self.await_func(self.handler.on_binary_message(self.session, bytes(message_bytes)))
+        except Exception as e:
+            _logger.error(f"Error occurs when on message!")
+            self.close(f"Error occurs when on_message. {e}")
 
     async def on_continuation_frame(self, first_frame_opcode: int, fin: int, message_frame: bytearray):
-        if first_frame_opcode == WEBSOCKET_OPCODE_BINARY and hasattr(self.handler, "on_binary_frame") and callable(self.handler.on_binary_frame):
-            should_append_to_cache = await self.await_func(self.handler.on_binary_frame(self.session, bool(fin), bytes(message_frame)))
-            if should_append_to_cache == True:
+        try:
+            if first_frame_opcode == WEBSOCKET_OPCODE_BINARY and hasattr(self.handler, "on_binary_frame") and callable(self.handler.on_binary_frame):
+                should_append_to_cache = await self.await_func(self.handler.on_binary_frame(self.session, bool(fin), bytes(message_frame)))
+                if should_append_to_cache == True:
+                    self._continution_cache.message_bytes.extend(message_frame)
+            else:
                 self._continution_cache.message_bytes.extend(message_frame)
-        else:
-            self._continution_cache.message_bytes.extend(message_frame)
+        except Exception as e:
+            _logger.error(f"Error occurs when on message!")
+            self.close(f"Error occurs when on_message. {e}")
 
     async def on_open(self):
-        if hasattr(self.handler, "on_open") and callable(self.handler.on_open):
-            await self.await_func(self.handler.on_open(self.session))
+        try:
+            if hasattr(self.handler, "on_open") and callable(self.handler.on_open):
+                await self.await_func(self.handler.on_open(self.session))
+        except Exception as e:
+            _logger.error(f"Error occurs when on open!")
+            self.close(f"Error occurs when on_open. {e}")
 
     async def on_close(self):
-        if hasattr(self.handler, "on_close") and callable(self.handler.on_close):
-            await self.await_func(self.handler.on_close(self.session, self.close_reason))
+        try:
+            if hasattr(self.handler, "on_close") and callable(self.handler.on_close):
+                await self.await_func(self.handler.on_close(self.session, self.close_reason))
+        except Exception as e:
+            _logger.error(f"Error occurs when on close!")
 
     async def handle_request(self):
         while self.keep_alive:
@@ -478,10 +497,10 @@ class WebsocketSessionImpl(WebsocketSession):
     def is_closed(self) -> bool:
         return not self.__handler.keep_alive
 
-    def send_ping(self, message: str):
+    def send_ping(self, message: bytes = b''):
         self.__handler.send_ping(message)
 
-    def send_pone(self, message: str):
+    def send_pone(self, message: bytes = b''):
         self.__handler.send_pong(message)
 
     def send(self, message: Union[str, bytes], opcode: int = WEBSOCKET_OPCODE_TEXT, chunk_size: int = 0):
@@ -503,5 +522,5 @@ class WebsocketSessionImpl(WebsocketSession):
     def send_file(self, path: str, chunk_size: int = 0):
         self.__handler.send_file(path, chunk_size=chunk_size)
 
-    def close(self, reason: str):
+    def close(self, reason: str = ""):
         self.__handler.close(reason)

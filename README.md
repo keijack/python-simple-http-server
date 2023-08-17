@@ -22,6 +22,7 @@ Python 3.7+
 * Easy to use.
 * Free style controller writing.
 * Easily integraded with WSGI servers. 
+* Easily integraded with ASGI servers. Websocket will be supported when ASGI server enable websocket functions.
 * Coroutine mode support.
 
 ## Dependencies
@@ -703,6 +704,44 @@ def simple_app(environ, start_response):
 # If your entrance is async:
 async def simple_app(envion, start_response):
     return await wsgi_proxy.async_app_proxy(environ, start_response)
+```
+
+## ASGI Support
+
+You can use this module in ASGI server, take `uvicorn` fro example:
+
+```python
+
+import asyncio
+import uvicorn
+import simple_http_server.server as server
+from simple_http_server.server import ASGIProxy
+
+
+asgi_proxy: ASGIProxy = None
+init_asgi_proxy_lock: asyncio.Lock = asyncio.Lock()
+
+
+async def init_asgi_proxy():
+    global asgi_proxy
+    if asgi_proxy == None:
+        async with init_asgi_proxy_lock:
+            if asgi_proxy == None:
+                server.scan(base_dir="tests/ctrls", regx=r'.*controllers.*')
+                asgi_proxy = server.init_asgi_proxy(resources={"/public/*": "tests/static"})
+
+async def app(scope, receive, send):
+    await init_asgi_proxy()
+    await asgi_proxy.app_proxy(scope, receive, send)
+
+def main():
+    config = uvicorn.Config("main:app", host="0.0.0.0", port=9090, log_level="info")
+    asgi_server = uvicorn.Server(config)
+    asgi_server.run()
+
+if __name__ == "__main__":
+    main()
+
 ```
 
 ## Thanks
