@@ -27,7 +27,7 @@ import inspect
 import asyncio
 from typing import Any, Dict, List, Union, Callable
 
-from .basic_models import SessionFactory, WebsocketHandler, WebsocketRequest, WebsocketSession, WebsocketCloseReason
+from .basic_models import SessionFactory, WebsocketHandler
 from .basic_models import WEBSOCKET_MESSAGE_BINARY, WEBSOCKET_MESSAGE_BINARY_FRAME, WEBSOCKET_MESSAGE_PING, WEBSOCKET_MESSAGE_PONG, WEBSOCKET_MESSAGE_TEXT
 from .logger import get_logger
 
@@ -163,7 +163,7 @@ class ControllerFunction:
         return self.__func
 
 
-class WebsocketEvenHandler(WebsocketHandler):
+class WebsocketHandlerProxy(WebsocketHandler):
 
     def __init__(self) -> None:
         self.handshake: Callable = None
@@ -180,41 +180,41 @@ class WebsocketEvenHandler(WebsocketHandler):
             return await obj
         return obj
 
-    async def on_handshake(self, request: WebsocketRequest = None):
+    async def on_handshake(self, *args, **kwargs):
         if self.handshake:
-            return await self.await_func(self.handshake(request))
+            return await self.await_func(self.handshake(*args, **kwargs))
         return None
 
-    async def on_open(self, session: WebsocketSession = None):
+    async def on_open(self, *args, **kwargs):
         if self.open:
-            await self.await_func(self.open(session))
+            await self.await_func(self.open(*args, **kwargs))
 
-    async def on_close(self, session: WebsocketSession = None, reason: WebsocketCloseReason = None):
+    async def on_close(self, *args, **kwargs):
         if self.close:
-            await self.await_func(self.close(session, reason))
+            await self.await_func(self.close(*args, **kwargs))
 
-    async def on_ping_message(self, session: WebsocketSession = None, message: bytes = b''):
+    async def on_ping_message(self, *args, **kwargs):
         if self.ping:
-            await self.await_func(self.ping(session, message))
+            await self.await_func(self.ping(*args, **kwargs))
         else:
-            session.send_pone(message)
+            return super().on_ping_message()
 
-    async def on_pong_message(self, session: WebsocketSession = None, message: bytes = ""):
+    async def on_pong_message(self, *args, **kwargs):
         if self.pong:
-            await self.await_func(self.pong(session, message))
+            await self.await_func(self.pong(*args, **kwargs))
 
-    async def on_text_message(self, session: WebsocketSession = None, message: str = ""):
+    async def on_text_message(self, *args, **kwargs):
         if self.text:
-            await self.await_func(self.text(session, message))
+            await self.await_func(self.text(*args, **kwargs))
 
-    async def on_binary_message(self, session: WebsocketSession = None, message: bytes = b''):
+    async def on_binary_message(self, *args, **kwargs):
         if self.binary:
-            await self.await_func(self.binary(session, message))
+            await self.await_func(self.binary(*args, **kwargs))
 
-    async def on_binary_frame(self, session: WebsocketSession = None, fin: bool = False, frame_payload: bytes = b''):
+    async def on_binary_frame(self, *args, **kwargs):
         if self.binary_frame:
-            return await self.await_func(self.binary_frame(session, fin, frame_payload))
-        return True
+            return await self.await_func(self.binary_frame(*args, **kwargs))
+        return super().on_binary_frame()
 
 
 class WebsocketHandlerClass:
@@ -517,12 +517,12 @@ class AppConf:
             k = endpoint + ":::" + regexp
             if k not in self._ws_handlers:
                 handler = WebsocketHandlerClass(url=endpoint, regexp=regexp)
-                handler.ctrl_object = WebsocketEvenHandler()
+                handler.ctrl_object = WebsocketHandlerProxy()
                 handler.ctrl_object.handshake = ctrl
                 self._ws_handlers[k] = handler
             else:
                 handler = self._ws_handlers[k]
-                if not handler.cls and isinstance(handler.ctrl_object, WebsocketEvenHandler):
+                if not handler.cls and isinstance(handler.ctrl_object, WebsocketHandlerProxy):
                     handler.ctrl_object.handshake = ctrl
             return ctrl
         return map
@@ -532,12 +532,12 @@ class AppConf:
             k = endpoint + ":::" + regexp
             if k not in self._ws_handlers:
                 handler = WebsocketHandlerClass(url=endpoint, regexp=regexp)
-                handler.ctrl_object = WebsocketEvenHandler()
+                handler.ctrl_object = WebsocketHandlerProxy()
                 handler.ctrl_object.open = ctrl
                 self._ws_handlers[k] = handler
             else:
                 handler = self._ws_handlers[k]
-                if not handler.cls and isinstance(handler.ctrl_object, WebsocketEvenHandler):
+                if not handler.cls and isinstance(handler.ctrl_object, WebsocketHandlerProxy):
                     handler.ctrl_object.open = ctrl
             return ctrl
         return map
@@ -547,12 +547,12 @@ class AppConf:
             k = endpoint + ":::" + regexp
             if k not in self._ws_handlers:
                 handler = WebsocketHandlerClass(url=endpoint, regexp=regexp)
-                handler.ctrl_object = WebsocketEvenHandler()
+                handler.ctrl_object = WebsocketHandlerProxy()
                 handler.ctrl_object.close = ctrl
                 self._ws_handlers[k] = handler
             else:
                 handler = self._ws_handlers[k]
-                if not handler.cls and isinstance(handler.ctrl_object, WebsocketEvenHandler):
+                if not handler.cls and isinstance(handler.ctrl_object, WebsocketHandlerProxy):
                     handler.ctrl_object.close = ctrl
             return ctrl
         return map
@@ -562,11 +562,11 @@ class AppConf:
             k = endpoint + ":::" + regexp
             if k not in self._ws_handlers:
                 handler = WebsocketHandlerClass(url=endpoint, regexp=regexp)
-                handler.ctrl_object = WebsocketEvenHandler()
+                handler.ctrl_object = WebsocketHandlerProxy()
                 self._ws_handlers[k] = handler
 
             handler = self._ws_handlers[k]
-            if not handler.cls and isinstance(handler.ctrl_object, WebsocketEvenHandler):
+            if not handler.cls and isinstance(handler.ctrl_object, WebsocketHandlerProxy):
                 if message_type == WEBSOCKET_MESSAGE_TEXT:
                     handler.ctrl_object.text = ctrl
                 elif message_type == WEBSOCKET_MESSAGE_BINARY:
