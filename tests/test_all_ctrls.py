@@ -111,7 +111,8 @@ class ThreadingServerTest(unittest.TestCase):
             "code": 0,
             "msg": "xxx"
         }
-        res: str = self.visit(f"post_json", headers={"Content-Type": "application/json"}, data=json.dumps(data_dict).encode(errors="replace"))
+        res: str = self.visit(f"post_json", headers={
+                              "Content-Type": "application/json"}, data=json.dumps(data_dict).encode(errors="replace"))
         res_dict: dict = json.loads(res)
         assert data_dict["code"] == res_dict["code"]
         assert data_dict["msg"] == res_dict["msg"]
@@ -131,7 +132,6 @@ class ThreadingServerTest(unittest.TestCase):
             _logger.info(error_msg)
             assert error_msg == '500-Internal Server Error-some error occurs!'
 
-    
     def test_res_write_bytes(self):
         body = self.visit("res/write/bytes")
         assert body == 'abcdefg'
@@ -146,19 +146,32 @@ class ThreadingServerTest(unittest.TestCase):
         ws.close()
         assert txt == f"{path_val}-{msg}"
 
+    def test_ws_fun(self):
+        ws = websocket.WebSocket()
+        path_val = "test-ws-fun"
+        msg = "hello websocket!"
+        ws.connect(f"ws://127.0.0.1:{self.PORT}/ws-fun/{path_val}")
+        ws.send(msg)
+        txt = ws.recv()
+        ws.close()
+        assert txt == f"{path_val}-{msg}"
+
     def test_ws_continuation(self):
         ws = websocket.WebSocket()
         path_val = "test-ws"
 
         ws.connect(f"ws://127.0.0.1:{self.PORT}/ws/{path_val}")
         msg0 = "Hello "
-        frame0 = websocket.ABNF.create_frame(msg0, websocket.ABNF.OPCODE_TEXT, 0)
+        frame0 = websocket.ABNF.create_frame(
+            msg0, websocket.ABNF.OPCODE_TEXT, 0)
         ws.send_frame(frame0)
         msg1 = "Websocket "
-        frame1 = websocket.ABNF.create_frame(msg1, websocket.ABNF.OPCODE_CONT, 0)
+        frame1 = websocket.ABNF.create_frame(
+            msg1, websocket.ABNF.OPCODE_CONT, 0)
         ws.send_frame(frame1)
         msg2 = "Frames!"
-        frame2 = websocket.ABNF.create_frame(msg2, websocket.ABNF.OPCODE_CONT, 1)
+        frame2 = websocket.ABNF.create_frame(
+            msg2, websocket.ABNF.OPCODE_CONT, 1)
         ws.send_frame(frame2)
 
         txt = ws.recv()
@@ -171,13 +184,16 @@ class ThreadingServerTest(unittest.TestCase):
 
         ws.connect(f"ws://127.0.0.1:{self.PORT}/ws/{path_val}")
         msg0 = "Hello "
-        frame0 = websocket.ABNF.create_frame(msg0, websocket.ABNF.OPCODE_BINARY, 0)
+        frame0 = websocket.ABNF.create_frame(
+            msg0, websocket.ABNF.OPCODE_BINARY, 0)
         ws.send_frame(frame0)
         msg1 = "Websocket "
-        frame1 = websocket.ABNF.create_frame(msg1, websocket.ABNF.OPCODE_CONT, 0)
+        frame1 = websocket.ABNF.create_frame(
+            msg1, websocket.ABNF.OPCODE_CONT, 0)
         ws.send_frame(frame1)
         msg2 = "Frames!"
-        frame2 = websocket.ABNF.create_frame(msg2, websocket.ABNF.OPCODE_CONT, 1)
+        frame2 = websocket.ABNF.create_frame(
+            msg2, websocket.ABNF.OPCODE_CONT, 1)
         ws.send_frame(frame2)
 
         txt: str = ws.recv()

@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 
 
-from dataclasses import is_dataclass
 import os
 import shutil
 from uuid import uuid4
-from simple_http_server import WebsocketCloseReason, WebsocketHandler, WebsocketRequest, WebsocketSession, websocket_handler
+from simple_http_server import WebsocketCloseReason, WebsocketHandler, WebsocketRequest, WebsocketSession, websocket_handler, websocket_message
 import simple_http_server.logger as logger
 
 _logger = logger.get_logger("ws_test")
@@ -25,13 +24,15 @@ class WSHandler(WebsocketHandler):
         _logger.info(f">>{session.id}<< open! {session.request.path_values}")
 
     def on_text_message(self, session: WebsocketSession, message: str):
-        _logger.info(f">>{session.id}::{self.uuid}<< on text message: {message}")
+        _logger.info(
+            f">>{session.id}::{self.uuid}<< on text message: {message}")
         session.send(f"{session.request.path_values['path_val']}-{message}")
         if message == "close":
             session.close()
 
     def on_close(self, session: WebsocketSession, reason: WebsocketCloseReason):
-        _logger.info(f">>{session.id}<< close::{reason.message}-{reason.code}-{reason.reason}")
+        _logger.info(
+            f">>{session.id}<< close::{reason.message}-{reason.code}-{reason.reason}")
 
     def on_binary_frame(self, session: WebsocketSession = None, fin: bool = False, frame_data: bytes = b''):
         _logger.info(f"Fin => {fin}, Data: {frame_data}")
@@ -43,7 +44,8 @@ class WSHandler(WebsocketHandler):
         is_dir_tmp_folder = os.path.isdir(tmp_folder)
         if not is_dir_tmp_folder:
             os.mkdir(tmp_folder)
-        session.send('binary-message-received, and this is some message for the long size.', chunk_size=10)
+        session.send(
+            'binary-message-received, and this is some message for the long size.', chunk_size=10)
         tmp_file_path = f"{tmp_folder}/ws_bi_re.tmp"
         with open(tmp_file_path, 'wb') as out_file:
             out_file.write(message)
@@ -63,6 +65,15 @@ class WSRegHander(WebsocketHandler):
         self.uuid: str = uuid4().hex
 
     def on_text_message(self, session: WebsocketSession, message: str):
-        _logger.info(f">>{session.id}::{self.uuid}<< on text message: {message}")
+        _logger.info(
+            f">>{session.id}::{self.uuid}<< on text message: {message}")
         _logger.info(f"{session.request.reg_groups}")
         session.send(f"{session.request.reg_groups[0]}-{message}")
+
+
+@websocket_message(endpoint="/ws-fun/{path_val}")
+def txt(session: WebsocketSession, message: str):
+    _logger.info(f">>{session.id}<< on text message: {message}")
+    session.send(f"{session.request.path_values['path_val']}-{message}")
+    if message == "close":
+        session.close()

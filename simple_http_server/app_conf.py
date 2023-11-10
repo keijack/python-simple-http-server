@@ -26,10 +26,11 @@ import sys
 import inspect
 from typing import Any, Dict, List, Union, Callable
 
-from .basic_models import SessionFactory
+from .basic_models import SessionFactory, WebsocketHandler, WebsocketRequest, WebsocketSession, WebsocketCloseReason
+from .basic_models import WEBSOCKET_MESSAGE_BINARY, WEBSOCKET_MESSAGE_BINARY_FRAME, WEBSOCKET_MESSAGE_PING, WEBSOCKET_MESSAGE_PONG, WEBSOCKET_MESSAGE_TEXT
 from .logger import get_logger
 
-_logger = get_logger("simple_http_server.anno")
+_logger = get_logger("simple_http_server.app_conf")
 
 
 def _get_class_of_method(method_defind):
@@ -83,9 +84,11 @@ class ControllerFunction:
         self.__ctr_obj: object = None
         self.__func: Callable = func
         self.__clz = False
-        self.headers: List[str] = headers if isinstance(headers, list) else [headers]
+        self.headers: List[str] = headers if isinstance(headers, list) else [
+            headers]
         self._match_all_headers_expressions: bool = match_all_headers_expressions
-        self.params: List[str] = params if isinstance(params, list) else [params]
+        self.params: List[str] = params if isinstance(params, list) else [
+            params]
         self._match_all_params_expressions: bool = match_all_params_expressions
 
     @property
@@ -100,11 +103,14 @@ class ControllerFunction:
     def _is_config_ok(self):
         try:
             assert self.url or self.regexp, "you should set one of url and regexp"
-            assert not (self.url and self.regexp), "you can only set one of url and regexp, not both"
-            assert self.func is not None and (inspect.isfunction(self.func) or inspect.ismethod(self.func))
+            assert not (
+                self.url and self.regexp), "you can only set one of url and regexp, not both"
+            assert self.func is not None and (inspect.isfunction(
+                self.func) or inspect.ismethod(self.func))
             return True
         except AssertionError as ae:
-            _logger.warn(f"[{self.__url}|{self.regexp}] => {self.func} configurate error: {ae}")
+            _logger.warn(
+                f"[{self.__url}|{self.regexp}] => {self.func} configurate error: {ae}")
             return False
 
     @property
@@ -138,7 +144,8 @@ class ControllerFunction:
 
         if self.__ctr_obj is None:
             self.__ctr_obj = self._create_ctrl_obj()
-            _logger.debug(f"object does not exist, create one -> {self.__ctr_obj} ")
+            _logger.debug(
+                f"object does not exist, create one -> {self.__ctr_obj} ")
         else:
             _logger.debug(f"object[{self.__ctr_obj}] exists, return. ")
         return self.__ctr_obj
@@ -153,6 +160,55 @@ class ControllerFunction:
     @property
     def func(self) -> Callable:
         return self.__func
+
+
+class WebsocketEvenHandler(WebsocketHandler):
+
+    def __init__(self) -> None:
+        self.handshake: Callable = None
+        self.open: Callable = None
+        self.close: Callable = None
+        self.ping: Callable = None
+        self.pong: Callable = None
+        self.text: Callable = None
+        self.binary: Callable = None
+        self.binary_frame: Callable = None
+
+    def on_handshake(self, request: WebsocketRequest = None):
+        if self.handshake:
+            return self.handshake(request)
+        return None
+
+    def on_open(self, session: WebsocketSession = None):
+        if self.open:
+            self.open(session)
+
+    def on_close(self, session: WebsocketSession = None, reason: WebsocketCloseReason = None):
+        if self.close:
+            self.close(session, reason)
+
+    def on_ping_message(self, session: WebsocketSession = None, message: bytes = b''):
+        if self.ping:
+            self.ping(session, message)
+        else:
+            session.send_pone(message)
+
+    def on_pong_message(self, session: WebsocketSession = None, message: bytes = ""):
+        if self.pong:
+            self.pong(session, message)
+
+    def on_text_message(self, session: WebsocketSession = None, message: str = ""):
+        if self.text:
+            self.text(session, message)
+
+    def on_binary_message(self, session: WebsocketSession = None, message: bytes = b''):
+        if self.binary:
+            self.binary(session, message)
+
+    def on_binary_frame(self, session: WebsocketSession = None, fin: bool = False, frame_payload: bytes = b''):
+        if self.binary_frame:
+            return self.binary_frame(session, fin, frame_payload)
+        return True
 
 
 class WebsocketHandlerClass:
@@ -174,11 +230,13 @@ class WebsocketHandlerClass:
     def _is_config_ok(self):
         try:
             assert self.url or self.regexp, "you should set one of url and regexp"
-            assert not (self.url and self.regexp), "you can only set one of url and regexp, not both"
+            assert not (
+                self.url and self.regexp), "you can only set one of url and regexp, not both"
             assert self.cls is not None and inspect.isclass(self.cls)
             return True
         except AssertionError as ae:
-            _logger.warn(f"[{self.__url}|{self.regexp}] => {self.cls} configurate error: {ae}")
+            _logger.warn(
+                f"[{self.__url}|{self.regexp}] => {self.cls} configurate error: {ae}")
             return False
 
     @property
@@ -195,6 +253,8 @@ class WebsocketHandlerClass:
 
     @property
     def ctrl_object(self) -> object:
+        if not self.cls:
+            return self.__ctr_obj
         if not self.singleton:
             obj = self._create_ctrl_obj()
             _logger.debug(f"singleton: create a object -> {obj}")
@@ -202,7 +262,8 @@ class WebsocketHandlerClass:
 
         if self.__ctr_obj is None:
             self.__ctr_obj = self._create_ctrl_obj()
-            _logger.debug(f"object does not exist, create one -> {self.__ctr_obj} ")
+            _logger.debug(
+                f"object does not exist, create one -> {self.__ctr_obj} ")
         else:
             _logger.debug(f"object[{self.__ctr_obj}] exists, return. ")
         return self.__ctr_obj
@@ -330,7 +391,7 @@ class AppConf:
         self._ctrls = {}
         self._ctrl_singletons = {}
 
-        self._ws_handlers: List[WebsocketHandlerClass] = []
+        self._ws_handlers: Dict[str, WebsocketHandlerClass] = {}
 
         self._error_page = {}
 
@@ -341,7 +402,8 @@ class AppConf:
 
     def controller(self, *anno_args, singleton: bool = True, args: List[Any] = [], kwargs: Dict[str, Any] = {}):
         def map(ctr_obj_class):
-            _logger.debug(f"map controller[{ctr_obj_class}]({singleton}) with args: {args}, and kwargs: {kwargs})")
+            _logger.debug(
+                f"map controller[{ctr_obj_class}]({singleton}) with args: {args}, and kwargs: {kwargs})")
             self._ctrls[ctr_obj_class] = (singleton, args, kwargs)
             return ctr_obj_class
         if len(anno_args) == 1 and inspect.isclass(anno_args[0]):
@@ -400,7 +462,8 @@ class AppConf:
                                         params=ps,
                                         match_all_params_expressions=match_all_params_expressions,
                                         func=ctrl)
-                _logger.debug(f"map url {_url} with method[{mth}] to function {ctrl}. with headers {cf.headers} and params {cf.params}")
+                _logger.debug(
+                    f"map url {_url} with method[{mth}] to function {ctrl}. with headers {cf.headers} and params {cf.params}")
                 self._request_mappings.append(cf)
             # return the original function, so you can use a decoration chain
             return ctrl
@@ -416,7 +479,8 @@ class AppConf:
         assert (p and not r) or (not p and r)
 
         def map(filter_fun):
-            self._filters.append({"path": p, "url_pattern": r, "func": filter_fun})
+            self._filters.append(
+                {"path": p, "url_pattern": r, "func": filter_fun})
             return filter_fun
         return map
 
@@ -436,9 +500,81 @@ class AppConf:
 
     def websocket_handler(self, endpoint: str = "", regexp: str = "", singleton: bool = True) -> Callable:
         def map(ws_class):
-            self._ws_handlers.append(WebsocketHandlerClass(url=endpoint, regexp=regexp, cls=ws_class, singleton=singleton))
+            self._ws_handlers[endpoint + ":::" + regexp] = WebsocketHandlerClass(
+                url=endpoint, regexp=regexp, cls=ws_class, singleton=singleton)
             return ws_class
 
+        return map
+
+    def websocket_handshake(self, endpoint: str = "", regexp: str = "") -> Callable:
+        def map(ctrl):
+            k = endpoint + ":::" + regexp
+            if k not in self._ws_handlers:
+                handler = WebsocketHandlerClass(url=endpoint, regexp=regexp)
+                handler.ctrl_object = WebsocketEvenHandler()
+                handler.ctrl_object.handshake = ctrl
+                self._ws_handlers[k] = handler
+            else:
+                handler = self._ws_handlers[k]
+                if not handler.cls and isinstance(handler.ctrl_object, WebsocketEvenHandler):
+                    handler.ctrl_object.handshake = ctrl
+            return ctrl
+        return map
+
+    def websocket_open(self, endpoint: str = "", regexp: str = "") -> Callable:
+        def map(ctrl):
+            k = endpoint + ":::" + regexp
+            if k not in self._ws_handlers:
+                handler = WebsocketHandlerClass(url=endpoint, regexp=regexp)
+                handler.ctrl_object = WebsocketEvenHandler()
+                handler.ctrl_object.open = ctrl
+                self._ws_handlers[k] = handler
+            else:
+                handler = self._ws_handlers[k]
+                if not handler.cls and isinstance(handler.ctrl_object, WebsocketEvenHandler):
+                    handler.ctrl_object.open = ctrl
+            return ctrl
+        return map
+
+    def websocket_close(self, endpoint: str = "", regexp: str = "") -> Callable:
+        def map(ctrl):
+            k = endpoint + ":::" + regexp
+            if k not in self._ws_handlers:
+                handler = WebsocketHandlerClass(url=endpoint, regexp=regexp)
+                handler.ctrl_object = WebsocketEvenHandler()
+                handler.ctrl_object.close = ctrl
+                self._ws_handlers[k] = handler
+            else:
+                handler = self._ws_handlers[k]
+                if not handler.cls and isinstance(handler.ctrl_object, WebsocketEvenHandler):
+                    handler.ctrl_object.close = ctrl
+            return ctrl
+        return map
+
+    def websocket_message(self, endpoint: str = "", regexp: str = "", message_type: str = WEBSOCKET_MESSAGE_TEXT) -> Callable:
+        def map(ctrl):
+            k = endpoint + ":::" + regexp
+            if k not in self._ws_handlers:
+                handler = WebsocketHandlerClass(url=endpoint, regexp=regexp)
+                handler.ctrl_object = WebsocketEvenHandler()
+                self._ws_handlers[k] = handler
+
+            handler = self._ws_handlers[k]
+            if not handler.cls and isinstance(handler.ctrl_object, WebsocketEvenHandler):
+                if message_type == WEBSOCKET_MESSAGE_TEXT:
+                    handler.ctrl_object.text = ctrl
+                elif message_type == WEBSOCKET_MESSAGE_BINARY:
+                    handler.ctrl_object.binary = ctrl
+                elif message_type == WEBSOCKET_MESSAGE_BINARY_FRAME:
+                    handler.ctrl_object.binary_frame = ctrl
+                elif message_type == WEBSOCKET_MESSAGE_PING:
+                    handler.ctrl_object.ping = ctrl
+                elif message_type == WEBSOCKET_MESSAGE_PONG:
+                    handler.ctrl_object.pong = ctrl
+                else:
+                    _logger.error(
+                        f"Cannot match message type: [{message_type}]!")
+            return ctrl
         return map
 
     def error_message(self, *anno_args):
@@ -496,7 +632,8 @@ class AppConf:
                 mps = ctr_fun._match_all_params_expressions if ctr_fun._match_all_params_expressions is not None else clz_ctrl._match_all_params_expressions
                 if not ctr_fun.method and methods:
                     for mth in methods:
-                        _logger.debug(f"map url {full_url} included [{clz_url}] with method[{mth}] to function {ctr_fun.func}. ")
+                        _logger.debug(
+                            f"map url {full_url} included [{clz_url}] with method[{mth}] to function {ctr_fun.func}. ")
                         mappings.append(ControllerFunction(url=full_url,
                                                            regexp=ctr_fun.regexp,
                                                            method=mth,
@@ -506,7 +643,8 @@ class AppConf:
                                                            params=ps,
                                                            match_all_params_expressions=mps))
                 else:
-                    _logger.debug(f"map url {full_url} included [{clz_url}] with method[{ctr_fun.method}] to function {ctr_fun.func}. ")
+                    _logger.debug(
+                        f"map url {full_url} included [{clz_url}] with method[{ctr_fun.method}] to function {ctr_fun.func}. ")
                     mappings.append(ControllerFunction(url=full_url,
                                                        regexp=ctr_fun.regexp,
                                                        method=ctr_fun.method,
@@ -528,7 +666,8 @@ class AppConf:
                 ctr_fun.ctr_obj_init_args = args
                 ctr_fun.ctr_obj_init_kwargs = kwargs
                 if singleton:
-                    ctr_fun.ctrl_object = self._get_singletion(clz, args, kwargs)
+                    ctr_fun.ctrl_object = self._get_singletion(
+                        clz, args, kwargs)
 
         return mappings
 
@@ -536,7 +675,7 @@ class AppConf:
         return self._filters
 
     def _get_websocket_handlers(self) -> List[WebsocketHandlerClass]:
-        return self._ws_handlers
+        return list(self._ws_handlers.values())
 
     def _get_error_pages(self) -> Dict[str, Callable]:
         return self._error_page
@@ -576,11 +715,29 @@ def request_filter(path: str = "", regexp: str = ""):
 
 def filter_map(regexp: str = "", filter_function: Callable = None) -> Callable:
     """ deprecated, plese request_filter instead. """
+    _logger.warning(
+        "`filter_map` is deprecated and will be removed in future version,  please use `request_filter` instead. ")
     return _default_app_conf.filter_map(regexp=regexp, filter_function=filter_function)
 
 
 def websocket_handler(endpoint: str = "", regexp: str = "", singleton: bool = True) -> Callable:
     return _default_app_conf.websocket_handler(endpoint=endpoint, regexp=regexp, singleton=singleton)
+
+
+def websocket_handshake(endpoint: str = "", regexp: str = ""):
+    return _default_app_conf.websocket_handshake(endpoint=endpoint, regexp=regexp)
+
+
+def websocket_open(endpoint: str = "", regexp: str = ""):
+    return _default_app_conf.websocket_open(endpoint=endpoint, regexp=regexp)
+
+
+def websocket_close(endpoint: str = "", regexp: str = ""):
+    return _default_app_conf.websocket_close(endpoint=endpoint, regexp=regexp)
+
+
+def websocket_message(endpoint: str = "", regexp: str = "", message_type: str = WEBSOCKET_MESSAGE_TEXT):
+    return _default_app_conf.websocket_message(endpoint=endpoint, regexp=regexp, message_type=message_type)
 
 
 def error_message(*anno_args):

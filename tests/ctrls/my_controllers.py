@@ -98,7 +98,8 @@ def normal_form_post(txt=Parameter("中文txt", required=False, default="DEFAULT
 
 
 @request_map("/post_json", method="POST")
-def post_json(json=JSONBody()):
+def post_json(host=Header("Host"), json=JSONBody()):
+    print(f"Host: {host}")
     print(json)
     return OrderedDict(json)
 

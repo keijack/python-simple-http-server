@@ -38,6 +38,12 @@ WEBSOCKET_OPCODE_CLOSE: int = 0x8
 WEBSOCKET_OPCODE_PING: int = 0x9
 WEBSOCKET_OPCODE_PONG: int = 0xA
 
+WEBSOCKET_MESSAGE_TEXT: str = "WEBSOCKET_MESSAGE_TEXT"
+WEBSOCKET_MESSAGE_BINARY: str = "WEBSOCKET_MESSAGE_BINARY"
+WEBSOCKET_MESSAGE_BINARY_FRAME: str = "WEBSOCKET_MESSAGE_BINARY_FRAME"
+WEBSOCKET_MESSAGE_PING: str = "WEBSOCKET_MESSAGE_PING"
+WEBSOCKET_MESSAGE_PONG: str = "WEBSOCKET_MESSAGE_PONG"
+
 
 class Session:
 
@@ -111,9 +117,11 @@ class Request:
         self.reg_groups = ()  # If controller is matched via regexp, then ,all groups are save here
         self.path: str = ""  # Path
         self.__parameters = {}  # Parameters, key-value array, merged by query string and request body if the `Content-Type` in request header is `application/x-www-form-urlencoded` or `multipart/form-data`
-        self.__parameter = {}  # Parameters, key-value, if more than one parameters with the same key, only the first one will be stored.
+        # Parameters, key-value, if more than one parameters with the same key, only the first one will be stored.
+        self.__parameter = {}
         self._body: bytes = b""  # Request body
-        self.json: Dict[str, Any] = None  # A dictionary if the `Content-Type` in request header is `application/json`
+        # A dictionary if the `Content-Type` in request header is `application/json`
+        self.json: Dict[str, Any] = None
         self.environment = {}
         self.reader: RequestBodyReader = None  # A stream reader
 
@@ -493,7 +501,8 @@ class WebsocketRequest:
         self.reg_groups = ()  # If controller is matched via regexp, then ,all groups are save here
         self.path: str = ""  # Path
         self.__parameters = {}  # Parameters, key-value array, merged by query string and request body if the `Content-Type` in request header is `application/x-www-form-urlencoded` or `multipart/form-data`
-        self.__parameter = {}  # Parameters, key-value, if more than one parameters with the same key, only the first one will be stored.
+        # Parameters, key-value, if more than one parameters with the same key, only the first one will be stored.
+        self.__parameter = {}
 
     @property
     def cookies(self) -> Cookies:
