@@ -72,7 +72,7 @@ class WSRegHander(WebsocketHandler):
 
 
 @websocket_message(endpoint="/ws-fun/{path_val}")
-def txt(session: WebsocketSession, message: str):
+async def txt(session: WebsocketSession, message: str):
     _logger.info(f">>{session.id}<< on text message: {message}")
     session.send(f"{session.request.path_values['path_val']}-{message}")
     if message == "close":

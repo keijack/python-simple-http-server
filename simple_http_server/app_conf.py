@@ -24,6 +24,7 @@ SOFTWARE.
 
 import sys
 import inspect
+import asyncio
 from typing import Any, Dict, List, Union, Callable
 
 from .basic_models import SessionFactory, WebsocketHandler, WebsocketRequest, WebsocketSession, WebsocketCloseReason
@@ -174,40 +175,45 @@ class WebsocketEvenHandler(WebsocketHandler):
         self.binary: Callable = None
         self.binary_frame: Callable = None
 
-    def on_handshake(self, request: WebsocketRequest = None):
+    async def await_func(self, obj):
+        if asyncio.iscoroutine(obj):
+            return await obj
+        return obj
+
+    async def on_handshake(self, request: WebsocketRequest = None):
         if self.handshake:
-            return self.handshake(request)
+            return await self.await_func(self.handshake(request))
         return None
 
-    def on_open(self, session: WebsocketSession = None):
+    async def on_open(self, session: WebsocketSession = None):
         if self.open:
-            self.open(session)
+            await self.await_func(self.open(session))
 
-    def on_close(self, session: WebsocketSession = None, reason: WebsocketCloseReason = None):
+    async def on_close(self, session: WebsocketSession = None, reason: WebsocketCloseReason = None):
         if self.close:
-            self.close(session, reason)
+            await self.await_func(self.close(session, reason))
 
-    def on_ping_message(self, session: WebsocketSession = None, message: bytes = b''):
+    async def on_ping_message(self, session: WebsocketSession = None, message: bytes = b''):
         if self.ping:
-            self.ping(session, message)
+            await self.await_func(self.ping(session, message))
         else:
             session.send_pone(message)
 
-    def on_pong_message(self, session: WebsocketSession = None, message: bytes = ""):
+    async def on_pong_message(self, session: WebsocketSession = None, message: bytes = ""):
         if self.pong:
-            self.pong(session, message)
+            await self.await_func(self.pong(session, message))
 
-    def on_text_message(self, session: WebsocketSession = None, message: str = ""):
+    async def on_text_message(self, session: WebsocketSession = None, message: str = ""):
         if self.text:
-            self.text(session, message)
+            await self.await_func(self.text(session, message))
 
-    def on_binary_message(self, session: WebsocketSession = None, message: bytes = b''):
+    async def on_binary_message(self, session: WebsocketSession = None, message: bytes = b''):
         if self.binary:
-            self.binary(session, message)
+            await self.await_func(self.binary(session, message))
 
-    def on_binary_frame(self, session: WebsocketSession = None, fin: bool = False, frame_payload: bytes = b''):
+    async def on_binary_frame(self, session: WebsocketSession = None, fin: bool = False, frame_payload: bytes = b''):
         if self.binary_frame:
-            return self.binary_frame(session, fin, frame_payload)
+            return await self.await_func(self.binary_frame(session, fin, frame_payload))
         return True
 
 
