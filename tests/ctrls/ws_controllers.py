@@ -4,7 +4,7 @@
 import os
 import shutil
 from uuid import uuid4
-from simple_http_server import WebsocketCloseReason, WebsocketHandler, WebsocketRequest, WebsocketSession, websocket_handler, websocket_message
+from simple_http_server import WebsocketCloseReason, WebsocketHandler, WebsocketRequest, WebsocketSession, websocket_handler, websocket_message, websocket_handshake, websocket_open, websocket_close, WEBSOCKET_MESSAGE_TEXT
 import simple_http_server.logger as logger
 
 _logger = logger.get_logger("ws_test")
@@ -71,8 +71,24 @@ class WSRegHander(WebsocketHandler):
         session.send(f"{session.request.reg_groups[0]}-{message}")
 
 
-@websocket_message(endpoint="/ws-fun/{path_val}")
-async def txt(session: WebsocketSession, message: str):
+@websocket_handshake(endpoint="/ws-fun/{path_val}")
+def ws_handshake(request: WebsocketRequest):
+    return 0, {}
+
+
+@websocket_open(endpoint="/ws-fun/{path_val}")
+def ws_open(session: WebsocketSession):
+    _logger.info(f">>{session.id}<< open! {session.request.path_values}")
+
+
+@websocket_close(endpoint="/ws-fun/{path_val}")
+def ws_close(session: WebsocketSession, reason: WebsocketCloseReason):
+    _logger.info(
+        f">>{session.id}<< close::{reason.message}-{reason.code}-{reason.reason}")
+
+
+@websocket_message(endpoint="/ws-fun/{path_val}", message_type=WEBSOCKET_MESSAGE_TEXT)
+async def ws_text(session: WebsocketSession, message: str):
     _logger.info(f">>{session.id}<< on text message: {message}")
     session.send(f"{session.request.path_values['path_val']}-{message}")
     if message == "close":

@@ -513,6 +513,37 @@ class WSHandler(WebsocketHandler):
 
 ```
 
+But if you want to only handle one event, you can also use a function to handle it. 
+
+```python
+
+from simple_http_server import WebsocketCloseReason, WebsocketHandler, WebsocketRequest, WebsocketSession, websocket_message, websocket_handshake, websocket_open, websocket_close, WEBSOCKET_MESSAGE_TEXT
+
+@websocket_handshake(endpoint="/ws-fun/{path_val}")
+def ws_handshake(request: WebsocketRequest):
+    return 0, {}
+
+
+@websocket_open(endpoint="/ws-fun/{path_val}")
+def ws_open(session: WebsocketSession):
+    _logger.info(f">>{session.id}<< open! {session.request.path_values}")
+
+
+@websocket_close(endpoint="/ws-fun/{path_val}")
+def ws_close(session: WebsocketSession, reason: WebsocketCloseReason):
+    _logger.info(
+        f">>{session.id}<< close::{reason.message}-{reason.code}-{reason.reason}")
+
+
+@websocket_message(endpoint="/ws-fun/{path_val}", message_type=WEBSOCKET_MESSAGE_TEXT)
+# You can define a function in a sync or async way.
+async def ws_text(session: WebsocketSession, message: str): 
+    _logger.info(f">>{session.id}<< on text message: {message}")
+    session.send(f"{session.request.path_values['path_val']}-{message}")
+    if message == "close":
+        session.close()
+```
+
 ### Error pages
 
 You can use `@error_message` to specify your own error page. See:
