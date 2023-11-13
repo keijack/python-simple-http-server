@@ -476,7 +476,7 @@ class Cookie(http.cookies.Morsel):
         return self.__required
 
 
-class FilterContex:
+class FilterContext:
 
     @property
     def request(self) -> Request:

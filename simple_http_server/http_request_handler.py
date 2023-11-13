@@ -34,7 +34,7 @@ import datetime
 
 from typing import Any, Callable, Dict, List, Tuple, Union
 
-from .basic_models import FilterContex, ModelDict, Environment, RegGroup, RegGroups, HttpError, RequestBodyReader, StaticFile, \
+from .basic_models import FilterContext, ModelDict, Environment, RegGroup, RegGroups, HttpError, RequestBodyReader, StaticFile, \
     Headers, Redirect, Response, Cookies, Cookie, JSONBody, BytesBody, Header, Parameters, PathValue, \
     Parameter, MultipartFile, Request, Session, SessionFactory, DEFAULT_ENCODING, SESSION_COOKIE_NAME
 from .app_conf import ControllerFunction
@@ -180,7 +180,7 @@ class ResponseWrapper(Response):
         self.__req_handler.writer.close()
 
 
-class FilterContexImpl(FilterContex):
+class FilterContextImpl(FilterContext):
     """Context of a filter"""
 
     DEFAULT_TIME_OUT = 10
@@ -684,7 +684,7 @@ class HTTPRequestHandler:
                            "Cannot find a controller for your path")
         else:
             filters = self.routing_conf.get_matched_filters(req.path)
-            ctx = FilterContexImpl(req, res, ctrl, filters)
+            ctx = FilterContextImpl(req, res, ctrl, filters)
             try:
                 ctx.do_chain()
                 if req._coroutine_objects:

@@ -4,7 +4,7 @@
 import time
 from typing import List, OrderedDict
 
-from simple_http_server import BytesBody, FilterContex, ModelDict, Redirect, RegGroup, RequestBodyReader, request_filter
+from simple_http_server import BytesBody, FilterContext, ModelDict, Redirect, RegGroup, RequestBodyReader, request_filter
 from simple_http_server import Headers
 from simple_http_server import HttpError
 from simple_http_server import JSONBody
@@ -160,14 +160,14 @@ def header_echo(headers: Headers):
 
 
 @request_filter("/abcde/**")
-def fil(ctx: FilterContex):
+def fil(ctx: FilterContext):
     print("---------- through filter ---------------")
     ctx.do_chain()
 
 
 @request_filter(regexp="^/abcd")
 @request_filter("/tuple")
-async def filter_tuple(ctx: FilterContex):
+async def filter_tuple(ctx: FilterContext):
     print("---------- through filter async ---------------")
     # add a header to request header
     ctx.request.headers["filter-set"] = "through filter"
