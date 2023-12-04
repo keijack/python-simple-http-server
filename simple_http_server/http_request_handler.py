@@ -32,6 +32,7 @@ import threading
 import http.cookies as cookies
 import datetime
 
+from urllib.parse import unquote
 from typing import Any, Callable, Dict, List, Tuple, Union
 
 from .basic_models import FilterContext, ModelDict, Environment, RegGroup, RegGroups, HttpError, RequestBodyReader, StaticFile, \
@@ -166,11 +167,13 @@ class ResponseWrapper(Response):
     def __send_headers(self):
         if not self.__header_sent:
             self.__header_sent = True
-            self.__req_handler._send_res_headers(self.status_code, headers=self.headers, cks=self.cookies)
+            self.__req_handler._send_res_headers(
+                self.status_code, headers=self.headers, cks=self.cookies)
 
     def write_bytes(self, data: bytes):
         assert not self.__is_sent, "This response has benn sent"
-        assert isinstance(data, bytes) or isinstance(data, bytearray), "You can "
+        assert isinstance(data, bytes) or isinstance(
+            data, bytearray), "You can "
         self.__send_headers()
         self.__req_handler.writer.write(data)
 
@@ -273,7 +276,8 @@ class FilterContextImpl(FilterContext):
             return
         if self.__filters:
             filter_func = self.__filters.pop(0)
-            self.request._put_coroutine_task(self._wrap_to_async(filter_func, [self]))
+            self.request._put_coroutine_task(
+                self._wrap_to_async(filter_func, [self]))
         else:
             self.request._put_coroutine_task(self._do_request_async())
 
@@ -413,7 +417,8 @@ class FilterContextImpl(FilterContext):
         # wildcard value
         if len(self.request.path_values) == 1 and "__path_wildcard" in self.request.path_values:
             if val.name:
-                _logger.warning(f"Wildcard value, `name` of the PathValue:: [{val.name}] will be ignored. ")
+                _logger.warning(
+                    f"Wildcard value, `name` of the PathValue:: [{val.name}] will be ignored. ")
             return self.request.path_values["__path_wildcard"]
 
         # brace values
@@ -593,7 +598,8 @@ class HTTPRequestHandler:
     def __match_one_exp(self, d: Dict[str, Union[List[str], str]], exp: str, where: str) -> bool:
         if not exp:
             return True
-        _logger.debug(f"Match controller {where} expression [{exp}] for values: {d}. ")
+        _logger.debug(
+            f"Match controller {where} expression [{exp}] for values: {d}. ")
         exp_ = str(exp)
         e_idx = exp_.find("=")
         if e_idx < 0:
@@ -641,7 +647,8 @@ class HTTPRequestHandler:
                     return True
             return False
 
-        _logger.error(f"Controller {where} expression [{exp}] is not valied, returning False...")
+        _logger.error(
+            f"Controller {where} expression [{exp}] is not valied, returning False...")
         return False
 
     def __match_exps(self, d: Dict[str, Union[List[str], str]], exps: List[str], all: bool, where: str) -> bool:
@@ -774,17 +781,32 @@ class HTTPRequestHandler:
         line, rest = self.__read_line(field)
 
         kvs = self.__decode_content_disposition(line)
-        kname = kvs["name"].encode("ISO-8859-1", errors="replace").decode(DEFAULT_ENCODING, errors="replace")
+        kname = kvs["name"].encode(
+            "ISO-8859-1", errors="replace").decode(DEFAULT_ENCODING, errors="replace")
         if len(kvs) == 1:
             # this is a string field, the second line is an empty line, the rest is the value
-            val = self.__read_line(rest)[1].encode("ISO-8859-1", errors="replace").decode(DEFAULT_ENCODING, errors="replace")
-        elif len(kvs) == 2:
-            filename = kvs["filename"].encode("ISO-8859-1", errors="replace").decode(DEFAULT_ENCODING, errors="replace")
+            val = self.__read_line(rest)[1].encode(
+                "ISO-8859-1", errors="replace").decode(DEFAULT_ENCODING, errors="replace")
+        elif "filename" in kvs or "filename*" in kvs:
+            if "filename*" in kvs:
+                fnv = kvs["filename*"]
+                idx = fnv.find("''")
+                if idx < 0:
+                    fn_encode = DEFAULT_ENCODING
+                else:
+                    fn_encode = fnv[0:idx]
+                filename = unquote(fnv[idx + 2:], fn_encode)
+            else:
+                filename = kvs["filename"].encode(
+                    "ISO-8859-1", errors="replace").decode(DEFAULT_ENCODING, errors="replace")
+
+            
             # the second line is Content-Type line
             ct_line, rest = self.__read_line(rest)
             content_type = ct_line.split(":")[1].strip()
             # the third line is an empty line, the rest is the value
-            content = self.__read_line(rest)[1].encode("ISO-8859-1", errors="replace")
+            content = self.__read_line(rest)[1].encode(
+                "ISO-8859-1", errors="replace")
 
             val = MultipartFile(kname, filename=filename,
                                 content_type=content_type, content=content)
@@ -798,7 +820,10 @@ class HTTPRequestHandler:
         es = line.split(";")[1:]
         for e in es:
             k, v = utils.break_into(e.strip(), "=")
-            cont_dis[k] = v[1: -1]  # ignore the '"' symbol
+            if v.startswith('"') and v.endswith('"'):
+                cont_dis[k] = v[1: -1]  # ignore the '"' symbol
+            else:
+                cont_dis[k] = v
         return cont_dis
 
     def __read_line(self, txt):
