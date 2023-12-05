@@ -789,18 +789,19 @@ class HTTPRequestHandler:
                 "ISO-8859-1", errors="replace").decode(DEFAULT_ENCODING, errors="replace")
         elif "filename" in kvs or "filename*" in kvs:
             if "filename*" in kvs:
-                fnv = kvs["filename*"]
-                idx = fnv.find("''")
-                if idx < 0:
-                    fn_encode = DEFAULT_ENCODING
+                name_value = kvs["filename*"]
+                idx = name_value.find("'")
+                if idx <= 0:
+                    encoding = DEFAULT_ENCODING
                 else:
-                    fn_encode = fnv[0:idx]
-                filename = unquote(fnv[idx + 2:], fn_encode)
+                    encoding = name_value[0:idx]
+                name_value = name_value[idx + 1:]
+                idx = name_value.find("'")
+                filename = unquote(name_value[idx + 1:], encoding)
             else:
                 filename = kvs["filename"].encode(
                     "ISO-8859-1", errors="replace").decode(DEFAULT_ENCODING, errors="replace")
 
-            
             # the second line is Content-Type line
             ct_line, rest = self.__read_line(rest)
             content_type = ct_line.split(":")[1].strip()
