@@ -22,6 +22,9 @@ classifiers = [
 ]
 dynamic = ["version"]
 
+[tool.setuptools.packages.find]
+include=["simple_http_server"]
+
 [tool.setuptools.dynamic]
 version = {attr = "simple_http_server.version"}
 
