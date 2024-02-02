@@ -23,6 +23,7 @@ SOFTWARE.
 """
 
 import os
+import sys
 import threading
 import inspect
 import importlib
@@ -70,12 +71,14 @@ def _load_all_modules(work_dir, pkg, regx):
         return [_to_module_name(pkg, regx)]
     if not os.path.exists(abs_folder):
         if abs_folder.endswith(".py"):
-            _logger.warning(f"Cannot find package {pkg}, file [{abs_folder}] is not exist")
+            _logger.warning(
+                f"Cannot find package {pkg}, file [{abs_folder}] is not exist")
             return []
         if os.path.isfile(abs_folder + ".py"):
             return [_to_module_name(pkg + ".py", regx)]
         else:
-            _logger.warning(f"Cannot find package {pkg}, file [{abs_folder}] is not exist")
+            _logger.warning(
+                f"Cannot find package {pkg}, file [{abs_folder}] is not exist")
             return []
 
     modules = []
@@ -113,10 +116,10 @@ def scan(base_dir: str = "", regx: str = r"", project_dir: str = "") -> None:
     if project_dir:
         work_dir = project_dir
     else:
-        ft = inspect.currentframe()
-        fts = inspect.getouterframes(ft)
-        entrance = fts[-1]
-        work_dir = os.path.dirname(inspect.getabsfile(entrance[0]))
+        mpath = os.path.dirname(sys.modules['__main__'].__file__)
+        _logger.debug(
+            f"Project directory is not set, use the directory where the main module is in. {mpath}")
+        work_dir = mpath
     modules = _load_all_modules(work_dir, base_dir, regx)
 
     for mname in modules:
@@ -250,7 +253,8 @@ def stop() -> None:
 
 def __fill_proxy(proxy: RoutingServer, session_factory: SessionFactory, app_conf: AppConf):
     appconf = app_conf or get_app_conf()
-    set_session_factory(session_factory or appconf.session_factory or LocalSessionFactory())
+    set_session_factory(
+        session_factory or appconf.session_factory or LocalSessionFactory())
     filters = appconf._get_filters()
     # filter configuration
     for ft in filters:
