@@ -15,7 +15,7 @@ Python 3.7+
 * 轻量级
 * 函数化编程
 * 支持 Session 会话，并且可以通过[这个扩展](https://gitee.com/keijack/python-simple-http-server-redis-session)支持分布式会话。
-* 可以通过[这个扩展](https://github.com/keijack/python-simple-http-server-jinja) 来使用 `jinja` 视图层功能。
+* 可以通过[这个扩展](https://gitee.com/keijack/python-simple-http-server-jinja) 来使用 `jinja` 视图层功能。
 * 支持过滤器链
 * Spring MVC 风格的请求映射配置
 * 简单易用
