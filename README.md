@@ -16,6 +16,7 @@ Python 3.7+
 * Functional programing.
 * Filter chain support.
 * Session support, and can support distributed session by [this extention](https://github.com/keijack/python-simple-http-server-redis-session).
+* You can use [this extention](https://github.com/keijack/python-simple-http-server-jinja) to support `jinja` views.
 * Spring MVC like request mapping.
 * SSL support.
 * Websocket support
