@@ -25,7 +25,6 @@ SOFTWARE.
 import os
 import sys
 import threading
-import inspect
 import importlib
 import re
 
@@ -276,12 +275,16 @@ def __fill_proxy(proxy: RoutingServer, session_factory: SessionFactory, app_conf
 
 
 def init_wsgi_proxy(resources: Dict[str, str] = {}, session_factory: SessionFactory = None, app_conf: AppConf = None) -> WSGIProxy:
-    proxy = WSGIProxy(res_conf=resources)
-    __fill_proxy(proxy, session_factory, app_conf)
+    appconf = app_conf or get_app_conf()
+    proxy = WSGIProxy(res_conf=resources,
+                      model_binding_conf=appconf.model_binding_conf)
+    __fill_proxy(proxy, session_factory, appconf)
     return proxy
 
 
 def init_asgi_proxy(resources: Dict[str, str] = {}, session_factory: SessionFactory = None, app_conf: AppConf = None) -> ASGIProxy:
-    proxy = ASGIProxy(res_conf=resources)
-    __fill_proxy(proxy, session_factory, app_conf)
+    appconf = app_conf or get_app_conf()
+    proxy = ASGIProxy(res_conf=resources,
+                      model_binding_conf=appconf.model_binding_conf)
+    __fill_proxy(proxy, session_factory, appconf)
     return proxy

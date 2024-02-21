@@ -25,7 +25,7 @@ SOFTWARE.
 import sys
 import inspect
 import asyncio
-from typing import Any, Dict, List, Union, Callable
+from typing import Any, Dict, List, Type, Union, Callable
 
 from .models.basic_models import SessionFactory, WebsocketHandler
 from .models.basic_models import WEBSOCKET_MESSAGE_BINARY, WEBSOCKET_MESSAGE_BINARY_FRAME, WEBSOCKET_MESSAGE_PING, WEBSOCKET_MESSAGE_PONG, WEBSOCKET_MESSAGE_TEXT
@@ -408,11 +408,19 @@ class AppConf:
         self.route = self.request_map
         self.model_binding_conf = ModelBindingConf()
 
-    def set_model_binding_type(self, model_type, model_bingding_type):
-        self.model_binding_conf.model_bingding_types[model_type] = model_bingding_type
+    def model_binding(self, arg_type: Type):
+        def map(model_binding_type):
+            self.model_binding_conf.model_bingding_types[arg_type] = model_binding_type
+            return model_binding_type
+        return map
 
-    def set_default_model_bingding_type(self, model_bingding_type):
-        self.model_binding_conf.default_model_binding_type = model_bingding_type
+    def default_model_binding(self, *anno_args):
+        def map(model_binding_type):
+            self.model_binding_conf.default_model_binding_type = model_binding_type
+            return model_binding_type
+        if len(anno_args) == 1 and inspect.isclass(anno_args[0]):
+            return map(anno_args[0])
+        return map
 
     def controller(self, *anno_args, singleton: bool = True, args: List[Any] = [], kwargs: Dict[str, Any] = {}):
         def map(ctr_obj_class):
@@ -758,12 +766,12 @@ def error_message(*anno_args):
     return _default_app_conf.error_message(*anno_args)
 
 
-def set_model_binding_type(model_type, model_bingding_type):
-    return _default_app_conf.set_model_binding_type(model_type, model_bingding_type)
+def model_binding(arg_type: Type):
+    return _default_app_conf.model_binding(arg_type)
 
 
-def set_default_model_bingding_type(model_bingding_type):
-    return _default_app_conf.set_default_model_bingding_type(model_bingding_type)
+def default_model_binding(*anno_args):
+    return _default_app_conf.default_model_binding(*anno_args)
 
 
 def get_app_conf(tag: str = "") -> AppConf:

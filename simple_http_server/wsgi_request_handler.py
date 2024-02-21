@@ -32,7 +32,7 @@ from .http_request_handler import HTTPRequestHandler
 from .logger import get_logger
 
 
-_logger = get_logger("simple_http_server.wsgi_request_server")
+_logger = get_logger("simple_http_server.wsgi_request_handler")
 
 
 class WSGIRequestHandler:

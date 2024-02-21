@@ -38,7 +38,8 @@ _app = get_app_conf("2")
 @request_map("/index")
 @_app.route("/")
 def my_ctrl():
-    return {"code": 0, "message": "success"}  # You can return a dictionary, a string or a `simple_http_server.simple_http_server.Response` object.
+    # You can return a dictionary, a string or a `simple_http_server.simple_http_server.Response` object.
+    return {"code": 0, "message": "success"}
 
 
 @request_map("/say_hello", method=["GET", "POST"])
@@ -110,7 +111,8 @@ def set_headers(res: Response, headers: Headers, cookies: Cookies, cookie=Cookie
     print(cookies)
     print("==================cookies==========")
     print(cookie)
-    res.add_header("Set-Cookie", "sc=keijack; Expires=Web, 31 Oct 2018 00:00:00 GMT;")
+    res.add_header(
+        "Set-Cookie", "sc=keijack; Expires=Web, 31 Oct 2018 00:00:00 GMT;")
     res.add_header("Set-Cookie", "sc=keijack2;")
     res.body = "<!DOCTYPE html><html><body>OK!</body></html>"
 

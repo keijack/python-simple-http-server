@@ -1,5 +1,6 @@
 # coding: utf-8
 
+import json
 import os
 from typing import Dict
 import unittest
@@ -33,8 +34,10 @@ class WSGIHttpRequestTest(unittest.TestCase):
     def start_server(cls):
         _logger.info("start server in background. ")
         root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        server.scan(project_dir=root, base_dir="tests/ctrls", regx=r'.*controllers.*')
-        wsgi_proxy = server.init_wsgi_proxy(resources={"/public/*": f"{root}/tests/static"})
+        server.scan(project_dir=root, base_dir="tests/ctrls",
+                    regx=r'.*controllers.*')
+        wsgi_proxy = server.init_wsgi_proxy(
+            resources={"/public/*": f"{root}/tests/static"})
 
         def wsgi_simple_app(environment, start_response):
             return wsgi_proxy.app_proxy(environment, start_response)
@@ -49,7 +52,8 @@ class WSGIHttpRequestTest(unittest.TestCase):
         while not cls.server_ready:
             sleep(1)
             retry = retry + 1
-            _logger.info(f"server is not ready wait. {retry}/{cls.WAIT_COUNT} ")
+            _logger.info(
+                f"server is not ready wait. {retry}/{cls.WAIT_COUNT} ")
             if retry >= cls.WAIT_COUNT:
                 raise Exception("Server start wait timeout.")
 
@@ -62,7 +66,8 @@ class WSGIHttpRequestTest(unittest.TestCase):
 
     @classmethod
     def visit(cls, ctx_path, headers: Dict[str, str] = {}, data=None, return_type: str = "TEXT"):
-        req: urllib.request.Request = urllib.request.Request(f"http://127.0.0.1:{cls.PORT}/{ctx_path}")
+        req: urllib.request.Request = urllib.request.Request(
+            f"http://127.0.0.1:{cls.PORT}/{ctx_path}")
         for k, v in headers.items():
             req.add_header(k, v)
         res: http.client.HTTPResponse = urllib.request.urlopen(req, data=data)
@@ -73,13 +78,18 @@ class WSGIHttpRequestTest(unittest.TestCase):
             headers = res.headers
             res.close()
             return headers
+        elif return_type == "JSON":
+            txt = res.read().decode("utf-8")
+            res.close()
+            return json.loads(txt)
         else:
             txt = res.read().decode("utf-8")
             res.close()
             return txt
 
     def test_header_echo(self):
-        res: http.client.HTTPResponse = self.visit(f"header_echo", headers={"X-KJ-ABC": "my-headers"}, return_type="RESPONSE")
+        res: http.client.HTTPResponse = self.visit(
+            f"header_echo", headers={"X-KJ-ABC": "my-headers"}, return_type="RESPONSE")
         assert "X-Kj-Abc" in res.headers
         assert res.headers["X-Kj-Abc"] == "my-headers"
 
@@ -110,3 +120,13 @@ class WSGIHttpRequestTest(unittest.TestCase):
             error_msg = err.read().decode("utf-8")
             _logger.info(error_msg)
             assert error_msg == '500-Internal Server Error-some error occurs!'
+
+    def test_model_binding(self):
+        name = "keijack"
+        sex = "male"
+        age = 18
+        res: Dict = self.visit(
+            f"model_binding/person?name={name}&sex={sex}&age={age}", return_type="JSON")
+        assert res["name"] == name
+        assert res["sex"] == sex
+        assert res["age"] == age

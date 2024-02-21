@@ -317,12 +317,10 @@ class FilterContextImpl(FilterContext):
                 arg_vals.append(self.__controller.ctrl_object)
                 args = args[1:]
         for arg, arg_type_anno in args:
-            if arg not in self.request.parameter.keys() \
-                    and arg_type_anno not in (Request, Session, Response, RegGroups, RegGroup, Headers, cookies.BaseCookie,
-                                              cookies.SimpleCookie, Cookies, PathValue, JSONBody, BytesBody, RequestBodyReader, ModelDict):
+            param = await self.__get_params_(arg, arg_type_anno)
+            if param is None:
                 raise HttpError(400, "Missing Paramter",
                                 f"Parameter[{arg}] is required! ")
-            param = await self.__get_params_(arg, arg_type_anno)
             arg_vals.append(param)
 
         return arg_vals

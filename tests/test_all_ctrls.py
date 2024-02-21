@@ -72,6 +72,10 @@ class ThreadingServerTest(unittest.TestCase):
             headers = res.headers
             res.close()
             return headers
+        elif return_type == "JSON":
+            txt = res.read().decode("utf-8")
+            res.close()
+            return json.loads(txt)
         else:
             txt = res.read().decode("utf-8")
             res.close()
@@ -221,6 +225,15 @@ class ThreadingServerTest(unittest.TestCase):
         assert body == 'a=b'
         body = self.visit("param/narrowing?a=c")
         assert body == 'a!=b'
+
+    def test_model_binding(self):
+        name = "keijack"
+        sex = "male"
+        age = 18
+        res: Dict = self.visit(f"model_binding/person?name={name}&sex={sex}&age={age}", return_type="JSON")
+        assert res["name"] == name
+        assert res["sex"] == sex
+        assert res["age"] == age
 
 
 class CoroutineServerTest(ThreadingServerTest):
