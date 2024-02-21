@@ -38,6 +38,8 @@ from time import sleep
 
 from typing import Dict,  Tuple
 
+from simple_http_server.models.model_bindings import ModelBindingConf
+
 from .app_conf import ControllerFunction, WebsocketHandlerClass, AppConf, get_app_conf, _get_session_factory
 from .routing_server import RoutingServer
 from .http_protocol_handler import HttpProtocolHandler, SocketServerStreamRequestHandlerWraper
@@ -63,8 +65,9 @@ class ThreadingHTTPServer(TCPServer, RoutingServer):
         self.server_name = socket.getfqdn(host)
         self.server_port = port
 
-    def __init__(self, addr, res_conf={}, max_workers: int = None):
-        RoutingServer.__init__(self, res_conf)
+    def __init__(self, addr, res_conf={},  model_bingding_conf: ModelBindingConf = ModelBindingConf(), max_workers: int = None):
+        RoutingServer.__init__(
+            self, res_conf, model_binding_conf=model_bingding_conf)
         self.max_workers = max_workers or self._default_max_workers
         self.threadpool: ThreadPoolExecutor = ThreadPoolExecutor(
             thread_name_prefix="ReqThread",
@@ -104,8 +107,9 @@ class ThreadingHTTPServer(TCPServer, RoutingServer):
 
 class CoroutineHTTPServer(RoutingServer):
 
-    def __init__(self, host: str = '', port: int = 9090, ssl: SSLContext = None, res_conf={}) -> None:
-        RoutingServer.__init__(self, res_conf)
+    def __init__(self, host: str = '', port: int = 9090, ssl: SSLContext = None, res_conf={}, model_bingding_conf: ModelBindingConf = ModelBindingConf()) -> None:
+        RoutingServer.__init__(
+            self, res_conf, model_binding_conf=model_bingding_conf)
         self.host: str = host
         self.port: int = port
         self.ssl: SSLContext = ssl
@@ -207,20 +211,20 @@ class HttpServer:
         else:
             self.ssl_ctx = None
 
+        appconf = app_conf or get_app_conf()
         if prefer_corountine:
             _logger.info(
                 f"Start server in corouting mode, listen to port: {self.host[1]}")
             self.server = CoroutineHTTPServer(
-                self.host[0], self.host[1], self.ssl_ctx, resources)
+                self.host[0], self.host[1], self.ssl_ctx, resources, model_bingding_conf=appconf.model_binding_conf)
         else:
             _logger.info(
                 f"Start server in threading mixed mode, listen to port {self.host[1]}")
             self.server = ThreadingHTTPServer(
-                self.host, resources, max_workers=max_workers)
+                self.host, resources, model_bingding_conf=appconf.model_binding_conf, max_workers=max_workers)
             if self.ssl_ctx:
                 self.server.socket = self.ssl_ctx.wrap_socket(
                     self.server.socket, server_side=True)
-        appconf = app_conf or get_app_conf()
 
         filters = appconf._get_filters()
         # filter configuration

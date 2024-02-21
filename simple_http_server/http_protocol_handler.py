@@ -40,7 +40,7 @@ from asyncio.streams import StreamReader, StreamWriter
 from http import HTTPStatus
 
 from simple_http_server import version as __version__
-from .basic_models import RequestBodyReader
+from .models.basic_models import RequestBodyReader
 from .logger import get_logger
 from .routing_server import RoutingServer
 from .http_request_handler import HTTPRequestHandler

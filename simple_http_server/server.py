@@ -39,7 +39,7 @@ from .routing_server import RoutingServer
 from simple_http_server._http_session_local_impl import LocalSessionFactory
 from simple_http_server.logger import get_logger
 from .app_conf import set_session_factory
-from .basic_models import SessionFactory
+from .models.basic_models import SessionFactory
 
 
 _logger = get_logger("simple_http_server.server")

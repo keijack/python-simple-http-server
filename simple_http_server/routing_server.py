@@ -35,7 +35,8 @@ from urllib.parse import unquote
 
 from typing import Any, Callable, Dict, List, Tuple
 
-from .basic_models import StaticFile, SessionFactory
+from .models.basic_models import StaticFile, SessionFactory
+from .models.model_bindings import ModelBindingConf
 from .app_conf import WebsocketHandlerClass, ControllerFunction
 
 from .__utils import remove_url_first_slash, get_function_args, get_function_kwargs, get_path_reg_pattern
@@ -49,10 +50,10 @@ class RoutingServer:
     HTTP_METHODS = ["OPTIONS", "GET", "HEAD",
                     "POST", "PUT", "DELETE", "TRACE", "CONNECT"]
 
-    def __init__(self, res_conf={}):
+    def __init__(self, res_conf={}, model_binding_conf: ModelBindingConf = ModelBindingConf()):
         self.method_url_mapping: Dict[str,
                                       Dict[str, List[ControllerFunction]]] = {"_": {}}
-        self.path_val_url_mapping: Dict[str, Dict[str, List[Tuple(ControllerFunction, List[str])]]] = {
+        self.path_val_url_mapping: Dict[str, Dict[str, List[Tuple[ControllerFunction, List[str]]]]] = {
             "_": OrderedDict()}
         self.method_regexp_mapping: Dict[str, Dict[str, List[ControllerFunction]]] = {
             "_": OrderedDict()}
@@ -74,6 +75,7 @@ class RoutingServer:
         self.__connection_idle_time: float = 60
         self.__keep_alive_max_request: int = 10
         self.session_factory: SessionFactory = None
+        self.model_binding_conf = model_binding_conf
 
     @property
     def connection_idle_time(self):
@@ -101,7 +103,8 @@ class RoutingServer:
     def put_to_path_val_url_mapping(self, method, path_pattern, ctrl, path_names):
         if path_pattern not in self.path_val_url_mapping[method]:
             self.path_val_url_mapping[method][path_pattern] = []
-        self.path_val_url_mapping[method][path_pattern].insert(0, (ctrl, path_names))
+        self.path_val_url_mapping[method][path_pattern].insert(
+            0, (ctrl, path_names))
 
     def put_to_method_regexp_mapping(self, method, regexp, ctrl):
         if regexp not in self.method_regexp_mapping[method]:
@@ -127,7 +130,8 @@ class RoutingServer:
                 res_k = res_k + "*"
             if res_k.startswith('*'):
                 suffix = res_k[2:] if res_k.startswith("**") else res_k[1:]
-                assert suffix.find('/') < 0 and suffix.find('*') < 0, "If a resource path starts with *, only suffix can be configurated. "
+                assert suffix.find('/') < 0 and suffix.find(
+                    '*') < 0, "If a resource path starts with *, only suffix can be configurated. "
             if res_k.startswith('**.'):
                 # **.xxx
                 suffix = res_k[3:]
@@ -141,14 +145,16 @@ class RoutingServer:
                 prefix = res_k[0:-2]
                 while prefix.startswith('/'):
                     prefix = prefix[1:]
-                assert prefix.find("*") < 0, "You can only config a * or ** at the start or end of a path."
+                assert prefix.find(
+                    "*") < 0, "You can only config a * or ** at the start or end of a path."
                 key = f'^{prefix}([\\w%.\\-@!\\(\\)\\[\\]\\|\\$/]+)$'
             elif res_k.endswith("/*"):
                 # xx/*
                 prefix = res_k[0:-1]
                 while prefix.startswith('/'):
                     prefix = prefix[1:]
-                assert prefix.find("*") < 0, "You can only config a * or ** at the start or end of a path."
+                assert prefix.find(
+                    "*") < 0, "You can only config a * or ** at the start or end of a path."
                 key = f'^{prefix}([\\w%.\\-@!\\(\\)\\[\\]\\|\\$]+)$'
 
             if v.endswith(os.path.sep):
@@ -174,7 +180,8 @@ class RoutingServer:
             if path_pattern is None:
                 self.put_to_method_url_mapping(_method, _url, ctrl)
             else:
-                self.put_to_path_val_url_mapping(_method, path_pattern, ctrl, path_names)
+                self.put_to_path_val_url_mapping(
+                    _method, path_pattern, ctrl, path_names)
 
     def _res_(self, fpath: str):
         # fpath = os.path.join(res_dir, path.replace(res_regx, ""))
@@ -229,7 +236,8 @@ class RoutingServer:
         # static files
         for k, v in self.res_conf:
             match_static_path_conf = re.match(k, path)
-            _logger.debug(f"{path} macth static file conf {k} ? {match_static_path_conf}")
+            _logger.debug(
+                f"{path} macth static file conf {k} ? {match_static_path_conf}")
             if match_static_path_conf:
                 if match_static_path_conf.groups():
                     fpath = f"{v}{match_static_path_conf.group(1)}"

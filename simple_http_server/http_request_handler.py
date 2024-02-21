@@ -35,7 +35,9 @@ import datetime
 from urllib.parse import unquote
 from typing import Any, Callable, Dict, List, Tuple, Union
 
-from .basic_models import FilterContext, ModelDict, Environment, RegGroup, RegGroups, HttpError, RequestBodyReader, StaticFile, \
+from simple_http_server.models.model_bindings import ModelBindingConf
+
+from .models.basic_models import FilterContext, ModelDict, Environment, RegGroup, RegGroups, HttpError, RequestBodyReader, StaticFile, \
     Headers, Redirect, Response, Cookies, Cookie, JSONBody, BytesBody, Header, Parameters, PathValue, \
     Parameter, MultipartFile, Request, Session, SessionFactory, DEFAULT_ENCODING, SESSION_COOKIE_NAME
 from .app_conf import ControllerFunction
@@ -188,11 +190,12 @@ class FilterContextImpl(FilterContext):
 
     DEFAULT_TIME_OUT = 10
 
-    def __init__(self, req, res, controller: ControllerFunction, filters: List[Callable] = None):
+    def __init__(self, req, res, controller: ControllerFunction, model_binding_conf: ModelBindingConf, filters: List[Callable] = None):
         self.__request: RequestWrapper = req
         self.__response = res
         self.__controller: ControllerFunction = controller
         self.__filters: List[Callable] = filters if filters is not None else []
+        self.__model_binding_conf = model_binding_conf
 
     @property
     def request(self) -> RequestWrapper:
@@ -324,83 +327,18 @@ class FilterContextImpl(FilterContext):
 
         return arg_vals
 
-    async def __get_params_(self, arg, arg_type, val=None, type_check=True):
-        if val is not None:
-            kws = {"val": val}
+    async def __get_params_(self, arg, arg_type, val=None):
+        if arg_type in self.__model_binding_conf.model_bingding_types:
+            binding_type = self.__model_binding_conf.model_bingding_types[arg_type]
         else:
-            kws = {}
+            binding_type = self.__model_binding_conf.default_model_binding_type
 
-        if arg_type == Request:
-            param = self.request
-        elif arg_type == Session:
-            param = self.request.get_session(True)
-        elif arg_type == Response:
-            param = self.response
-        elif arg_type == Headers:
-            param = Headers(self.request.headers)
-        elif arg_type == RegGroups:
-            param = RegGroups(self.request.reg_groups)
-        elif arg_type == Environment:
-            param = Environment(self.request.environment)
-        elif arg_type == Header:
-            param = self.__build_header(arg, **kws)
-        elif inspect.isclass(arg_type) and issubclass(arg_type, cookies.BaseCookie):
-            param = self.request.cookies
-        elif arg_type == Cookie:
-            param = self.__build_cookie(arg, **kws)
-        elif arg_type == MultipartFile:
-            param = self.__build_multipart(arg, **kws)
-        elif arg_type == Parameter:
-            param = self.__build_param(arg, **kws)
-        elif arg_type == PathValue:
-            param = self.__build_path_value(arg, **kws)
-        elif arg_type == Parameters:
-            param = self.__build_params(arg, **kws)
-        elif arg_type == RegGroup:
-            param = self.__build_reg_group(**kws)
-        elif arg_type == JSONBody:
-            param = self.__build_json_body()
-        elif arg_type == RequestBodyReader:
-            param = self.request.reader
-        elif arg_type == BytesBody:
-            if not self.request._body:
-                self.request._body = await self.request.reader.read()
-            param = BytesBody(self.request._body)
-        elif arg_type == str:
-            param = self.__build_str(arg, **kws)
-        elif arg_type == bool:
-            param = self.__build_bool(arg, **kws)
-        elif arg_type == int:
-            param = self.__build_int(arg, **kws)
-        elif arg_type == float:
-            param = self.__build_float(arg, **kws)
-        elif arg_type in (list, List, List[str], List[Parameter], List[int], List[float], List[bool], List[dict], List[Dict]):
-            param = self.__build_list(arg, target_type=arg_type, **kws)
-        elif arg_type == ModelDict:
-            param = self.__build_model_dict()
-        elif arg_type in (dict, Dict):
-            param = self.__build_dict(arg, **kws)
-        elif type_check:
-            raise HttpError(
-                400, None, f"Parameter[{arg}] with Type {arg_type} is not supported yet.")
-        else:
-            param = val
-        return param
-
-    def __build_reg_group(self, val: RegGroup = RegGroup(group=0)):
-        if val.group >= len(self.request.reg_groups):
-            raise HttpError(
-                400, None, f"RegGroup required an element at {val.group}, but the reg length is only {len(self.request.reg_groups)}")
-        return RegGroup(group=val.group, _value=self.request.reg_groups[val.group])
-
-    def __build_model_dict(self):
-        mdict = ModelDict()
-        for k, v in self.request.parameters.items():
-            if len(v) == 1:
-                mdict[k] = v[0]
-            else:
-                mdict[k] = v
-        return mdict
+        binding_obj = binding_type(self.request,
+                                   self.response,
+                                   arg,
+                                   arg_type,
+                                   val)
+        return await binding_obj.bind()
 
     async def __prepare_kwargs(self):
         kwargs = get_function_kwargs(self.__controller.func)
@@ -409,170 +347,9 @@ class FilterContextImpl(FilterContext):
         kwarg_vals = {}
         for k, v, t in kwargs:
             kwarg_vals[k] = await self.__get_params_(
-                k, type(v) if v is not None else t, v, False)
+                k, type(v) if v is not None else t, v)
 
         return kwarg_vals
-
-    def __build_path_value(self, key, val=PathValue()):
-        # wildcard value
-        if len(self.request.path_values) == 1 and "__path_wildcard" in self.request.path_values:
-            if val.name:
-                _logger.warning(
-                    f"Wildcard value, `name` of the PathValue:: [{val.name}] will be ignored. ")
-            return self.request.path_values["__path_wildcard"]
-
-        # brace values
-        name = val.name if val.name is not None and val.name != "" else key
-        if name in self.request.path_values:
-            return PathValue(name=name, _value=self.request.path_values[name])
-        else:
-            raise HttpError(
-                500, None, f"path name[{name}] not in your url mapping!")
-
-    def __build_cookie(self, key, val=None):
-        name = val.name if val.name is not None and val.name != "" else key
-        if val._required and name not in self.request.cookies:
-            raise HttpError(400, "Missing Cookie",
-                            f"Cookie[{name}] is required.")
-        if name in self.request.cookies:
-            morsel = self.request.cookies[name]
-            cookie = Cookie()
-            cookie.set(morsel.key, morsel.value, morsel.coded_value)
-            cookie.update(morsel)
-            return cookie
-        else:
-            return val
-
-    def __build_multipart(self, key, val=MultipartFile()):
-        name = val.name if val.name is not None and val.name != "" else key
-        if val._required and name not in self.request.parameter.keys():
-            raise HttpError(400, "Missing Parameter",
-                            f"Parameter[{name}] is required.")
-        if name in self.request.parameter.keys():
-            v = self.request.parameter[name]
-            if isinstance(v, MultipartFile):
-                return v
-            else:
-                raise HttpError(
-                    400, None, f"Parameter[{name}] should be a file.")
-        else:
-            return val
-
-    def __build_dict(self, key, val={}):
-        if key in self.request.parameter.keys():
-            try:
-                return json.loads(self.request.parameter[key])
-            except:
-                raise HttpError(
-                    400, None, f"Parameter[{key}] should be a JSON string.")
-        else:
-            return val
-
-    def __build_list(self, key, target_type=list, val=[]):
-        if key in self.request.parameters.keys():
-            ori_list = self.request.parameters[key]
-        else:
-            ori_list = val
-
-        if target_type == List[int]:
-            try:
-                return [int(p) for p in ori_list]
-            except:
-                raise HttpError(
-                    400, None, f"One of the parameter[{key}] is not int. ")
-        elif target_type == List[float]:
-            try:
-                return [float(p) for p in ori_list]
-            except:
-                raise HttpError(
-                    400, None, f"One of the parameter[{key}] is not float. ")
-        elif target_type == List[bool]:
-            return [p.lower() not in ("0", "false", "") for p in ori_list]
-        elif target_type in (List[dict], List[Dict]):
-            try:
-                return [json.loads(p) for p in ori_list]
-            except:
-                raise HttpError(
-                    400, None, f"One of the parameter[{key}] is not JSON string. ")
-        elif target_type == List[Parameter]:
-            return [Parameter(name=key, default=p, required=False) for p in ori_list]
-        else:
-            return ori_list
-
-    def __build_float(self, key, val=None):
-        if key in self.request.parameter.keys():
-            try:
-                return float(self.request.parameter[key])
-            except:
-                raise HttpError(
-                    400, None, f"Parameter[{key}] should be an float. ")
-        else:
-            return val
-
-    def __build_int(self, key, val=None):
-        if key in self.request.parameter.keys():
-            try:
-                return int(self.request.parameter[key])
-            except:
-                raise HttpError(
-                    400, None, f"Parameter[{key}] should be an int. ")
-        else:
-            return val
-
-    def __build_bool(self, key, val=None):
-        if key in self.request.parameter.keys():
-            v = self.request.parameter[key]
-            return v.lower() not in ("0", "false", "")
-        else:
-            return val
-
-    def __build_str(self, key, val=None):
-        if key in self.request.parameter.keys():
-            return Parameter(name=key, default=self.request.parameter[key], required=False)
-        elif val is None:
-            return None
-        else:
-            return Parameter(name=key, default=val, required=False)
-
-    def __build_json_body(self):
-        if "content-type" not in self.request._headers_keys_in_lowcase.keys() or \
-                not self.request._headers_keys_in_lowcase["content-type"].lower().startswith("application/json"):
-            raise HttpError(
-                400, None, 'The content type of this request must be "application/json"')
-        return JSONBody(self.request.json)
-
-    def __build_header(self, key, val=Header()):
-        name = val.name if val.name is not None and val.name != "" else key
-        if val._required and name not in self.request.headers:
-            raise HttpError(400, "Missing Header",
-                            f"Header[{name}] is required.")
-        if name in self.request.headers:
-            v = self.request.headers[name]
-            return Header(name=name, default=v, required=val._required)
-        else:
-            return val
-
-    def __build_params(self, key, val=Parameters()):
-        name = val.name if val.name is not None and val.name != "" else key
-        if val._required and name not in self.request.parameters:
-            raise HttpError(400, "Missing Parameter",
-                            f"Parameter[{name}] is required.")
-        if name in self.request.parameters:
-            v = self.request.parameters[name]
-            return Parameters(name=name, default=v, required=val._required)
-        else:
-            return val
-
-    def __build_param(self, key, val=Parameter()):
-        name = val.name if val.name is not None and val.name != "" else key
-        if val._required and name not in self.request.parameter:
-            raise HttpError(400, "Missing Parameter",
-                            f"Parameter[{name}] is required.")
-        if name in self.request.parameter:
-            v = self.request.parameter[name]
-            return Parameter(name=name, default=v, required=val._required)
-        else:
-            return val
 
 
 class HTTPRequestHandler:
@@ -691,7 +468,8 @@ class HTTPRequestHandler:
                            "Cannot find a controller for your path")
         else:
             filters = self.routing_conf.get_matched_filters(req.path)
-            ctx = FilterContextImpl(req, res, ctrl, filters)
+            ctx = FilterContextImpl(
+                req, res, ctrl, self.routing_conf.model_binding_conf, filters)
             try:
                 ctx.do_chain()
                 if req._coroutine_objects:

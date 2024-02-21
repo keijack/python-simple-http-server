@@ -27,8 +27,9 @@ import inspect
 import asyncio
 from typing import Any, Dict, List, Union, Callable
 
-from .basic_models import SessionFactory, WebsocketHandler
-from .basic_models import WEBSOCKET_MESSAGE_BINARY, WEBSOCKET_MESSAGE_BINARY_FRAME, WEBSOCKET_MESSAGE_PING, WEBSOCKET_MESSAGE_PONG, WEBSOCKET_MESSAGE_TEXT
+from .models.basic_models import SessionFactory, WebsocketHandler
+from .models.basic_models import WEBSOCKET_MESSAGE_BINARY, WEBSOCKET_MESSAGE_BINARY_FRAME, WEBSOCKET_MESSAGE_PING, WEBSOCKET_MESSAGE_PONG, WEBSOCKET_MESSAGE_TEXT
+from .models.model_bindings import ModelBindingConf
 from .logger import get_logger
 
 _logger = get_logger("simple_http_server.app_conf")
@@ -405,6 +406,13 @@ class AppConf:
 
         self.request_map("/favicon.ico")(_favicon)
         self.route = self.request_map
+        self.model_binding_conf = ModelBindingConf()
+
+    def set_model_binding_type(self, model_type, model_bingding_type):
+        self.model_binding_conf.model_bingding_types[model_type] = model_bingding_type
+
+    def set_default_model_bingding_type(self, model_bingding_type):
+        self.model_binding_conf.default_model_binding_type = model_bingding_type
 
     def controller(self, *anno_args, singleton: bool = True, args: List[Any] = [], kwargs: Dict[str, Any] = {}):
         def map(ctr_obj_class):
@@ -748,6 +756,14 @@ def websocket_message(endpoint: str = "", regexp: str = "", message_type: str = 
 
 def error_message(*anno_args):
     return _default_app_conf.error_message(*anno_args)
+
+
+def set_model_binding_type(model_type, model_bingding_type):
+    return _default_app_conf.set_model_binding_type(model_type, model_bingding_type)
+
+
+def set_default_model_bingding_type(model_bingding_type):
+    return _default_app_conf.set_default_model_bingding_type(model_bingding_type)
 
 
 def get_app_conf(tag: str = "") -> AppConf:
