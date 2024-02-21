@@ -22,6 +22,9 @@ classifiers = [
 ]
 dynamic = ["version"]
 
+[project.optional-dependencies]
+test = ["websocket-client"]
+
 [tool.setuptools.packages.find]
 include=["simple_http_server"]
 
