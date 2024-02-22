@@ -284,11 +284,11 @@ class FilterContextImpl(FilterContext):
         else:
             self.request._put_coroutine_task(self._do_request_async())
 
-    async def _wrap_to_async(self, func: Callable, args: List = [], kwargs: Dict = {}):
+    async def _wrap_to_async(self, func: Callable, args: List = [], kwargs: Dict = {}) -> Any:
         if asyncio.iscoroutinefunction(func):
-            await func(*args, **kwargs)
+            return await func(*args, **kwargs)
         else:
-            func(*args, **kwargs)
+            return func(*args, **kwargs)
 
     def __decode_tuple_response(self, ctr_res):
         status_code = None
@@ -336,7 +336,7 @@ class FilterContextImpl(FilterContext):
                                    arg,
                                    arg_type,
                                    val)
-        return await binding_obj.bind()
+        return await self._wrap_to_async(binding_obj.bind)
 
     async def __prepare_kwargs(self):
         kwargs = get_function_kwargs(self.__controller.func)

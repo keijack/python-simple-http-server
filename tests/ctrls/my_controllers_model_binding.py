@@ -1,8 +1,12 @@
 
+import time
 from typing import Any
 from simple_http_server.models.model_bindings import ModelBinding
-from simple_http_server import model_binding, route
+from simple_http_server import model_binding, route, default_model_binding
 from simple_http_server import HttpError
+from simple_http_server.logger import get_logger
+
+_logger = get_logger("my_ctrls_model_bindings")
 
 
 class Person:
@@ -11,6 +15,19 @@ class Person:
         self.name = name
         self.sex = sex
         self.age = age
+
+
+class Dog:
+
+    def __init__(self, name="a dog") -> None:
+        self.name = name
+
+    def wang(self):
+        name = self.name
+        if hasattr(self, "name"):
+            name = self.name
+        _logger.info(f"wang, I'm {name}, with attrs {self.__dict__}")
+        return name
 
 
 @model_binding(Person)
@@ -26,10 +43,32 @@ class PersonModelBinding(ModelBinding):
         return Person(name, sex, age)
 
 
+@default_model_binding
+class SetAttrModelBinding(ModelBinding):
+
+    def bind(self) -> Any:
+        try:
+            obj = self.arg_type()
+            for k, v in self.request.parameter.items():
+                setattr(obj, k, v)
+            return obj
+        except Exception as e:
+            _logger.warning(
+                f"Cannot create Object with given type {self.arg_type}. ", stack_info=True)
+            return self.default_value
+
+
 @route("/model_binding/person")
 def test_model_binding(person: Person):
     return {
         "name": person.name,
         "sex": person.sex,
         "age": person.age,
+    }
+
+
+@route("/model_binding/dog")
+def test_model_binding_dog(dog: Dog):
+    return {
+        "name": dog.wang()
     }
