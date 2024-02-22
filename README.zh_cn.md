@@ -275,6 +275,87 @@ def your_ctroller_function(
     return "<html><body>Hello, World!</body></html>"
 ```
 
+如果内置的参数绑定无法满足你的需求，你可以通过`@model_binding` 以及 `@default_model_binding` 来指定自己的绑定逻辑。
+
+如果你只需要特定类型的数据绑定，请使用 `@model_binding` 进行。
+
+```python
+from typing import Any
+from simple_http_server.models.model_bindings import ModelBinding
+from simple_http_server import model_binding
+from simple_http_server import HttpError, route
+
+class Person:
+
+    def __init__(self, name: str = "", sex: int = "", age: int = 0) -> None:
+        self.name = name
+        self.sex = sex
+        self.age = age
+
+@model_binding(Person)
+class PersonModelBinding(ModelBinding):
+
+    async def bind(self) -> Any:
+        name = self.request.get_parameter("name", "no-one")
+        sex = self.request.get_parameter("sex", "secret")
+        try:
+            age = int(self.request.get_parameter("age", ""))
+        except:
+            raise HttpError(400, "Age is required, and must be an integer")
+        return Person(name, sex, age)
+
+# 之后，你便可以在控制器方法，使用该参数定义了。
+@route("/model_binding/person")
+def test_model_binding(person: Person):
+    return {
+        "name": person.name,
+        "sex": person.sex,
+        "age": person.age,
+    }
+
+```
+
+当然，你也可以使用 `@default_model_binding` 来指定默认的数据绑定逻辑，配置了该项后，所有未在内置或者是上述配置中找到的数据，均会使用该类来处理。
+
+```python
+from simple_http_server.models.model_bindings import ModelBinding
+from simple_http_server import default_model_binding
+from simple_http_server import HttpError, route
+
+class Dog:
+
+    def __init__(self, name="a dog") -> None:
+        self.name = name
+
+    def wang(self):
+        return self.name
+
+@default_model_binding
+class SetAttrModelBinding(ModelBinding):
+
+    """
+    " 该类会尝试使用无参数的方法创建一个对象，然后将请求的参数通过 `setattr` 的方式设置到该对象当中。
+    """
+
+    def bind(self) -> Any:
+        # bind 方法可以定义为 async 或者普通方法
+        try:
+            obj = self.arg_type()
+            for k, v in self.request.parameter.items():
+                setattr(obj, k, v)
+            return obj
+        except Exception as e:
+            _logger.warning(
+                f"Cannot create Object with given type {self.arg_type}. ", stack_info=True)
+            return self.default_value
+
+@route("/model_binding/dog")
+def test_model_binding_dog(dog: Dog):
+    return {
+        "name": dog.wang()
+    }
+```
+
 我们建议使用函数式编程来编写你的控制器（Controller），不过你更喜欢使用对象的话，你可以将你的`@request_map` 用在类方法上，下面的例子中，每一个请求进来之后，系统会自动创建一个对象来调用该方法。:
 
 ```python

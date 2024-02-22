@@ -354,6 +354,86 @@ class MyController:
 
 ```
 
+### Model binding
+
+If the inner binding can not satisfied you, you can use `@model_binding` and `@default_model_binding` to define your own binding logic.
+
+You can use `@model_binding` to define the binding of specified types.
+
+```python
+from typing import Any
+from simple_http_server.models.model_bindings import ModelBinding
+from simple_http_server import model_binding
+from simple_http_server import HttpError, route
+
+class Person:
+
+    def __init__(self, name: str = "", sex: int = "", age: int = 0) -> None:
+        self.name = name
+        self.sex = sex
+        self.age = age
+
+@model_binding(Person)
+class PersonModelBinding(ModelBinding):
+
+    async def bind(self) -> Any:
+        name = self.request.get_parameter("name", "no-one")
+        sex = self.request.get_parameter("sex", "secret")
+        try:
+            age = int(self.request.get_parameter("age", ""))
+        except:
+            raise HttpError(400, "Age is required, and must be an integer")
+        return Person(name, sex, age)
+
+# Now, you can use `Person` in your controller attributes.
+@route("/model_binding/person")
+def test_model_binding(person: Person):
+    return {
+        "name": person.name,
+        "sex": person.sex,
+        "age": person.age,
+    }
+
+```
+
+You can also use `@default_model_binding` to handle all the types that not defined in inner and the `@model_binding` configurations.
+
+```python
+from simple_http_server.models.model_bindings import ModelBinding
+from simple_http_server import default_model_binding
+from simple_http_server import HttpError, route
+
+class Dog:
+
+    def __init__(self, name="a dog") -> None:
+        self.name = name
+
+    def wang(self):
+        return self.name
+
+@default_model_binding
+class SetAttrModelBinding(ModelBinding):
+
+    def bind(self) -> Any:
+        # You can define `bind` method in normal or async ways. 
+        try:
+            obj = self.arg_type()
+            for k, v in self.request.parameter.items():
+                setattr(obj, k, v)
+            return obj
+        except Exception as e:
+            _logger.warning(
+                f"Cannot create Object with given type {self.arg_type}. ", stack_info=True)
+            return self.default_value
+
+@route("/model_binding/dog")
+def test_model_binding_dog(dog: Dog):
+    return {
+        "name": dog.wang()
+    }
+```
+
+
 ### Session
 
 Defaultly, the session is stored in local, you can extend `SessionFactory` and `Session` classes to implement your own session storage requirement (like store all data in redis or memcache)

@@ -1,9 +1,8 @@
 
-import time
 from typing import Any
 from simple_http_server.models.model_bindings import ModelBinding
-from simple_http_server import model_binding, route, default_model_binding
-from simple_http_server import HttpError
+from simple_http_server import model_binding, default_model_binding
+from simple_http_server import HttpError, route
 from simple_http_server.logger import get_logger
 
 _logger = get_logger("my_ctrls_model_bindings")
