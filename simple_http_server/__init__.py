@@ -26,4 +26,4 @@ from .app_conf import *
 from .models.basic_models import *
 
 name = "simple_http_server"
-version = "0.24.0"
+version = "0.24.1"

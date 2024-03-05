@@ -44,6 +44,29 @@ from .logger import get_logger
 _logger = get_logger("simple_http_server.routing_server")
 
 
+_EXT_CONTENT_TYPE = {
+    ".html": "text/html",
+    ".htm": "text/html",
+    ".xhtml": "text/html",
+    ".css": "text/css",
+    ".js": "text/javascript",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".ico": "image/x-icon",
+    ".svg": "image/svg+xml",
+    ".gif": "image/gif",
+    ".avif": "image/avif",
+    ".avifs": "image/avif",
+    ".webp": "image/webp",
+    ".pdf": "application/pdf",
+    ".json": "application/json",
+    ".mp4": "video/mp4",
+    ".mp3": "video/mp3",
+    ".txt": "text/plain"
+}
+
+
 class RoutingServer:
 
     HTTP_METHODS = ["OPTIONS", "GET", "HEAD",
@@ -191,39 +214,7 @@ class RoutingServer:
     def _res_(self, fpath: str):
         fext = os.path.splitext(fpath)[1]
         ext = fext.lower()
-        if ext in (".html", ".htm", ".xhtml"):
-            content_type = "text/html"
-        elif ext == ".xml":
-            content_type = "text/xml"
-        elif ext == ".css":
-            content_type = "text/css"
-        elif ext in (".jpg", ".jpeg"):
-            content_type = "image/jpeg"
-        elif ext == ".png":
-            content_type = "image/png"
-        elif ext == ".ico":
-            content_type = "image/x-icon"
-        elif ext == ".svg":
-            content_type = "image/svg+xml"
-        elif ext == ".gif":
-            content_type = "image/gif"
-        elif ext in (".avif", ".avifs"):
-            content_type = "image/avif"    
-        elif ext == ".webp":
-            content_type = "image/webp"
-        elif ext == ".js":
-            content_type = "text/javascript"
-        elif ext == ".pdf":
-            content_type = "application/pdf"
-        elif ext == ".mp4":
-            content_type = "video/mp4"
-        elif ext == ".mp3":
-            content_type = "audio/mp3"
-        elif ext == ".txt":
-            content_type = "text/plain"
-        else:
-            content_type = "application/octet-stream"
-
+        content_type = _EXT_CONTENT_TYPE.get(ext, "application/octet-stream")
         return StaticFile(fpath, content_type)
 
     def get_url_controllers(self, path: str = "", method: str = "") -> List[Tuple[ControllerFunction, Dict, List]]:
