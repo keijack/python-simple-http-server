@@ -24,10 +24,10 @@ SOFTWARE.
 
 
 import asyncio
-from asyncio.streams import StreamReader
+from asyncio.streams import StreamReader, StreamWriter
+import gzip
 import os
 import json
-import inspect
 import threading
 import http.cookies as cookies
 import datetime
@@ -36,10 +36,10 @@ from urllib.parse import unquote
 from typing import Any, Callable, Dict, List, Tuple, Union
 
 from simple_http_server.models.model_bindings import ModelBindingConf
+from simple_http_server.routing_server import RoutingServer
 
-from .models.basic_models import FilterContext, ModelDict, Environment, RegGroup, RegGroups, HttpError, RequestBodyReader, StaticFile, \
-    Headers, Redirect, Response, Cookies, Cookie, JSONBody, BytesBody, Header, Parameters, PathValue, \
-    Parameter, MultipartFile, Request, Session, SessionFactory, DEFAULT_ENCODING, SESSION_COOKIE_NAME
+from .models.basic_models import FilterContext, HttpError, RequestBodyReader, StaticFile, Headers, Redirect, Response, Cookies, MultipartFile, Request, Session, SessionFactory
+from .models.basic_models import DEFAULT_ENCODING, SESSION_COOKIE_NAME
 from .app_conf import ControllerFunction
 import simple_http_server.__utils as utils
 
@@ -169,7 +169,7 @@ class ResponseWrapper(Response):
     def __send_headers(self):
         if not self.__header_sent:
             self.__header_sent = True
-            self.__req_handler._send_res_headers(
+            self.__req_handler._send_and_end_res_headers(
                 self.status_code, headers=self.headers, cks=self.cookies)
 
     def write_bytes(self, data: bytes):
@@ -358,16 +358,16 @@ class HTTPRequestHandler:
         self.query_string: str = http_protocol_handler.query_string
         self.query_parameters: Dict[str, List[str]
                                     ] = http_protocol_handler.query_parameters
-        self.headers: Dict[str, Dict[str, str]] = http_protocol_handler.headers
+        self.headers: Dict[str, str] = http_protocol_handler.headers
 
-        self.routing_conf = http_protocol_handler.routing_conf
-        self.reader = http_protocol_handler.reader
+        self.routing_conf: RoutingServer = http_protocol_handler.routing_conf
+        self.reader: StreamReader = http_protocol_handler.reader
 
         self.send_header = http_protocol_handler.send_header
         self.end_headers = http_protocol_handler.end_headers
         self.send_response = http_protocol_handler.send_response
         self.send_error = http_protocol_handler.send_error
-        self.writer = http_protocol_handler.writer
+        self.writer: StreamWriter = http_protocol_handler.writer
         self.environment: Dict[str, Any] = environment
 
     def __match_one_exp(self, d: Dict[str, Union[List[str], str]], exp: str, where: str) -> bool:
@@ -622,6 +622,9 @@ class HTTPRequestHandler:
     def __send_res_headers(self, status_code: int, headers: Dict[str, str] = {}, content_type: str = "", cks: Cookies = Cookies()):
         if "Content-Type" not in headers.keys() and "content-type" not in headers.keys():
             headers["Content-Type"] = content_type
+        elif "content-type" in headers.keys():
+            headers["Content-Type"] = headers["content-type"]
+            del headers["content-type"]
 
         self.send_response(status_code)
         self.send_header("Last-Modified", str(utils.date_time_string()))
@@ -637,16 +640,62 @@ class HTTPRequestHandler:
             ck = cks[k]
             self.send_header("Set-Cookie", ck.OutputString())
 
-    def _send_res_headers(self, *args, **kwargs):
+    def _send_and_end_res_headers(self, *args, **kwargs):
         """
         " For response object to send and writer headers.
         """
         self.__send_res_headers(*args, **kwargs)
         self.end_headers()
 
+    def _should_send_gzip(self, headers: Dict[str, str]) -> bool:
+        if "Accept-Encoding" not in self.headers.keys():
+            return False
+        accept_encoding = self.headers["Accept-Encoding"].split(",")
+        acgzip = False
+        for acoding in accept_encoding:
+            if acoding.strip().lower().startswith("gzip"):
+                acgzip = True
+        if not acgzip:
+            return False
+        for ctype in self.routing_conf.gzip_content_types:
+            if headers["Content-Type"].lower().startswith(ctype):
+                return True
+        return False
+
     def _send_res(self, status_code: int, headers: Dict[str, str] = {}, content_type: str = "", cks: Cookies = Cookies(), body: Union[str, bytes, bytearray, StaticFile] = None):
         self.__send_res_headers(status_code, headers, content_type, cks)
+        if self._should_send_gzip(headers):
+            self._send_gzip_data(body)
+        else:
+            self._send_raw_data(body)
 
+    def _send_gzip_data(self, body):
+        if body is None:
+            self.send_header("Content-Length", 0)
+            self.end_headers()
+            return
+        body_data = b''
+        if isinstance(body, str):
+            body_data = body.encode(DEFAULT_ENCODING, errors="replace")
+        elif isinstance(body, bytes) or isinstance(body, bytearray):
+            body_data = body
+        elif isinstance(body, StaticFile):
+            buffer_size = 1024 * 1024  # 1M
+            with open(body.file_path, "rb") as in_file:
+                buffer_data = in_file.read(buffer_size)
+                while buffer_data:
+                    body_data = body_data + buffer_data
+                    buffer_data = in_file.read(buffer_size)
+
+        gzip_data = gzip.compress(
+            body_data, compresslevel=self.routing_conf.gzip_compress_level)
+
+        self.send_header("Content-Encoding", "gzip")
+        self.send_header("Content-Length", len(gzip_data))
+        self.end_headers()
+        self.writer.write(gzip_data)
+
+    def _send_raw_data(self, body):
         if body is None:
             self.send_header("Content-Length", 0)
             self.end_headers()
@@ -655,7 +704,6 @@ class HTTPRequestHandler:
             self.send_header("Content-Length", len(data))
             self.end_headers()
             self.writer.write(data)
-
         elif isinstance(body, bytes) or isinstance(body, bytearray):
             self.send_header("Content-Length", len(body))
             self.end_headers()

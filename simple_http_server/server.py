@@ -139,6 +139,8 @@ def _prepare_server(host: str = "",
                     connection_idle_time=None,
                     keep_alive=True,
                     keep_alive_max_request=None,
+                    gzip_content_types=set(),
+                    gzip_compress_level=9,
                     prefer_coroutine=False,
                     app_conf: AppConf = None
                     ) -> None:
@@ -158,6 +160,8 @@ def _prepare_server(host: str = "",
                              connection_idle_time=connection_idle_time,
                              keep_alive=keep_alive,
                              keep_alive_max_request=keep_alive_max_request,
+                             gzip_content_types=gzip_content_types,
+                             gzip_compress_level=gzip_compress_level,
                              prefer_corountine=prefer_coroutine,
                              app_conf=app_conf)
 
@@ -175,6 +179,8 @@ def start(host: str = "",
           connection_idle_time=None,
           keep_alive=True,
           keep_alive_max_request=None,
+          gzip_content_types=set(),
+          gzip_compress_level=9,
           prefer_coroutine=False,
           app_conf: AppConf = None) -> None:
     _prepare_server(
@@ -191,6 +197,8 @@ def start(host: str = "",
         connection_idle_time=connection_idle_time,
         keep_alive=keep_alive,
         keep_alive_max_request=keep_alive_max_request,
+        gzip_content_types=gzip_content_types,
+        gzip_compress_level=gzip_compress_level,
         prefer_coroutine=prefer_coroutine,
         app_conf=app_conf
     )
@@ -211,6 +219,8 @@ async def start_async(host: str = "",
                       connection_idle_time=None,
                       keep_alive=True,
                       keep_alive_max_request=None,
+                      gzip_content_types=set(),
+                      gzip_compress_level=9,
                       prefer_coroutine=True,
                       app_conf: AppConf = None) -> None:
     _prepare_server(
@@ -227,6 +237,8 @@ async def start_async(host: str = "",
         connection_idle_time=connection_idle_time,
         keep_alive=keep_alive,
         keep_alive_max_request=keep_alive_max_request,
+        gzip_content_types=gzip_content_types,
+        gzip_compress_level=gzip_compress_level,
         prefer_coroutine=prefer_coroutine,
         app_conf=app_conf
     )

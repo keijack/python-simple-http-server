@@ -192,6 +192,8 @@ class HttpServer:
                  connection_idle_time=None,
                  keep_alive=True,
                  keep_alive_max_request=None,
+                 gzip_content_types=set(),
+                 gzip_compress_level=9,
                  app_conf: AppConf = None):
         self.host = host
         self.__ready = False
@@ -225,6 +227,9 @@ class HttpServer:
             if self.ssl_ctx:
                 self.server.socket = self.ssl_ctx.wrap_socket(
                     self.server.socket, server_side=True)
+
+        self.server.gzip_compress_level = gzip_compress_level
+        self.server.gzip_content_types = gzip_content_types
 
         filters = appconf._get_filters()
         # filter configuration

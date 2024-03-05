@@ -30,10 +30,9 @@ import os
 import re
 
 
-from collections import OrderedDict
 from urllib.parse import unquote
 
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Set, Tuple, Union
 
 from .models.basic_models import StaticFile, SessionFactory
 from .models.model_bindings import ModelBindingConf
@@ -54,21 +53,21 @@ class RoutingServer:
         self.method_url_mapping: Dict[str,
                                       Dict[str, List[ControllerFunction]]] = {"_": {}}
         self.path_val_url_mapping: Dict[str, Dict[str, List[Tuple[ControllerFunction, List[str]]]]] = {
-            "_": OrderedDict()}
+            "_": {}}
         self.method_regexp_mapping: Dict[str, Dict[str, List[ControllerFunction]]] = {
-            "_": OrderedDict()}
+            "_": {}}
         for mth in self.HTTP_METHODS:
             self.method_url_mapping[mth] = {}
-            self.path_val_url_mapping[mth] = OrderedDict()
-            self.method_regexp_mapping[mth] = OrderedDict()
+            self.path_val_url_mapping[mth] = {}
+            self.method_regexp_mapping[mth] = {}
 
-        self.filter_mapping = OrderedDict()
+        self.filter_mapping = {}
         self._res_conf = []
         self.add_res_conf(res_conf)
 
-        self.ws_mapping: Dict[str, ControllerFunction] = OrderedDict()
-        self.ws_path_val_mapping: Dict[str, ControllerFunction] = OrderedDict()
-        self.ws_regx_mapping: Dict[str, ControllerFunction] = OrderedDict()
+        self.ws_mapping: Dict[str, ControllerFunction] = {}
+        self.ws_path_val_mapping: Dict[str, ControllerFunction] = {}
+        self.ws_regx_mapping: Dict[str, ControllerFunction] = {}
 
         self.error_page_mapping = {}
         self.keep_alive = True
@@ -76,6 +75,8 @@ class RoutingServer:
         self.__keep_alive_max_request: int = 10
         self.session_factory: SessionFactory = None
         self.model_binding_conf = model_binding_conf
+        self.gzip_content_types: Set[str] = set()
+        self.gzip_compress_level = 9
 
     @property
     def connection_idle_time(self):
@@ -94,6 +95,10 @@ class RoutingServer:
     def keep_alive_max_request(self, val):
         if isinstance(val, int) and val > 0:
             self.__keep_alive_max_request = val
+
+    def extend_gzip_content_types(self, content_types: Union[Set[str], List[str]]):
+        for ctype in content_types:
+            self.gzip_content_types.add(ctype.lower())
 
     def put_to_method_url_mapping(self, method, url, ctrl):
         if url not in self.method_url_mapping[method]:
@@ -184,8 +189,6 @@ class RoutingServer:
                     _method, path_pattern, ctrl, path_names)
 
     def _res_(self, fpath: str):
-        # fpath = os.path.join(res_dir, path.replace(res_regx, ""))
-        # _logger.debug(f"static file. {path} :: {fpath}")
         fext = os.path.splitext(fpath)[1]
         ext = fext.lower()
         if ext in (".html", ".htm", ".xhtml"):
@@ -208,6 +211,8 @@ class RoutingServer:
             content_type = "video/mp4"
         elif ext == ".mp3":
             content_type = "audio/mp3"
+        elif ext == ".txt":
+            content_type = "text/plain"
         else:
             content_type = "application/octet-stream"
 

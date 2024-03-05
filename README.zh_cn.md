@@ -20,6 +20,7 @@ Python 3.7+
 * Spring MVC 风格的请求映射配置
 * 简单易用
 * 支持 SSL
+* 支持 Gzip 压缩
 * 支持 websocket
 * 编写风格自由
 * 可嵌入到 WSGI 标准的服务器当中
@@ -937,6 +938,19 @@ if __name__ == "__main__":
     # 即使你调用该函数的异步版本，你依然可以让所有的请求运行在独立的线程了。
     await server.start_async(prefer_coroutine=False)
 ```
+
+### Gzip 压缩
+
+如果你想你的响应体使用 gzip 进行压缩返回，你可以在服务器启动时设置需要压缩的 `Content-Type` 以及压缩等级。
+
+```python
+server.start(host="", 
+             port=8080, 
+             gzip_content_types={"text/html", "text/plain", "text/css", "application/json", "text/javascript"}, 
+             gzip_compress_level=9)
+```
+
+此后，当请求包含 `Accept-Encoding` 头包含 `gzip` 后，该请求会将内容压缩后再返回。
 
 ## 日志
 

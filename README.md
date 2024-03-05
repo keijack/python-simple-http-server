@@ -19,6 +19,7 @@ Python 3.7+
 * You can use [this extention](https://github.com/keijack/python-simple-http-server-jinja) to support `jinja` views.
 * Spring MVC like request mapping.
 * SSL support.
+* Gzip support.
 * Websocket support
 * Easy to use.
 * Free style controller writing.
@@ -742,6 +743,17 @@ If you call the server starting in a async function, you can all its async versi
 
 ```python
     await server.start_async(prefer_coroutine=True)
+```
+
+### Gzip
+
+If you want to the response return gzip data:
+
+```python
+server.start(host="", 
+             port=8080, 
+             gzip_content_types={"text/html", "text/plain", "text/css", "application/json", "text/javascript"}, 
+             gzip_compress_level=9)
 ```
 
 ## Logger

@@ -70,6 +70,8 @@ def start_server():
         # ssl=True,
         # certfile=f"{PROJECT_ROOT}/tests/certs/fullchain.pem",
         # keyfile=f"{PROJECT_ROOT}/tests/certs//privkey.pem",
+        gzip_content_types={"image/x-icon", "text/plain"},
+        gzip_compress_level=9,
         prefer_coroutine=False)
 
 
@@ -123,7 +125,8 @@ async def asgi_app(scope, receive, send):
 
 
 def start_server_uvicorn():
-    config = uvicorn.Config("debug_main:asgi_app", host="0.0.0.0", port=9090, log_level="info")
+    config = uvicorn.Config("debug_main:asgi_app",
+                            host="0.0.0.0", port=9090, log_level="info")
     global asgi_server
     asgi_server = uvicorn.Server(config)
     asgi_server.run()

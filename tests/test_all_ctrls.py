@@ -1,5 +1,6 @@
 # coding: utf-8
 
+from gzip import GzipFile
 import os
 import json
 import websocket
@@ -37,6 +38,7 @@ class ThreadingServerTest(unittest.TestCase):
         server.start(
             port=cls.PORT,
             resources={"/public/*": f"{root}/tests/static"},
+            gzip_content_types={"text/plain"},
             prefer_coroutine=cls.COROUTINE)
 
     @classmethod
@@ -89,6 +91,15 @@ class ThreadingServerTest(unittest.TestCase):
 
     def test_static(self):
         txt = self.visit("public/a.txt")
+        assert txt == "hello world!"
+
+    def test_gzip(self):
+        res: http.client.HTTPResponse = self.visit(
+            f"public/a.txt", headers={"Accept-Encoding": "gzip ,deflate"}, return_type="RESPONSE")
+        content_encoding = res.info().get("Content-Encoding")
+        assert "gzip" == content_encoding
+        f = GzipFile(fileobj=res)
+        txt = f.read().decode()
         assert txt == "hello world!"
 
     def test_path_value(self):
@@ -230,7 +241,8 @@ class ThreadingServerTest(unittest.TestCase):
         name = "keijack"
         sex = "male"
         age = 18
-        res: Dict = self.visit(f"model_binding/person?name={name}&sex={sex}&age={age}", return_type="JSON")
+        res: Dict = self.visit(
+            f"model_binding/person?name={name}&sex={sex}&age={age}", return_type="JSON")
         assert res["name"] == name
         assert res["sex"] == sex
         assert res["age"] == age

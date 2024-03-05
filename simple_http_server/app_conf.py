@@ -327,8 +327,6 @@ def _favicon():
 class AppConf:
 
     def __init__(self) -> None:
-        pass
-
         self._request_mappings: List[ControllerFunction] = []
         self._request_clz_mapping: Dict[Any, ControllerFunction] = {}
 
