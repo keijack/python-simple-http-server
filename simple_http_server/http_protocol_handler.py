@@ -414,6 +414,7 @@ class HttpProtocolHandler:
             if self.req_count >= self._keep_alive_max_req:
                 self.send_response("Connection", "close")
             await self.handle_http_request()
+            _logger.debug("Handle a keep-alive request successfully!")
 
     async def handle_http_request(self):
         try:

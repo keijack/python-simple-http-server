@@ -28,7 +28,7 @@ import asyncio
 import base64
 from typing import Any, Dict, List, Type, Union, Callable
 
-from .models.basic_models import SessionFactory, WebsocketHandler
+from .models.basic_models import Headers, SessionFactory, WebsocketHandler
 from .models.basic_models import WEBSOCKET_MESSAGE_BINARY, WEBSOCKET_MESSAGE_BINARY_FRAME, WEBSOCKET_MESSAGE_PING, WEBSOCKET_MESSAGE_PONG, WEBSOCKET_MESSAGE_TEXT
 from .models.model_bindings import ModelBindingConf
 from .logger import get_logger
@@ -321,7 +321,7 @@ __favicon = base64.b64decode(
 
 
 def _favicon():
-    return __favicon
+    return Headers({"Content-Type": "image/x-icon"}), __favicon
 
 
 class AppConf:
