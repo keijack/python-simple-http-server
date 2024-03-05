@@ -201,6 +201,14 @@ class RoutingServer:
             content_type = "image/jpeg"
         elif ext == ".png":
             content_type = "image/png"
+        elif ext == ".ico":
+            content_type = "image/x-icon"
+        elif ext == ".svg":
+            content_type = "image/svg+xml"
+        elif ext == ".gif":
+            content_type = "image/gif"
+        elif ext in (".avif", ".avifs"):
+            content_type = "image/avif"    
         elif ext == ".webp":
             content_type = "image/webp"
         elif ext == ".js":
