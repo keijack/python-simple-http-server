@@ -116,9 +116,6 @@ class HttpProtocolHandler:
         except asyncio.TimeoutError:
             _logger.warn("Wait for reading request line timeout. ")
             return False
-        except TimeoutError:
-            _logger.warn("Wait for reading request line timeout. ")
-            return False
         if len(raw_requestline) > _LINE_MAX_BYTES:
             self.requestline = ''
             self.request_version = ''
