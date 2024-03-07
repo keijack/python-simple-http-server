@@ -25,12 +25,12 @@ SOFTWARE.
 
 import html
 import io
-import simple_http_server.__utils as utils
 
 from typing import Any, Dict, List, Tuple, Union, Coroutine
 from http import HTTPStatus
 from .http_request_handler import HTTPRequestHandler
-from .logger import get_logger
+from ..utils import http_utils
+from ..utils.logger import get_logger
 from .websocket_request_handler import *
 
 _logger = get_logger("simple_http_server.asgi_request_server")
@@ -53,7 +53,8 @@ class ASGIRequestHandler:
 
         self.routing_conf = routing_conf
         self.headers = self._parse_headers()
-        self.query_parameters = utils.decode_query_string(self.query_string)
+        self.query_parameters = http_utils.decode_query_string(
+            self.query_string)
 
         # For http only, not for websocket
         self.writer = self
@@ -105,7 +106,8 @@ class ASGIRequestHandler:
                 while True:
                     recv: dict = await self.receive()
                     if recv["type"] != "http.request":
-                        _logger.warn(f"Receive message type[{recv['type']}], return.")
+                        _logger.warn(
+                            f"Receive message type[{recv['type']}], return.")
                         return
                     body_chunk = recv.get("body", b'')
                     self.req_body.extend(body_chunk)
@@ -150,7 +152,8 @@ class ASGIRequestHandler:
         headers: Dict[str, str] = {}
         for h in self.scope["headers"]:
             name = h[0].decode() if isinstance(h[0], bytes) else str(h[0])
-            name = "-".join([p[0].upper() + p[1:].lower() for p in name.split("-")])
+            name = "-".join([p[0].upper() + p[1:].lower()
+                            for p in name.split("-")])
             val = h[1].decode() if isinstance(h[1], bytes) else str(h[1])
             headers[name] = val
 
@@ -158,7 +161,7 @@ class ASGIRequestHandler:
 
     def send_response(self, code, message=None):
         self.send_response_only(code, message)
-        self.send_header('Date', utils.date_time_string())
+        self.send_header('Date', http_utils.date_time_string())
 
     def send_response_only(self, code, message=None):
         if message:
@@ -207,7 +210,8 @@ class ASGIRequestHandler:
                     message, quote=False), html.escape(explain, quote=False))
             except:
                 content: str = ""
-            content_type, body = utils.decode_response_body_to_bytes(content)
+            content_type, body = http_utils.decode_response_body_to_bytes(
+                content)
 
             self.send_header("Content-Type", content_type)
             self.send_header('Content-Length', str(len(body)))
@@ -292,7 +296,8 @@ class ASGIWebsocketRequestHandler(WebsocketRequestHandler):
                 _logger.debug(f"Websocket is connected.")
             elif msg["type"] == "websocket.disconnect":
                 self.keep_alive = False
-                self.close_reason = WebsocketCloseReason("Client asked to close connection.", code=msg.get("code", 1005), reason='')
+                self.close_reason = WebsocketCloseReason(
+                    "Client asked to close connection.", code=msg.get("code", 1005), reason='')
                 self.out_msg_queue.put_nowait({
                     "type": "websocket.close.client"
                 })
@@ -303,9 +308,11 @@ class ASGIWebsocketRequestHandler(WebsocketRequestHandler):
                     elif "bytes" in msg and msg["bytes"] is not None and hasattr(self.handler, "on_binary_message") and callable(self.handler.on_binary_message):
                         await self.await_func(self.handler.on_binary_message(self.session, msg["bytes"]))
                     else:
-                        _logger.error(f"Cannot read message from ASGI receive event")
+                        _logger.error(
+                            f"Cannot read message from ASGI receive event")
                 except Exception as e:
-                    _logger.error(f"Error occurs when on message!", exc_info=True)
+                    _logger.error(
+                        f"Error occurs when on message!", exc_info=True)
                     self.close(f"Error occurs when on_message. {e}")
             else:
                 _logger.error(f"Cannot handle message type {msg['type']}")
@@ -329,10 +336,12 @@ class ASGIWebsocketRequestHandler(WebsocketRequestHandler):
         return NotImplemented
 
     def send_ping(self, message: Union[str, bytes]):
-        raise WebsocketException(WebsocketCloseReason(reason="ASGI cannot send ping message."))
+        raise WebsocketException(WebsocketCloseReason(
+            reason="ASGI cannot send ping message."))
 
     def send_pong(self, message: Union[str, bytes]):
-        raise WebsocketException(WebsocketCloseReason(reason="ASGI cannot send pong message."))
+        raise WebsocketException(WebsocketCloseReason(
+            reason="ASGI cannot send pong message."))
 
     def _send_bytes_no_lock(self, opcode: int, payload: bytes, chunk_size: int = 0):
         return NotImplemented
@@ -344,14 +353,16 @@ class ASGIWebsocketRequestHandler(WebsocketRequestHandler):
         return NotImplemented
 
     def send_file(self, path: str, chunk_size: int = 0):
-        raise WebsocketException(WebsocketCloseReason(reason="ASGI cannot send file message."))
+        raise WebsocketException(WebsocketCloseReason(
+            reason="ASGI cannot send file message."))
 
     def _send_file_no_lock(self, path: str, file_size: int, chunk_size: int):
         return NotImplemented
 
     def send_bytes(self, opcode: int, payload: bytes, chunk_size: int = 0):
         if opcode == WEBSOCKET_OPCODE_TEXT:
-            self.send_message(payload.decode(DEFAULT_ENCODING), chunk_size=chunk_size)
+            self.send_message(payload.decode(
+                DEFAULT_ENCODING), chunk_size=chunk_size)
         elif opcode == WEBSOCKET_OPCODE_BINARY:
             self.send_message(payload, chunk_size=chunk_size)
         else:
@@ -359,7 +370,8 @@ class ASGIWebsocketRequestHandler(WebsocketRequestHandler):
 
     def send_message(self, message: Union[str, bytes], chunk_size: int = 0):
         if chunk_size != 0:
-            _logger.warning(f"chunk_size is not supported in ASGI mode, ignore it.")
+            _logger.warning(
+                f"chunk_size is not supported in ASGI mode, ignore it.")
         if isinstance(message, bytes):
             self.out_msg_queue.put_nowait({
                 "type": "websocket.send",
@@ -375,7 +387,8 @@ class ASGIWebsocketRequestHandler(WebsocketRequestHandler):
 
     def close(self, reason: str = ""):
         self.keep_alive = False
-        self.close_reason = WebsocketCloseReason("Server asked to close connection.")
+        self.close_reason = WebsocketCloseReason(
+            "Server asked to close connection.")
         self.out_msg_queue.put_nowait({
             "type": "websocket.close",
             "reason": reason

@@ -5,7 +5,7 @@ import os
 import shutil
 from uuid import uuid4
 from simple_http_server import WebsocketCloseReason, WebsocketHandler, WebsocketRequest, WebsocketSession, websocket_handler, websocket_message, websocket_handshake, websocket_open, websocket_close, WEBSOCKET_MESSAGE_TEXT
-import simple_http_server.logger as logger
+import simple_http_server.utils.logger as logger
 
 _logger = logger.get_logger("ws_test")
 

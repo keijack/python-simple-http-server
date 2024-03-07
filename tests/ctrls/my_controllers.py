@@ -23,7 +23,7 @@ from simple_http_server import controller
 from simple_http_server import error_message
 from simple_http_server.app_conf import get_app_conf
 import os
-import simple_http_server.logger as logger
+import simple_http_server.utils.logger as logger
 
 
 _logger = logger.get_logger("my_test_main")

@@ -35,10 +35,10 @@ from typing import Dict, Tuple, Union, List
 from uuid import uuid4
 from socket import error as SocketError
 
-from .logger import get_logger
-from .models.basic_models import Headers, WebsocketCloseReason, WebsocketRequest, WebsocketSession
-from .models.basic_models import WEBSOCKET_OPCODE_BINARY, WEBSOCKET_OPCODE_CLOSE, WEBSOCKET_OPCODE_CONTINUATION, WEBSOCKET_OPCODE_PING, WEBSOCKET_OPCODE_PONG, WEBSOCKET_OPCODE_TEXT
-from .models.basic_models import DEFAULT_ENCODING
+from ..utils.logger import get_logger
+from ..models.basic_models import Headers, WebsocketCloseReason, WebsocketRequest, WebsocketSession
+from ..models.basic_models import WEBSOCKET_OPCODE_BINARY, WEBSOCKET_OPCODE_CLOSE, WEBSOCKET_OPCODE_CONTINUATION, WEBSOCKET_OPCODE_PING, WEBSOCKET_OPCODE_PONG, WEBSOCKET_OPCODE_TEXT
+from ..models.basic_models import DEFAULT_ENCODING
 
 
 _logger = get_logger("simple_http_server.websocket_request_handler")

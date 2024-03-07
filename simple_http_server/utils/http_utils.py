@@ -32,7 +32,7 @@ import re
 from collections import OrderedDict
 from typing import Any, Tuple, Union
 from urllib.parse import unquote, quote
-from .models.basic_models import HttpError, StaticFile, DEFAULT_ENCODING
+from ..models.basic_models import HttpError, StaticFile, DEFAULT_ENCODING
 
 from .logger import get_logger
 

@@ -31,12 +31,12 @@ import re
 from ssl import PROTOCOL_TLS_SERVER, SSLContext
 from typing import Dict
 
-from simple_http_server.http_server import HttpServer, ASGIProxy, WSGIProxy
+from .http_servers.http_server import HttpServer, ASGIProxy, WSGIProxy
 
-from simple_http_server.app_conf import get_app_conf, AppConf
-from .routing_server import RoutingServer
-from simple_http_server._http_session_local_impl import LocalSessionFactory
-from simple_http_server.logger import get_logger
+from .app_conf import get_app_conf, AppConf
+from .http_servers.routing_server import RoutingServer
+from .request_handlers._http_session_local_impl import LocalSessionFactory
+from .utils.logger import get_logger
 from .app_conf import set_session_factory
 from .models.basic_models import SessionFactory
 

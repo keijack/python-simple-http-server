@@ -3,8 +3,8 @@ import os
 import sys
 import signal
 import getopt
-import simple_http_server.logger as logger
-import simple_http_server.server as server
+from . import server
+from .utils import logger
 
 _logger = logger.get_logger("__main__")
 

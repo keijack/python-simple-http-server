@@ -35,17 +35,17 @@ import datetime
 from urllib.parse import unquote
 from typing import Any, Callable, Dict, List, Tuple, Union
 
-from simple_http_server.models.model_bindings import ModelBindingConf
-from simple_http_server.routing_server import RoutingServer
+from ..models.model_bindings import ModelBindingConf
+from ..http_servers.routing_server import RoutingServer
 
-from .models.basic_models import FilterContext, HttpError, RequestBodyReader, StaticFile, Headers, Redirect, Response, Cookies, MultipartFile, Request, Session, SessionFactory
-from .models.basic_models import DEFAULT_ENCODING, SESSION_COOKIE_NAME
-from .app_conf import ControllerFunction
-import simple_http_server.__utils as utils
+from ..models.basic_models import FilterContext, HttpError, RequestBodyReader, StaticFile, Headers, Redirect, Response, Cookies, MultipartFile, Request, Session, SessionFactory
+from ..models.basic_models import DEFAULT_ENCODING, SESSION_COOKIE_NAME
+from ..app_conf import ControllerFunction
+from ..utils import http_utils
 
 from ._http_session_local_impl import LocalSessionFactory
-from .logger import get_logger
-from .__utils import get_function_args, get_function_kwargs
+from ..utils.logger import get_logger
+from ..utils.http_utils import get_function_args, get_function_kwargs
 
 _logger = get_logger("simple_http_server.http_request_handler")
 
@@ -385,7 +385,7 @@ class HTTPRequestHandler:
                 return exp_ in d.keys()
         idx = exp_.find("!=")
         if idx > 0 and idx < e_idx:
-            k, v = utils.break_into(exp_, '!=')
+            k, v = http_utils.break_into(exp_, '!=')
             if k not in d.keys():
                 return False
             dvals = d[k]
@@ -398,7 +398,7 @@ class HTTPRequestHandler:
 
         idx = exp_.find("^=")
         if idx > 0 and idx < e_idx:
-            k, v = utils.break_into(exp_, "^=")
+            k, v = http_utils.break_into(exp_, "^=")
             if k not in d.keys():
                 return False
             dvals = d[k]
@@ -411,7 +411,7 @@ class HTTPRequestHandler:
             return False
 
         if e_idx > 0:
-            k, v = utils.break_into(exp_, '=')
+            k, v = http_utils.break_into(exp_, '=')
             if k not in d.keys():
                 return False
             dvals = d[k]
@@ -511,7 +511,7 @@ class HTTPRequestHandler:
             content_type = _headers_keys_in_lowers["content-type"]
             if content_type.lower().startswith("application/x-www-form-urlencoded"):
                 req._body = await req.reader.read(content_length)
-                data_params = utils.decode_query_string(
+                data_params = http_utils.decode_query_string(
                     req._body.decode(DEFAULT_ENCODING))
             elif content_type.lower().startswith("multipart/form-data"):
                 req._body = await req.reader.read(content_length)
@@ -549,7 +549,7 @@ class HTTPRequestHandler:
             # trim the first and the last empty row
             f = field[field.index("\r\n") + 2: field.rindex("\r\n")]
             key, val = self.__decode_multipart_field(f)
-            utils.put_to(params, key, val)
+            http_utils.put_to(params, key, val)
         return params
 
     def __decode_multipart_field(self, field):
@@ -596,7 +596,7 @@ class HTTPRequestHandler:
         cont_dis = {}
         es = line.split(";")[1:]
         for e in es:
-            k, v = utils.break_into(e.strip(), "=")
+            k, v = http_utils.break_into(e.strip(), "=")
             if v.startswith('"') and v.endswith('"'):
                 cont_dis[k] = v[1: -1]  # ignore the '"' symbol
             else:
@@ -604,7 +604,7 @@ class HTTPRequestHandler:
         return cont_dis
 
     def __read_line(self, txt):
-        return utils.break_into(txt, "\r\n")
+        return http_utils.break_into(txt, "\r\n")
 
     def _send_response(self, response):
         try:
@@ -612,7 +612,7 @@ class HTTPRequestHandler:
             cks = response["cookies"]
             raw_body = response["body"]
             status_code = response["status_code"]
-            content_type, body = utils.decode_response_body(raw_body)
+            content_type, body = http_utils.decode_response_body(raw_body)
 
             self._send_res(status_code, headers, content_type, cks, body)
 
@@ -627,7 +627,7 @@ class HTTPRequestHandler:
             del headers["content-type"]
 
         self.send_response(status_code)
-        self.send_header("Last-Modified", str(utils.date_time_string()))
+        self.send_header("Last-Modified", str(http_utils.date_time_string()))
         for k, v in headers.items():
             if isinstance(v, str):
                 self.send_header(k, v)

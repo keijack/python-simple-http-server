@@ -28,7 +28,7 @@ from http.cookies import BaseCookie, SimpleCookie
 from .basic_models import ModelDict, Environment, RegGroup, RegGroups, HttpError, RequestBodyReader, \
     Headers, Response, Cookies, Cookie, JSONBody, BytesBody, Header, Parameters, PathValue, Parameter, \
     MultipartFile, Request, Session
-from ..logger import get_logger
+from ..utils.logger import get_logger
 
 _logger = get_logger("simple_http_server.models.model_bindings")
 

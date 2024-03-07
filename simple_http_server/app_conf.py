@@ -31,7 +31,7 @@ from typing import Any, Dict, List, Type, Union, Callable
 from .models.basic_models import Headers, SessionFactory, WebsocketHandler
 from .models.basic_models import WEBSOCKET_MESSAGE_BINARY, WEBSOCKET_MESSAGE_BINARY_FRAME, WEBSOCKET_MESSAGE_PING, WEBSOCKET_MESSAGE_PONG, WEBSOCKET_MESSAGE_TEXT
 from .models.model_bindings import ModelBindingConf
-from .logger import get_logger
+from .utils.logger import get_logger
 
 _logger = get_logger("simple_http_server.app_conf")
 

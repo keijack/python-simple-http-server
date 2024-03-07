@@ -24,142 +24,25 @@ SOFTWARE.
 """
 
 
-import socket
-
-import threading
 import asyncio
 
-from asyncio.base_events import Server
-from concurrent.futures import ThreadPoolExecutor
-from asyncio.streams import StreamReader, StreamWriter
 from ssl import PROTOCOL_TLS_SERVER, SSLContext
-from socketserver import TCPServer
-from time import sleep
 
 from typing import Dict,  Tuple
+from .coroutine_http_server import CoroutineHTTPServer
+from .threading_http_server import ThreadingHTTPServer
 
-from simple_http_server.models.model_bindings import ModelBindingConf
+from ..models.model_bindings import ModelBindingConf
 
-from .app_conf import ControllerFunction, WebsocketHandlerClass, AppConf, get_app_conf, _get_session_factory
+from ..app_conf import ControllerFunction, WebsocketHandlerClass, AppConf, get_app_conf, _get_session_factory
 from .routing_server import RoutingServer
-from .http_protocol_handler import HttpProtocolHandler, SocketServerStreamRequestHandlerWraper
-from .wsgi_request_handler import WSGIRequestHandler
-from .asgi_request_handler import ASGIRequestHandler
+from ..request_handlers.wsgi_request_handler import WSGIRequestHandler
+from ..request_handlers.asgi_request_handler import ASGIRequestHandler
 
-from .logger import get_logger
-
-
-_logger = get_logger("simple_httpself.http_server")
+from ..utils.logger import get_logger
 
 
-class ThreadingHTTPServer(TCPServer, RoutingServer):
-
-    allow_reuse_address = 1    # Seems to make sense in testing environment
-
-    _default_max_workers = 50
-
-    def server_bind(self):
-        """Override server_bind to store the server name."""
-        TCPServer.server_bind(self)
-        host, port = self.server_address[:2]
-        self.server_name = socket.getfqdn(host)
-        self.server_port = port
-
-    def __init__(self, addr, res_conf={},  model_binding_conf: ModelBindingConf = ModelBindingConf(), max_workers: int = None):
-        RoutingServer.__init__(
-            self, res_conf, model_binding_conf=model_binding_conf)
-        self.max_workers = max_workers or self._default_max_workers
-        self.threadpool: ThreadPoolExecutor = ThreadPoolExecutor(
-            thread_name_prefix="ReqThread",
-            max_workers=self.max_workers)
-        TCPServer.__init__(self, addr, SocketServerStreamRequestHandlerWraper)
-
-    def process_request_thread(self, request, client_address):
-        try:
-            self.finish_request(request, client_address)
-        except Exception:
-            self.handle_error(request, client_address)
-        finally:
-            self.shutdown_request(request)
-
-    # override
-    def process_request(self, request, client_address):
-        self.threadpool.submit(
-            self.process_request_thread, request, client_address)
-
-    def server_close(self):
-        super().server_close()
-        self.threadpool.shutdown(True)
-
-    def start(self):
-        self.serve_forever()
-
-    async def start_async(self):
-        self.start()
-
-    def _shutdown(self) -> None:
-        _logger.debug("shutdown http server in a seperate thread..")
-        super().shutdown()
-
-    def shutdown(self) -> None:
-        threading.Thread(target=self._shutdown, daemon=False).start()
-
-
-class CoroutineHTTPServer(RoutingServer):
-
-    def __init__(self, host: str = '', port: int = 9090, ssl: SSLContext = None, res_conf={}, model_binding_conf: ModelBindingConf = ModelBindingConf()) -> None:
-        RoutingServer.__init__(
-            self, res_conf, model_binding_conf=model_binding_conf)
-        self.host: str = host
-        self.port: int = port
-        self.ssl: SSLContext = ssl
-        self.server: Server = None
-        self.__thread_local = threading.local()
-
-    async def callback(self, reader: StreamReader, writer: StreamWriter):
-        handler = HttpProtocolHandler(reader, writer, routing_conf=self)
-        await handler.handle_request()
-        _logger.debug("Connection ends, close the writer.")
-        writer.close()
-
-    async def start_async(self):
-        self.server = await asyncio.start_server(
-            self.callback, host=self.host, port=self.port, ssl=self.ssl)
-        async with self.server:
-            try:
-                await self.server.serve_forever()
-            except asyncio.CancelledError:
-                _logger.debug(
-                    "Some requests are lost for the reason that the server is shutted down.")
-            finally:
-                await self.server.wait_closed()
-
-    def _get_event_loop(self) -> asyncio.AbstractEventLoop:
-        if not hasattr(self.__thread_local, "event_loop"):
-            try:
-                self.__thread_local.event_loop = asyncio.new_event_loop()
-            except:
-                self.__thread_local.event_loop = asyncio.get_event_loop()
-        return self.__thread_local.event_loop
-
-    def start(self):
-        self._get_event_loop().run_until_complete(self.start_async())
-
-    def _shutdown(self):
-        _logger.debug("Try to shutdown server.")
-        self.server.close()
-        loop = self.server.get_loop()
-        loop.call_soon_threadsafe(loop.stop)
-
-    def shutdown(self):
-        wait_time = 3
-        while wait_time:
-            sleep(1)
-            _logger.debug(f"couting to shutdown: {wait_time}")
-            wait_time = wait_time - 1
-            if wait_time == 0:
-                _logger.debug("shutdown server....")
-                self._shutdown()
+_logger = get_logger("simple_http.http_server")
 
 
 class HttpServer:

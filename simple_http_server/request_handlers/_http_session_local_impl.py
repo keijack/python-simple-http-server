@@ -28,8 +28,8 @@ import time
 
 from typing import Any, Dict, List, Tuple
 from threading import RLock
-from .models.basic_models import Session, SessionFactory
-from simple_http_server.logger import get_logger
+from ..models.basic_models import Session, SessionFactory
+from ..utils.logger import get_logger
 
 _logger = get_logger("simple_http_server.http_session_local")
 

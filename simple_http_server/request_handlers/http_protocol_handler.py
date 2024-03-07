@@ -31,7 +31,6 @@ import socketserver
 import asyncio
 import socket
 
-import simple_http_server.__utils as utils
 
 from typing import Any, Dict
 from http import HTTPStatus
@@ -39,10 +38,11 @@ from urllib.parse import unquote
 from asyncio.streams import StreamReader, StreamWriter
 from http import HTTPStatus
 
-from simple_http_server import version as __version__
-from .models.basic_models import RequestBodyReader
-from .logger import get_logger
-from .routing_server import RoutingServer
+from .. import version
+from ..models.basic_models import RequestBodyReader
+from ..utils import http_utils
+from ..utils.logger import get_logger
+from ..http_servers.routing_server import RoutingServer
 from .http_request_handler import HTTPRequestHandler
 from .websocket_request_handler import WebsocketRequestHandler
 
@@ -64,7 +64,7 @@ class RequestWriter:
 
 class HttpProtocolHandler:
 
-    server_version = f"simple-http-server/{__version__}"
+    server_version = f"simple-http-server/{version}"
 
     default_request_version = "HTTP/1.1"
 
@@ -183,7 +183,8 @@ class HttpProtocolHandler:
 
         self.query_string = self.__get_query_string(self.path)
 
-        self.query_parameters = utils.decode_query_string(self.query_string)
+        self.query_parameters = http_utils.decode_query_string(
+            self.query_string)
 
         # Examine the headers and look for a Connection directive.
         try:
@@ -204,7 +205,8 @@ class HttpProtocolHandler:
 
         conntype = self.headers.get('Connection', '')
 
-        self.close_connection = not self._keep_alive or conntype.lower() != 'keep-alive' or self.protocol_version != "HTTP/1.1"
+        self.close_connection = not self._keep_alive or conntype.lower(
+        ) != 'keep-alive' or self.protocol_version != "HTTP/1.1"
 
         # Examine the headers and look for an Expect directive
         expect = self.headers.get('Expect', "")
@@ -268,7 +270,7 @@ class HttpProtocolHandler:
     def _get_request_path(self, ori_path: str):
         path = ori_path.split('?', 1)[0]
         path = path.split('#', 1)[0]
-        path = utils.remove_url_first_slash(path)
+        path = http_utils.remove_url_first_slash(path)
         path = unquote(path)
         return path
 
@@ -299,7 +301,8 @@ class HttpProtocolHandler:
             except:
                 content: str = html.escape(
                     message, quote=False) + ":" + html.escape(explain, quote=False)
-            content_type, body = utils.decode_response_body_to_bytes(content)
+            content_type, body = http_utils.decode_response_body_to_bytes(
+                content)
 
             self.send_header("Content-Type", content_type)
             self.send_header('Content-Length', str(len(body)))
@@ -322,7 +325,7 @@ class HttpProtocolHandler:
         self.log_request(code)
         self.send_response_only(code, message)
         self.send_header('Server', self.server_version)
-        self.send_header('Date', utils.date_time_string())
+        self.send_header('Date', http_utils.date_time_string())
 
     def send_header(self, keyword: str, value: str):
         """Send a MIME header to the headers buffer."""
@@ -333,7 +336,8 @@ class HttpProtocolHandler:
                 if self._keep_alive:
                     self.close_connection = False
                 else:
-                    _logger.warning(f"Keep Alive configuration is set to False, won't send keep-alive header.")
+                    _logger.warning(
+                        f"Keep Alive configuration is set to False, won't send keep-alive header.")
                     return
 
         if self.request_version != 'HTTP/0.9':

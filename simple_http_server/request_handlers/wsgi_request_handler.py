@@ -24,12 +24,12 @@ SOFTWARE.
 
 
 import html
-import simple_http_server.__utils as utils
 
 from typing import Any, Dict, List
 from http import HTTPStatus
 from .http_request_handler import HTTPRequestHandler
-from .logger import get_logger
+from ..utils import http_utils
+from ..utils.logger import get_logger
 
 
 _logger = get_logger("simple_http_server.wsgi_request_handler")
@@ -53,7 +53,8 @@ class WSGIRequestHandler:
 
         self.routing_conf = routing_conf
         self.headers = self._parse_headers()
-        self.query_parameters = utils.decode_query_string(self.query_string)
+        self.query_parameters = http_utils.decode_query_string(
+            self.query_string)
         self.writer = self
         self.reader = self
 
@@ -145,7 +146,7 @@ class WSGIRequestHandler:
 
     def send_response(self, code, message=None):
         self.send_response_only(code, message)
-        self.send_header('Date', utils.date_time_string())
+        self.send_header('Date', http_utils.date_time_string())
 
     def send_response_only(self, code, message=None):
         if message is None:
@@ -197,7 +198,8 @@ class WSGIRequestHandler:
                     message, quote=False), html.escape(explain, quote=False))
             except:
                 content: str = ""
-            content_type, body = utils.decode_response_body_to_bytes(content)
+            content_type, body = http_utils.decode_response_body_to_bytes(
+                content)
 
             self.send_header("Content-Type", content_type)
             self.send_header('Content-Length', str(len(body)))

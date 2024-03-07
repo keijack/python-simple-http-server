@@ -12,7 +12,7 @@ from typing import Dict
 from threading import Thread
 from time import sleep
 
-from simple_http_server.logger import get_logger, set_level
+from simple_http_server.utils.logger import get_logger, set_level
 import simple_http_server.server as server
 
 set_level("DEBUG")

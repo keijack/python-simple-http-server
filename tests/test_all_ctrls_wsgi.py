@@ -11,7 +11,7 @@ import urllib.error
 import http.client
 
 from wsgiref.simple_server import WSGIServer, make_server
-from simple_http_server.logger import get_logger, set_level
+from simple_http_server.utils.logger import get_logger, set_level
 import simple_http_server.server as server
 
 
