@@ -43,7 +43,7 @@ from ..models.basic_models import DEFAULT_ENCODING, SESSION_COOKIE_NAME
 from ..app_conf import ControllerFunction
 from ..utils import http_utils
 
-from ._http_session_local_impl import LocalSessionFactory
+from .http_session_local_impl import LocalSessionFactory
 from ..utils.logger import get_logger
 from ..utils.http_utils import get_function_args, get_function_kwargs
 
