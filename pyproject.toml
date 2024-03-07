@@ -24,6 +24,7 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 test = ["websocket-client"]
+dev = ["uvicorn", "werkzeug", "websocket-client"]
 
 [tool.setuptools.packages.find]
 include=["naja_atra"]
