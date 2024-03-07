@@ -39,7 +39,7 @@ from time import sleep
 from ..utils.logger import get_logger
 
 
-_logger = get_logger("simple_http.http_server")
+_logger = get_logger("naja_atra.http_servers.coroutine_http_server")
 
 
 class CoroutineHTTPServer(RoutingServer):

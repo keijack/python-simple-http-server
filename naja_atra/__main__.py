@@ -6,7 +6,7 @@ import getopt
 from . import server
 from .utils import logger
 
-_logger = logger.get_logger("__main__")
+_logger = logger.get_logger("naja_atra.__main__")
 
 
 def print_help():

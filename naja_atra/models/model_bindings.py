@@ -30,7 +30,7 @@ from .basic_models import ModelDict, Environment, RegGroup, RegGroups, HttpError
     MultipartFile, Request, Session
 from ..utils.logger import get_logger
 
-_logger = get_logger("simple_http_server.models.model_bindings")
+_logger = get_logger("naja_atra.models.model_bindings")
 
 
 class ModelBinding:

@@ -33,7 +33,7 @@ from .models.basic_models import WEBSOCKET_MESSAGE_BINARY, WEBSOCKET_MESSAGE_BIN
 from .models.model_bindings import ModelBindingConf
 from .utils.logger import get_logger
 
-_logger = get_logger("simple_http_server.app_conf")
+_logger = get_logger("naja_atra.app_conf")
 
 
 def _get_class_of_method(method_defind):

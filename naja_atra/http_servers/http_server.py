@@ -42,7 +42,7 @@ from ..request_handlers.asgi_request_handler import ASGIRequestHandler
 from ..utils.logger import get_logger
 
 
-_logger = get_logger("simple_http.http_server")
+_logger = get_logger("naja_atra.http_servers.http_server")
 
 
 class HttpServer:

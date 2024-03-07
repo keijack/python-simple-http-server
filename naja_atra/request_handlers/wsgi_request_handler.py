@@ -32,7 +32,7 @@ from ..utils import http_utils
 from ..utils.logger import get_logger
 
 
-_logger = get_logger("simple_http_server.wsgi_request_handler")
+_logger = get_logger("naja_atra.request_handlers.wsgi_request_handler")
 
 
 class WSGIRequestHandler:

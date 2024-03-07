@@ -41,7 +41,7 @@ from ..models.basic_models import WEBSOCKET_OPCODE_BINARY, WEBSOCKET_OPCODE_CLOS
 from ..models.basic_models import DEFAULT_ENCODING
 
 
-_logger = get_logger("simple_http_server.websocket_request_handler")
+_logger = get_logger("naja_atra.request_handlers.websocket_request_handler")
 
 
 '''

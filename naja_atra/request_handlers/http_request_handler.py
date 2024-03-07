@@ -47,7 +47,7 @@ from .http_session_local_impl import LocalSessionFactory
 from ..utils.logger import get_logger
 from ..utils.http_utils import get_function_args, get_function_kwargs
 
-_logger = get_logger("simple_http_server.http_request_handler")
+_logger = get_logger("naja_atra.request_handlers.http_request_handler")
 
 
 class RequestBodyReaderWrapper(RequestBodyReader):

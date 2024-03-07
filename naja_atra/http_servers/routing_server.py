@@ -41,7 +41,7 @@ from ..app_conf import WebsocketHandlerClass, ControllerFunction
 from ..utils.http_utils import remove_url_first_slash, get_function_args, get_function_kwargs, get_path_reg_pattern
 from ..utils.logger import get_logger
 
-_logger = get_logger("simple_http_server.routing_server")
+_logger = get_logger("naja_atra.http_servers.routing_server")
 
 
 _EXT_CONTENT_TYPE = {

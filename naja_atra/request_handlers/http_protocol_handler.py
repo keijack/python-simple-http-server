@@ -50,7 +50,7 @@ from .websocket_request_handler import WebsocketRequestHandler
 _LINE_MAX_BYTES = 65536
 _MAXHEADERS = 100
 
-_logger = get_logger("simple_http_server.http_protocol_handler")
+_logger = get_logger("naja_atra.request_handlers.http_protocol_handler")
 
 
 class RequestWriter:

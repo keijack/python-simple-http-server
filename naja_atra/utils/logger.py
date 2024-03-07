@@ -156,7 +156,7 @@ class LoggerFactory:
                 l.removeHandler(hdlr)
             l.addHandler(handler)
 
-    def get_logger(self, tag: str = "pythone-simple-http-server") -> logging.Logger:
+    def get_logger(self, tag: str = "naja_atra") -> logging.Logger:
         if tag not in self.__cache_loggers:
             self.__cache_loggers[tag] = CachingLogger(tag, self._log_level)
             for hdlr in self.handlers:
@@ -193,5 +193,5 @@ def set_handler(handler: logging.Handler) -> None:
     _default_logger_factory.set_handler(handler)
 
 
-def get_logger(tag: str = "pythone-simple-http-server", factory: str = "") -> logging.Logger:
+def get_logger(tag: str = "naja_atra", factory: str = "") -> logging.Logger:
     return get_logger_factory(factory).get_logger(tag)

@@ -31,7 +31,7 @@ from threading import RLock
 from ..models.basic_models import Session, SessionFactory
 from ..utils.logger import get_logger
 
-_logger = get_logger("simple_http_server.http_session_local")
+_logger = get_logger("naja_atra.request_handlers.http_session_local_impl")
 
 _SESSION_TIME_CLEANING_INTERVAL = 60
 

@@ -37,7 +37,7 @@ from ..models.basic_models import HttpError, StaticFile, DEFAULT_ENCODING
 from .logger import get_logger
 
 
-_logger = get_logger("simple_http_server.utils")
+_logger = get_logger("naja_atra.utils.http_utils")
 
 
 def remove_url_first_slash(url: str):

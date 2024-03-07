@@ -41,7 +41,7 @@ from .app_conf import set_session_factory
 from .models.basic_models import SessionFactory
 
 
-_logger = get_logger("simple_http_server.server")
+_logger = get_logger("naja_atra.server")
 __lock = threading.Lock()
 _server: HttpServer = None
 

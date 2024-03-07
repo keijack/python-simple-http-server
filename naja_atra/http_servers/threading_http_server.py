@@ -37,7 +37,7 @@ from socketserver import TCPServer
 from ..utils.logger import get_logger
 
 
-_logger = get_logger("simple_http.http_server")
+_logger = get_logger("naja_atra.http_servers.threading_http_server")
 
 
 class ThreadingHTTPServer(TCPServer, RoutingServer):

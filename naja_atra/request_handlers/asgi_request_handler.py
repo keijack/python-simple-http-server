@@ -33,7 +33,7 @@ from ..utils import http_utils
 from ..utils.logger import get_logger
 from .websocket_request_handler import *
 
-_logger = get_logger("simple_http_server.asgi_request_server")
+_logger = get_logger("naja_atra.request_handlers.asgi_request_server")
 
 
 class ASGIRequestHandler:
