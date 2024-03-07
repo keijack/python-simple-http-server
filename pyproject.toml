@@ -6,7 +6,7 @@ requires = [
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "naja_atrar"
+name = "naja_atra"
 description = "This is a simple http server, use MVC like design."
 readme = "README.md"
 authors = [
@@ -26,10 +26,10 @@ dynamic = ["version"]
 test = ["websocket-client"]
 
 [tool.setuptools.packages.find]
-include=["naja_atrar"]
+include=["naja_atra"]
 
 [tool.setuptools.dynamic]
-version = {attr = "naja_atrar.version"}
+version = {attr = "naja_atra.version"}
 
 [project.urls]
 homepage = "https://github.com/keijack/python-simple-http-server"
