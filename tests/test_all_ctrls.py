@@ -12,8 +12,8 @@ from typing import Dict
 from threading import Thread
 from time import sleep
 
-from simple_http_server.utils.logger import get_logger, set_level
-import simple_http_server.server as server
+from naja_atra.utils.logger import get_logger, set_level
+import naja_atra.server as server
 
 set_level("DEBUG")
 

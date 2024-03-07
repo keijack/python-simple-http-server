@@ -25,5 +25,5 @@ SOFTWARE.
 from .app_conf import *
 from .models.basic_models import *
 
-name = "simple_http_server"
-version = "0.24.1"
+name = "naja_atra"
+version = "1.0.0"

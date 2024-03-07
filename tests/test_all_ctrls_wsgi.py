@@ -11,8 +11,8 @@ import urllib.error
 import http.client
 
 from wsgiref.simple_server import WSGIServer, make_server
-from simple_http_server.utils.logger import get_logger, set_level
-import simple_http_server.server as server
+from naja_atra.utils.logger import get_logger, set_level
+import naja_atra.server as server
 
 
 set_level("DEBUG")

@@ -4,10 +4,10 @@
 # python3 -m pip install werkzeug 'uvicorn[standard]'
 #
 
-from .simple_http_server import request_map
+from naja_atra import request_map
 from wsgiref.simple_server import WSGIServer, make_server
-import simple_http_server.server as server
-from .simple_http_server.server import ASGIProxy
+import naja_atra.server as server
+from naja_atra.server import ASGIProxy
 import os
 import signal
 import asyncio
@@ -16,13 +16,13 @@ import uvicorn
 
 from threading import Thread
 from time import sleep
-from .simple_http_server.__main__ import main
-from .simple_http_server.http_servers.http_server import HttpServer
-from .simple_http_server.utils.logger import get_logger, set_level
+from naja_atra.__main__ import main
+from naja_atra.http_servers.http_server import HttpServer
+from naja_atra.utils.logger import get_logger, set_level
 
 from werkzeug.serving import make_server as mk_server
 
-from .simple_http_server import get_app_conf
+from naja_atra import get_app_conf
 set_level("DEBUG")
 
 

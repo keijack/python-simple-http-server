@@ -4,26 +4,26 @@
 import time
 from typing import List, OrderedDict
 
-from simple_http_server import BytesBody, FilterContext, ModelDict, Redirect, RegGroup, RequestBodyReader, request_filter
-from simple_http_server import Headers
-from simple_http_server import HttpError
-from simple_http_server import JSONBody
-from simple_http_server import Header
-from simple_http_server import Parameters
-from simple_http_server import Cookie
-from simple_http_server import Cookies
-from simple_http_server import PathValue
-from simple_http_server import Parameter
-from simple_http_server import MultipartFile
-from simple_http_server import Response
-from simple_http_server import Request
-from simple_http_server import Session
-from simple_http_server import request_map, route
-from simple_http_server import controller
-from simple_http_server import error_message
-from simple_http_server.app_conf import get_app_conf
+from naja_atra import BytesBody, FilterContext, ModelDict, Redirect, RegGroup, RequestBodyReader, request_filter
+from naja_atra import Headers
+from naja_atra import HttpError
+from naja_atra import JSONBody
+from naja_atra import Header
+from naja_atra import Parameters
+from naja_atra import Cookie
+from naja_atra import Cookies
+from naja_atra import PathValue
+from naja_atra import Parameter
+from naja_atra import MultipartFile
+from naja_atra import Response
+from naja_atra import Request
+from naja_atra import Session
+from naja_atra import request_map, route
+from naja_atra import controller
+from naja_atra import error_message
+from naja_atra.app_conf import get_app_conf
 import os
-import simple_http_server.utils.logger as logger
+import naja_atra.utils.logger as logger
 
 
 _logger = logger.get_logger("my_test_main")

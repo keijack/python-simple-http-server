@@ -38,7 +38,7 @@ from urllib.parse import unquote
 from asyncio.streams import StreamReader, StreamWriter
 from http import HTTPStatus
 
-from .. import version
+from .. import name, version
 from ..models.basic_models import RequestBodyReader
 from ..utils import http_utils
 from ..utils.logger import get_logger
@@ -64,7 +64,7 @@ class RequestWriter:
 
 class HttpProtocolHandler:
 
-    server_version = f"simple-http-server/{version}"
+    server_version = f"{name}/{version}"
 
     default_request_version = "HTTP/1.1"
 
