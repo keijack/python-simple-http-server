@@ -23,15 +23,15 @@ classifiers = [
 dynamic = ["version"]
 
 [project.optional-dependencies]
-test = ["websocket-client"]
-dev = ["uvicorn", "werkzeug", "websocket-client"]
+test = ["websocket-client", "pytest"]
+dev = ["websocket-client"]
 
 [tool.setuptools.packages.find]
-include=["naja_atra"]
+include=["naja_atra*"]
 
 [tool.setuptools.dynamic]
 version = {attr = "naja_atra.version"}
 
 [project.urls]
-homepage = "https://github.com/keijack/python-simple-http-server"
-repository = "https://github.com/keijack/python-simple-http-server"
+homepage = "https://github.com/naja-atra/naja-atra"
+repository = "https://github.com/naja-atra/naja-atra"

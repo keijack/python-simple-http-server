@@ -24,20 +24,15 @@ SOFTWARE.
 """
 
 
-import asyncio
-
 from ssl import PROTOCOL_TLS_SERVER, SSLContext
 
 from typing import Dict,  Tuple
 from .coroutine_http_server import CoroutineHTTPServer
 from .threading_http_server import ThreadingHTTPServer
 
-from ..models.model_bindings import ModelBindingConf
 
 from ..app_conf import ControllerFunction, WebsocketHandlerClass, AppConf, get_app_conf, _get_session_factory
-from .routing_server import RoutingServer
-from ..request_handlers.wsgi_request_handler import WSGIRequestHandler
-from ..request_handlers.asgi_request_handler import ASGIRequestHandler
+
 
 from ..utils.logger import get_logger
 
@@ -163,26 +158,3 @@ class HttpServer:
     def shutdown(self):
         # shutdown it in a seperate thread.
         self.server.shutdown()
-
-
-class WSGIProxy(RoutingServer):
-
-    def __init__(self, res_conf, model_binding_conf: ModelBindingConf = ModelBindingConf()):
-        super().__init__(res_conf=res_conf, model_binding_conf=model_binding_conf)
-
-    def app_proxy(self, environment, start_response):
-        return asyncio.run(self.async_app_proxy(environment, start_response))
-
-    async def async_app_proxy(self, environment, start_response):
-        request_handler = WSGIRequestHandler(self, environment, start_response)
-        return await request_handler.handle_request()
-
-
-class ASGIProxy(RoutingServer):
-
-    def __init__(self, res_conf, model_binding_conf: ModelBindingConf = ModelBindingConf()):
-        super().__init__(res_conf=res_conf, model_binding_conf=model_binding_conf)
-
-    async def app_proxy(self, scope, receive, send):
-        request_handler = ASGIRequestHandler(self, scope, receive, send)
-        await request_handler.handle_request()

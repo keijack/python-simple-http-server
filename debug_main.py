@@ -5,22 +5,14 @@
 #
 
 from naja_atra import request_map
-from wsgiref.simple_server import WSGIServer, make_server
 import naja_atra.server as server
-from naja_atra.server import ASGIProxy
+
 import os
 import signal
-import asyncio
 
-import uvicorn
 
-from threading import Thread
-from time import sleep
-from naja_atra.__main__ import main
 from naja_atra.http_servers.http_server import HttpServer
 from naja_atra.utils.logger import get_logger, set_level
-
-from werkzeug.serving import make_server as mk_server
 
 from naja_atra import get_app_conf
 set_level("DEBUG")
@@ -75,73 +67,8 @@ def start_server():
         prefer_coroutine=False)
 
 
-wsgi_server: WSGIServer = None
-
-
-def start_server_wsgi():
-    _logger.info("start server in background. ")
-    server.scan(base_dir="tests/ctrls", regx=r'.*controllers.*')
-    wsgi_proxy = server.init_wsgi_proxy(
-        resources={"/public/*": f"{PROJECT_ROOT}/tests/static",
-                   "/*": f"{PROJECT_ROOT}/tests/static"})
-
-    global wsgi_server
-    wsgi_server = make_server("", 9090, wsgi_proxy.app_proxy)
-    wsgi_server.serve_forever()
-
-
-def start_server_werkzeug():
-    server.scan(base_dir="tests/ctrls", regx=r'.*controllers.*')
-    wsgi_proxy = server.init_wsgi_proxy(
-        resources={"/public/*": f"{PROJECT_ROOT}/tests/static",
-                   "/*": f"{PROJECT_ROOT}/tests/static"})
-
-    global wsgi_server
-    wsgi_server = mk_server("", 9090, wsgi_proxy.app_proxy)
-    wsgi_server.serve_forever()
-
-
-asgi_server: uvicorn.Server = None
-
-asgi_proxy: ASGIProxy = None
-init_asgi_proxy_lock: asyncio.Lock = asyncio.Lock()
-
-
-async def init_asgi_proxy():
-    global asgi_proxy
-    if asgi_proxy == None:
-        async with init_asgi_proxy_lock:
-            if asgi_proxy == None:
-                _logger.info("init asgi proxy... ")
-                server.scan(base_dir="tests/ctrls", regx=r'.*controllers.*')
-                asgi_proxy = server.init_asgi_proxy(
-                    resources={"/public/*": f"{PROJECT_ROOT}/tests/static",
-                               "/*": f"{PROJECT_ROOT}/tests/static"})
-
-
-async def asgi_app(scope, receive, send):
-    await init_asgi_proxy()
-    await asgi_proxy.app_proxy(scope, receive, send)
-
-
-def start_server_uvicorn():
-    config = uvicorn.Config("debug_main:asgi_app",
-                            host="0.0.0.0", port=9090, log_level="info")
-    global asgi_server
-    asgi_server = uvicorn.Server(config)
-    asgi_server.run()
-
-
 def on_sig_term(signum, frame):
-    if wsgi_server:
-        _logger.info(f"Receive signal [{signum}], shutdown the wsgi server...")
-        Thread(target=wsgi_server.shutdown).start()
-    elif asgi_server:
-        _logger.info(f"Receive signal [{signum}], shutdown the wsgi server...")
-        Thread(target=asgi_server.shutdown).start()
-    else:
-        _logger.info(f"Receive signal [{signum}], stop server now...")
-        server.stop()
+    server.stop()
     if _server:
         _server.shutdown()
 

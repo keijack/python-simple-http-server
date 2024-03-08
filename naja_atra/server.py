@@ -31,7 +31,7 @@ import re
 from ssl import PROTOCOL_TLS_SERVER, SSLContext
 from typing import Dict
 
-from .http_servers.http_server import HttpServer, ASGIProxy, WSGIProxy
+from .http_servers.http_server import HttpServer
 
 from .app_conf import get_app_conf, AppConf
 from .http_servers.routing_server import RoutingServer
@@ -284,19 +284,3 @@ def __fill_proxy(proxy: RoutingServer, session_factory: SessionFactory, app_conf
     err_pages = appconf._get_error_pages()
     for code, func in err_pages.items():
         proxy.map_error_page(code, func)
-
-
-def init_wsgi_proxy(resources: Dict[str, str] = {}, session_factory: SessionFactory = None, app_conf: AppConf = None) -> WSGIProxy:
-    appconf = app_conf or get_app_conf()
-    proxy = WSGIProxy(res_conf=resources,
-                      model_binding_conf=appconf.model_binding_conf)
-    __fill_proxy(proxy, session_factory, appconf)
-    return proxy
-
-
-def init_asgi_proxy(resources: Dict[str, str] = {}, session_factory: SessionFactory = None, app_conf: AppConf = None) -> ASGIProxy:
-    appconf = app_conf or get_app_conf()
-    proxy = ASGIProxy(res_conf=resources,
-                      model_binding_conf=appconf.model_binding_conf)
-    __fill_proxy(proxy, session_factory, appconf)
-    return proxy
