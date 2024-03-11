@@ -23,7 +23,7 @@ SOFTWARE.
 """
 
 from .app_conf import *
-from .models.basic_models import *
+from .models import *
 
 name = "naja_atra"
 version = "1.0.0"

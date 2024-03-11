@@ -25,9 +25,9 @@ SOFTWARE.
 import json
 from typing import Any, Dict, List, Type
 from http.cookies import BaseCookie, SimpleCookie
-from .basic_models import ModelDict, Environment, RegGroup, RegGroups, HttpError, RequestBodyReader, \
+from ..models import ModelDict, Environment, RegGroup, RegGroups, HttpError, RequestBodyReader, \
     Headers, Response, Cookies, Cookie, JSONBody, BytesBody, Header, Parameters, PathValue, Parameter, \
-    MultipartFile, Request, Session
+    MultipartFile, Request, HttpSession
 from ..utils.logger import get_logger
 
 _logger = get_logger("naja_atra.models.model_bindings")
@@ -62,7 +62,7 @@ class RequestModelBinding(ModelBinding):
 
 class SessionModelBinding(ModelBinding):
 
-    async def bind(self) -> Session:
+    async def bind(self) -> HttpSession:
         return self.request.get_session(True)
 
 
@@ -388,7 +388,7 @@ class ModelBindingConf:
         self.default_model_binding_type = DefaultModelBinding
         self.model_bingding_types: Dict[Type, Type[ModelBinding]] = {
             Request: RequestModelBinding,
-            Session: SessionModelBinding,
+            HttpSession: SessionModelBinding,
             Response: ResponseModelBinding,
             Headers: HeadersModelBinding,
             RegGroups: RegGroupsModelBinding,

@@ -28,9 +28,11 @@ import asyncio
 import base64
 from typing import Any, Dict, List, Type, Union, Callable
 
-from .models.basic_models import Headers, SessionFactory, WebsocketHandler
-from .models.basic_models import WEBSOCKET_MESSAGE_BINARY, WEBSOCKET_MESSAGE_BINARY_FRAME, WEBSOCKET_MESSAGE_PING, WEBSOCKET_MESSAGE_PONG, WEBSOCKET_MESSAGE_TEXT
-from .models.model_bindings import ModelBindingConf
+from naja_atra.request_handlers.http_session_local_impl import LocalSessionFactory
+
+from .models import Headers, HttpSessionFactory, WebsocketHandler
+from .models import WEBSOCKET_MESSAGE_BINARY, WEBSOCKET_MESSAGE_BINARY_FRAME, WEBSOCKET_MESSAGE_PING, WEBSOCKET_MESSAGE_PONG, WEBSOCKET_MESSAGE_TEXT
+from .request_handlers.model_bindings import ModelBindingConf
 from .utils.logger import get_logger
 
 _logger = get_logger("naja_atra.app_conf")
@@ -68,7 +70,7 @@ def _to_str_list(obj: Union[str, list, tuple]):
         return [str(obj)]
 
 
-class ControllerFunction:
+class _ControllerFunction:
 
     def __init__(self, url: str = "",
                  regexp: str = "",
@@ -165,7 +167,7 @@ class ControllerFunction:
         return self.__func
 
 
-class WebsocketHandlerProxy(WebsocketHandler):
+class _WebsocketHandlerProxy(WebsocketHandler):
 
     def __init__(self) -> None:
         self.handshake: Callable = None
@@ -219,7 +221,7 @@ class WebsocketHandlerProxy(WebsocketHandler):
         return super().on_binary_frame()
 
 
-class WebsocketHandlerClass:
+class _WebsocketHandlerClass:
 
     def __init__(self, url: str = "",
                  cls: Callable = None,
@@ -306,23 +308,33 @@ def _favicon():
 class AppConf:
 
     def __init__(self) -> None:
-        self._request_mappings: List[ControllerFunction] = []
-        self._request_clz_mapping: Dict[Any, ControllerFunction] = {}
+        self._request_mappings: List[_ControllerFunction] = []
+        self._request_clz_mapping: Dict[Any, _ControllerFunction] = {}
 
         self._filters = []
 
         self._ctrls = {}
         self._ctrl_singletons = {}
 
-        self._ws_handlers: Dict[str, WebsocketHandlerClass] = {}
+        self._ws_handlers: Dict[str, _WebsocketHandlerClass] = {}
 
         self._error_page = {}
 
-        self.session_factory: SessionFactory = None
+        self._session_factory: HttpSessionFactory = None
 
         self.request_map("/favicon.ico")(_favicon)
         self.route = self.request_map
         self.model_binding_conf = ModelBindingConf()
+
+    @property
+    def session_factory(self):
+        if self._session_factory == None:
+            self._session_factory = LocalSessionFactory()
+        return self._session_factory
+
+    @session_factory.setter
+    def session_factory(self, session_factory: HttpSessionFactory):
+        self._session_factory = session_factory
 
     def model_binding(self, arg_type: Type):
         def map(model_binding_type):
@@ -380,26 +392,26 @@ class AppConf:
             ps = _to_str_list(params)
 
             if inspect.isclass(ctrl):
-                self._request_clz_mapping[ctrl] = ControllerFunction(url=_url,
-                                                                     regexp=regexp,
-                                                                     method=mths,
-                                                                     headers=hs,
-                                                                     match_all_headers_expressions=match_all_headers_expressions,
-                                                                     params=ps,
-                                                                     match_all_params_expressions=match_all_params_expressions,
-                                                                     func=ctrl)
+                self._request_clz_mapping[ctrl] = _ControllerFunction(url=_url,
+                                                                      regexp=regexp,
+                                                                      method=mths,
+                                                                      headers=hs,
+                                                                      match_all_headers_expressions=match_all_headers_expressions,
+                                                                      params=ps,
+                                                                      match_all_params_expressions=match_all_params_expressions,
+                                                                      func=ctrl)
 
                 return ctrl
 
             for mth in mths:
-                cf = ControllerFunction(url=_url,
-                                        regexp=regexp,
-                                        method=mth,
-                                        headers=hs,
-                                        match_all_headers_expressions=match_all_headers_expressions,
-                                        params=ps,
-                                        match_all_params_expressions=match_all_params_expressions,
-                                        func=ctrl)
+                cf = _ControllerFunction(url=_url,
+                                         regexp=regexp,
+                                         method=mth,
+                                         headers=hs,
+                                         match_all_headers_expressions=match_all_headers_expressions,
+                                         params=ps,
+                                         match_all_params_expressions=match_all_params_expressions,
+                                         func=ctrl)
                 _logger.debug(
                     f"map url {_url} with method[{mth}] to function {ctrl}. with headers {cf.headers} and params {cf.params}")
                 self._request_mappings.append(cf)
@@ -438,7 +450,7 @@ class AppConf:
 
     def websocket_handler(self, endpoint: str = "", regexp: str = "", singleton: bool = True) -> Callable:
         def map(ws_class):
-            self._ws_handlers[endpoint + ":::" + regexp] = WebsocketHandlerClass(
+            self._ws_handlers[endpoint + ":::" + regexp] = _WebsocketHandlerClass(
                 url=endpoint, regexp=regexp, cls=ws_class, singleton=singleton)
             return ws_class
 
@@ -448,13 +460,13 @@ class AppConf:
         def map(ctrl):
             k = endpoint + ":::" + regexp
             if k not in self._ws_handlers:
-                handler = WebsocketHandlerClass(url=endpoint, regexp=regexp)
-                handler.ctrl_object = WebsocketHandlerProxy()
+                handler = _WebsocketHandlerClass(url=endpoint, regexp=regexp)
+                handler.ctrl_object = _WebsocketHandlerProxy()
                 handler.ctrl_object.handshake = ctrl
                 self._ws_handlers[k] = handler
             else:
                 handler = self._ws_handlers[k]
-                if not handler.cls and isinstance(handler.ctrl_object, WebsocketHandlerProxy):
+                if not handler.cls and isinstance(handler.ctrl_object, _WebsocketHandlerProxy):
                     handler.ctrl_object.handshake = ctrl
             return ctrl
         return map
@@ -463,13 +475,13 @@ class AppConf:
         def map(ctrl):
             k = endpoint + ":::" + regexp
             if k not in self._ws_handlers:
-                handler = WebsocketHandlerClass(url=endpoint, regexp=regexp)
-                handler.ctrl_object = WebsocketHandlerProxy()
+                handler = _WebsocketHandlerClass(url=endpoint, regexp=regexp)
+                handler.ctrl_object = _WebsocketHandlerProxy()
                 handler.ctrl_object.open = ctrl
                 self._ws_handlers[k] = handler
             else:
                 handler = self._ws_handlers[k]
-                if not handler.cls and isinstance(handler.ctrl_object, WebsocketHandlerProxy):
+                if not handler.cls and isinstance(handler.ctrl_object, _WebsocketHandlerProxy):
                     handler.ctrl_object.open = ctrl
             return ctrl
         return map
@@ -478,13 +490,13 @@ class AppConf:
         def map(ctrl):
             k = endpoint + ":::" + regexp
             if k not in self._ws_handlers:
-                handler = WebsocketHandlerClass(url=endpoint, regexp=regexp)
-                handler.ctrl_object = WebsocketHandlerProxy()
+                handler = _WebsocketHandlerClass(url=endpoint, regexp=regexp)
+                handler.ctrl_object = _WebsocketHandlerProxy()
                 handler.ctrl_object.close = ctrl
                 self._ws_handlers[k] = handler
             else:
                 handler = self._ws_handlers[k]
-                if not handler.cls and isinstance(handler.ctrl_object, WebsocketHandlerProxy):
+                if not handler.cls and isinstance(handler.ctrl_object, _WebsocketHandlerProxy):
                     handler.ctrl_object.close = ctrl
             return ctrl
         return map
@@ -493,12 +505,12 @@ class AppConf:
         def map(ctrl):
             k = endpoint + ":::" + regexp
             if k not in self._ws_handlers:
-                handler = WebsocketHandlerClass(url=endpoint, regexp=regexp)
-                handler.ctrl_object = WebsocketHandlerProxy()
+                handler = _WebsocketHandlerClass(url=endpoint, regexp=regexp)
+                handler.ctrl_object = _WebsocketHandlerProxy()
                 self._ws_handlers[k] = handler
 
             handler = self._ws_handlers[k]
-            if not handler.cls and isinstance(handler.ctrl_object, WebsocketHandlerProxy):
+            if not handler.cls and isinstance(handler.ctrl_object, _WebsocketHandlerProxy):
                 if message_type == WEBSOCKET_MESSAGE_TEXT:
                     handler.ctrl_object.text = ctrl
                 elif message_type == WEBSOCKET_MESSAGE_BINARY:
@@ -541,8 +553,8 @@ class AppConf:
         else:
             return map
 
-    def _get_request_mappings(self) -> List[ControllerFunction]:
-        mappings: List[ControllerFunction] = []
+    def _get_request_mappings(self) -> List[_ControllerFunction]:
+        mappings: List[_ControllerFunction] = []
 
         for ctr_fun in self._request_mappings:
             clz = ctr_fun.clz
@@ -572,25 +584,25 @@ class AppConf:
                     for mth in methods:
                         _logger.debug(
                             f"map url {full_url} included [{clz_url}] with method[{mth}] to function {ctr_fun.func}. ")
-                        mappings.append(ControllerFunction(url=full_url,
-                                                           regexp=ctr_fun.regexp,
-                                                           method=mth,
-                                                           func=ctr_fun.func,
-                                                           headers=hs,
-                                                           match_all_headers_expressions=mhs,
-                                                           params=ps,
-                                                           match_all_params_expressions=mps))
+                        mappings.append(_ControllerFunction(url=full_url,
+                                                            regexp=ctr_fun.regexp,
+                                                            method=mth,
+                                                            func=ctr_fun.func,
+                                                            headers=hs,
+                                                            match_all_headers_expressions=mhs,
+                                                            params=ps,
+                                                            match_all_params_expressions=mps))
                 else:
                     _logger.debug(
                         f"map url {full_url} included [{clz_url}] with method[{ctr_fun.method}] to function {ctr_fun.func}. ")
-                    mappings.append(ControllerFunction(url=full_url,
-                                                       regexp=ctr_fun.regexp,
-                                                       method=ctr_fun.method,
-                                                       func=ctr_fun.func,
-                                                       headers=hs,
-                                                       match_all_headers_expressions=mhs,
-                                                       params=ps,
-                                                       match_all_params_expressions=mps))
+                    mappings.append(_ControllerFunction(url=full_url,
+                                                        regexp=ctr_fun.regexp,
+                                                        method=ctr_fun.method,
+                                                        func=ctr_fun.func,
+                                                        headers=hs,
+                                                        match_all_headers_expressions=mhs,
+                                                        params=ps,
+                                                        match_all_params_expressions=mps))
             else:
                 mappings.append(ctr_fun)
 
@@ -612,7 +624,7 @@ class AppConf:
     def _get_filters(self):
         return self._filters
 
-    def _get_websocket_handlers(self) -> List[WebsocketHandlerClass]:
+    def _get_websocket_handlers(self) -> List[_WebsocketHandlerClass]:
         return list(self._ws_handlers.values())
 
     def _get_error_pages(self) -> Dict[str, Callable]:
@@ -690,21 +702,13 @@ def default_model_binding(*anno_args):
     return _default_app_conf.default_model_binding(*anno_args)
 
 
+def set_session_factory(session_factory: HttpSessionFactory):
+    _default_app_conf.session_factory = session_factory
+
+
 def get_app_conf(tag: str = "") -> AppConf:
     if not tag:
         return _default_app_conf
     if tag not in _app_confs:
         _app_confs[tag] = AppConf()
     return _app_confs[tag]
-
-
-_session_facory: SessionFactory = None
-
-
-def set_session_factory(session_factory: SessionFactory):
-    global _session_facory
-    _session_facory = session_factory
-
-
-def _get_session_factory() -> SessionFactory:
-    return _session_facory

@@ -25,8 +25,8 @@ SOFTWARE.
 
 
 from .routing_server import RoutingServer
-from ..models.model_bindings import ModelBindingConf
-from ..request_handlers.http_protocol_handler import HttpProtocolHandler
+from ..request_handlers.model_bindings import ModelBindingConf
+from ..request_handlers.http_request_handler import HttpRequestHandler
 
 
 import asyncio
@@ -54,7 +54,7 @@ class CoroutineHTTPServer(RoutingServer):
         self.__thread_local = threading.local()
 
     async def callback(self, reader: StreamReader, writer: StreamWriter):
-        handler = HttpProtocolHandler(reader, writer, routing_conf=self)
+        handler = HttpRequestHandler(reader, writer, routing_conf=self)
         await handler.handle_request()
         _logger.debug("Connection ends, close the writer.")
         writer.close()

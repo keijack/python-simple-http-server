@@ -33,12 +33,8 @@ from typing import Dict
 
 from .http_servers.http_server import HttpServer
 
-from .app_conf import get_app_conf, AppConf
-from .http_servers.routing_server import RoutingServer
-from .request_handlers.http_session_local_impl import LocalSessionFactory
+from .app_conf import AppConf
 from .utils.logger import get_logger
-from .app_conf import set_session_factory
-from .models.basic_models import SessionFactory
 
 
 _logger = get_logger("naja_atra.server")
@@ -260,27 +256,3 @@ def stop() -> None:
             _server = None
         else:
             _logger.warning("Server is not ready yet.")
-
-
-def __fill_proxy(proxy: RoutingServer, session_factory: SessionFactory, app_conf: AppConf):
-    appconf = app_conf or get_app_conf()
-    set_session_factory(
-        session_factory or appconf.session_factory or LocalSessionFactory())
-    filters = appconf._get_filters()
-    # filter configuration
-    for ft in filters:
-        proxy.map_filter(ft)
-
-    request_mappings = appconf._get_request_mappings()
-    # request mapping
-    for ctr in request_mappings:
-        proxy.map_controller(ctr)
-
-    ws_handlers = appconf._get_websocket_handlers()
-
-    for hander in ws_handlers:
-        proxy.map_websocket_handler(hander)
-
-    err_pages = appconf._get_error_pages()
-    for code, func in err_pages.items():
-        proxy.map_error_page(code, func)

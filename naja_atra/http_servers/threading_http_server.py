@@ -25,8 +25,8 @@ SOFTWARE.
 
 
 from .routing_server import RoutingServer
-from ..models.model_bindings import ModelBindingConf
-from ..request_handlers.http_protocol_handler import SocketServerStreamRequestHandlerWraper
+from ..request_handlers.model_bindings import ModelBindingConf
+from ..request_handlers.http_request_handler import SocketServerStreamRequestHandlerWraper
 
 
 import socket

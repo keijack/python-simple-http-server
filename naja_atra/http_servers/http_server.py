@@ -31,7 +31,7 @@ from .coroutine_http_server import CoroutineHTTPServer
 from .threading_http_server import ThreadingHTTPServer
 
 
-from ..app_conf import ControllerFunction, WebsocketHandlerClass, AppConf, get_app_conf, _get_session_factory
+from ..app_conf import _ControllerFunction, _WebsocketHandlerClass, AppConf, get_app_conf
 
 
 from ..utils.logger import get_logger
@@ -46,10 +46,10 @@ class HttpServer:
     def map_filter(self, filter_conf):
         self.server.map_filter(filter_conf)
 
-    def map_controller(self, ctrl: ControllerFunction):
+    def map_controller(self, ctrl: _ControllerFunction):
         self.server.map_controller(ctrl)
 
-    def map_websocket_handler(self, handler: WebsocketHandlerClass):
+    def map_websocket_handler(self, handler: _WebsocketHandlerClass):
         self.server.map_websocket_handler(handler)
 
     def map_error_page(self, code, func):
@@ -130,7 +130,7 @@ class HttpServer:
         self.server.keep_alive = keep_alive
         self.server.connection_idle_time = connection_idle_time
         self.server.keep_alive_max_request = keep_alive_max_request
-        self.server.session_factory = appconf.session_factory or _get_session_factory()
+        self.server.session_factory = appconf.session_factory
 
     @property
     def ready(self):

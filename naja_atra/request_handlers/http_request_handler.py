@@ -22,699 +22,445 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-
+import html
+import re
+import http.client
+import email.parser
+import email.message
+import socketserver
 import asyncio
-from asyncio.streams import StreamReader, StreamWriter
-import gzip
-import os
-import json
-import threading
-import http.cookies as cookies
-import datetime
+import socket
 
+
+from typing import Any, Dict
+from http import HTTPStatus
 from urllib.parse import unquote
-from typing import Any, Callable, Dict, List, Tuple, Union
+from asyncio.streams import StreamReader, StreamWriter
+from http import HTTPStatus
 
-from ..models.model_bindings import ModelBindingConf
-from ..http_servers.routing_server import RoutingServer
-
-from ..models.basic_models import FilterContext, HttpError, RequestBodyReader, StaticFile, Headers, Redirect, Response, Cookies, MultipartFile, Request, Session, SessionFactory
-from ..models.basic_models import DEFAULT_ENCODING, SESSION_COOKIE_NAME
-from ..app_conf import ControllerFunction
+from .. import name, version
+from ..models import RequestBodyReader
 from ..utils import http_utils
-
-from .http_session_local_impl import LocalSessionFactory
 from ..utils.logger import get_logger
-from ..utils.http_utils import get_function_args, get_function_kwargs
+from ..http_servers.routing_server import RoutingServer
+from .http_controller_handler import HTTPControllerHandler
+from .websocket_controller_handler import WebsocketControllerHandler
+
+
+_LINE_MAX_BYTES = 65536
+_MAXHEADERS = 100
 
 _logger = get_logger("naja_atra.request_handlers.http_request_handler")
 
 
-class RequestBodyReaderWrapper(RequestBodyReader):
+class RequestWriter:
 
-    def __init__(self, reader: StreamReader, content_length: int = None) -> None:
-        self._content_length: int = content_length
-        self._remain_length: int = content_length
-        self._reader: StreamReader = reader
+    def __init__(self, writer: StreamWriter) -> None:
+        self.writer: StreamWriter = writer
 
-    async def read(self, n: int = -1):
-        data = b''
-        if self._remain_length is not None and self._remain_length <= 0:
-            return data
-        if not n or n < 0:
-            if self._remain_length:
-                data = await self._reader.read(self._remain_length)
-            else:
-                data = await self._reader.read()
+    def send(self, data: bytes):
+        self.writer.write(data)
+
+
+class HttpRequestHandler:
+
+    server_version = f"{name}/{version}"
+
+    default_request_version = "HTTP/1.1"
+
+    # The version of the HTTP protocol we support.
+    # Set this to HTTP/1.1 to enable automatic keepalive
+    protocol_version = "HTTP/1.1"
+
+    # MessageClass used to parse headers
+    _message_class = http.client.HTTPMessage
+
+    # hack to maintain backwards compatibility
+    responses = {
+        v: (v.phrase, v.description)
+        for v in HTTPStatus.__members__.values()
+    }
+
+    def __init__(self, reader: StreamReader, writer: StreamWriter, request_writer=None, routing_conf: RoutingServer = None) -> None:
+        self.routing_conf: RoutingServer = routing_conf
+        self.reader: StreamReader = reader
+        self.writer: StreamWriter = writer
+        self.request_writer: RequestWriter = request_writer if request_writer else RequestWriter(
+            writer)
+
+        self.requestline = ''
+        self.request_version = ''
+        self.command = ''
+        self.path = ''
+        self.request_path = ''
+        self.query_string = ''
+        self.query_parameters = {}
+        self.headers = {}
+
+        self.close_connection = True
+        self._keep_alive = self.routing_conf.keep_alive
+        self._connection_idle_time = routing_conf.connection_idle_time
+        self._keep_alive_max_req = routing_conf.keep_alive_max_request
+        self.req_count = 0
+
+    async def parse_request(self):
+        self.req_count += 1
+        try:
+            if hasattr(self.reader, "connection"):
+                # For blocking io. asyncio.wait_for will not raise TimeoutError if the io is blocked.
+                self.reader.connection.settimeout(self._connection_idle_time)
+            raw_requestline = await asyncio.wait_for(self.reader.readline(), self._connection_idle_time)
+            if hasattr(self.reader, "connection") and hasattr(self.reader, "timeout"):
+                # For blocking io. Set the Original timeout to the connection.
+                self.reader.connection.settimeout(self.reader.timeout)
+        except asyncio.TimeoutError:
+            _logger.warn("Wait for reading request line timeout. ")
+            return False
+        if len(raw_requestline) > _LINE_MAX_BYTES:
+            self.requestline = ''
+            self.request_version = ''
+            self.command = ''
+            self.send_error(HTTPStatus.REQUEST_URI_TOO_LONG)
+            return False
+        if not raw_requestline:
+            self.close_connection = True
+            return False
+        self.command = None
+        self.request_version = version = self.default_request_version
+        self.close_connection = True
+        requestline = str(raw_requestline, 'iso-8859-1')
+        requestline = requestline.rstrip('\r\n')
+        self.requestline = requestline
+        words = requestline.split()
+        if len(words) == 0:
+            return False
+
+        if len(words) >= 3:  # Enough to determine protocol version
+            version = words[-1]
+            try:
+                if not version.startswith('HTTP/'):
+                    raise ValueError
+                base_version_number = version.split('/', 1)[1]
+                version_number = base_version_number.split(".")
+                # RFC 2145 section 3.1 says there can be only one "." and
+                #   - major and minor numbers MUST be treated as
+                #      separate integers;
+                #   - HTTP/2.4 is a lower version than HTTP/2.13, which in
+                #      turn is lower than HTTP/12.3;
+                #   - Leading zeros MUST be ignored by recipients.
+                if len(version_number) != 2:
+                    raise ValueError
+                version_number = int(version_number[0]), int(version_number[1])
+            except (ValueError, IndexError):
+                self.send_error(
+                    HTTPStatus.BAD_REQUEST,
+                    f"Bad request version {version}")
+                return False
+
+            if version_number >= (2, 0):
+                self.send_error(
+                    HTTPStatus.HTTP_VERSION_NOT_SUPPORTED,
+                    f"Invalid HTTP version {base_version_number}")
+                return False
+            self.request_version = version
+            _logger.info(f"request version: {self.request_version}")
+        if not 2 <= len(words) <= 3:
+            self.send_error(
+                HTTPStatus.BAD_REQUEST,
+                "Bad request syntax (%r)" % requestline)
+            return False
+        command, path = words[:2]
+        if len(words) == 2:
+            self.close_connection = True
+            if command != 'GET':
+                self.send_error(
+                    HTTPStatus.BAD_REQUEST,
+                    "Bad HTTP/0.9 request type (%r)" % command)
+                return False
+        self.command, self.path = command, path
+
+        self.request_path = self._get_request_path(self.path)
+
+        self.query_string = self.__get_query_string(self.path)
+
+        self.query_parameters = http_utils.decode_query_string(
+            self.query_string)
+
+        # Examine the headers and look for a Connection directive.
+        try:
+            self.headers = await self.parse_headers()
+        except http.client.LineTooLong as err:
+            self.send_error(
+                HTTPStatus.REQUEST_HEADER_FIELDS_TOO_LARGE,
+                "Line too long",
+                str(err))
+            return False
+        except http.client.HTTPException as err:
+            self.send_error(
+                HTTPStatus.REQUEST_HEADER_FIELDS_TOO_LARGE,
+                "Too many headers",
+                str(err)
+            )
+            return False
+
+        conntype = self.headers.get('Connection', '')
+
+        self.close_connection = not self._keep_alive or conntype.lower(
+        ) != 'keep-alive' or self.protocol_version != "HTTP/1.1"
+
+        # Examine the headers and look for an Expect directive
+        expect = self.headers.get('Expect', "")
+        if (expect.lower() == "100-continue" and
+                self.protocol_version >= "HTTP/1.1" and
+                self.request_version >= "HTTP/1.1"):
+            if not self.handle_expect_100():
+                return False
+        return True
+
+    async def parse_headers(self):
+        """Parses only RFC2822 headers from a file pointer.
+
+        email Parser wants to see strings rather than bytes.
+        But a TextIOWrapper around self.rfile would buffer too many bytes
+        from the stream, bytes which we later need to read as bytes.
+        So we read the correct bytes here, as bytes, for email Parser
+        to parse.
+
+        """
+        headers = []
+        while True:
+            line = await self.reader.readline()
+            if len(line) > _LINE_MAX_BYTES:
+                raise http.client.LineTooLong("header line")
+            headers.append(line)
+            if len(headers) > _MAXHEADERS:
+                raise http.client.HTTPException(
+                    f"got more than {_MAXHEADERS} headers")
+            if line in (b'\r\n', b'\n', b''):
+                break
+        hstring = b''.join(headers).decode('iso-8859-1')
+
+        return email.parser.Parser(_class=self._message_class).parsestr(hstring)
+
+    def handle_expect_100(self):
+        """Decide what to do with an "Expect: 100-continue" header.
+
+        If the client is expecting a 100 Continue response, we must
+        respond with either a 100 Continue or a final response before
+        waiting for the request body. The default is to always respond
+        with a 100 Continue. You can behave differently (for example,
+        reject unauthorized requests) by overriding this method.
+
+        This method should either return True (possibly after sending
+        a 100 Continue response) or send an error response and return
+        False.
+
+        """
+        self.send_response_only(HTTPStatus.CONTINUE)
+        self.end_headers()
+        return True
+
+    def __get_query_string(self, ori_path: str):
+        parts = ori_path.split('?')
+        if len(parts) == 2:
+            return parts[1]
         else:
-            if self._remain_length and n > self._remain_length:
-                data = await self._reader.read(self._remain_length)
-            else:
-                data = await self._reader.read(n)
-
-        if self._remain_length and self._remain_length > 0:
-            self._remain_length -= len(data)
-
-        return data
-
-
-class RequestWrapper(Request):
-
-    def __init__(self):
-        super().__init__()
-        self._headers_keys_in_lowcase = {}
-        self._path = ""
-        self.__session = None
-        self._socket_req = None
-        self._coroutine_objects = []
-        self._session_fac: SessionFactory = None
-
-    @property
-    def host(self) -> str:
-        if "host" not in self._headers_keys_in_lowcase:
             return ""
-        else:
-            return self.headers["host"]
 
-    @property
-    def content_type(self) -> str:
-        if "content-type" not in self._headers_keys_in_lowcase:
-            return ""
-        else:
-            return self.headers["content-type"]
+    def _get_request_path(self, ori_path: str):
+        path = ori_path.split('?', 1)[0]
+        path = path.split('#', 1)[0]
+        path = http_utils.remove_url_first_slash(path)
+        path = unquote(path)
+        return path
 
-    @property
-    def content_length(self) -> int:
-        if "content-length" not in self._headers_keys_in_lowcase:
-            return ""
-        else:
-            return self.headers["content-length"]
+    def send_error(self, code: int, message: str = None, explain: str = None, headers: Dict[str, str] = {}):
+        try:
+            shortmsg, longmsg = self.responses[code]
+        except KeyError:
+            shortmsg, longmsg = '???', '???'
+        if message is None:
+            message = shortmsg
+        if explain is None:
+            explain = longmsg
+        self.log_error(f"code {code}, message {message}")
+        self.send_response(code, message)
+        self.send_header('Connection', 'close')
 
-    def get_session(self, create: bool = False) -> Session:
-        if not self.__session:
-            sid = self.cookies[SESSION_COOKIE_NAME].value if SESSION_COOKIE_NAME in self.cookies.keys(
-            ) else ""
-            session_fac = self._session_fac or LocalSessionFactory()
-            self.__session = session_fac.get_session(sid, create)
-        return self.__session
-
-    def _put_coroutine_task(self, coroutine_object):
-        self._coroutine_objects.append(coroutine_object)
-
-
-class ResponseWrapper(Response):
-    """ """
-
-    def __init__(self, handler,
-                 status_code=200,
-                 headers=None):
-        super().__init__(status_code=status_code, headers=headers, body="")
-        self.__req_handler = handler
-        self.__is_sent = False
-        self.__header_sent = False
-        self.__send_lock__ = threading.Lock()
-
-    @property
-    def is_sent(self) -> bool:
-        return self.__is_sent
-
-    def send_error(self, status_code: int, message: str = "", explain: str = "") -> None:
-        with self.__send_lock__:
-            self.__is_sent = True
-            self.status_code = status_code
-            self.__req_handler.send_error(
-                self.status_code, message=message, explain=explain, headers=self.headers)
-
-    def send_redirect(self, url: str) -> None:
-        self.status_code = 302
-        self.set_header("Location", url)
-        self.body = None
-        self.send_response()
-
-    def send_response(self) -> None:
-        with self.__send_lock__:
-            self.__send_response()
-
-    def __send_response(self):
-        assert not self.__is_sent and not self.__header_sent, "This response has benn sent"
-        self.__header_sent = True
-        self.__is_sent = True
-        self.__req_handler._send_response({
-            "status_code": self.status_code,
-            "headers": self.headers,
-            "cookies": self.cookies,
-            "body": self.body
-        })
-
-    def __send_headers(self):
-        if not self.__header_sent:
-            self.__header_sent = True
-            self.__req_handler._send_and_end_res_headers(
-                self.status_code, headers=self.headers, cks=self.cookies)
-
-    def write_bytes(self, data: bytes):
-        assert not self.__is_sent, "This response has benn sent"
-        assert isinstance(data, bytes) or isinstance(
-            data, bytearray), "You can "
-        self.__send_headers()
-        self.__req_handler.writer.write(data)
-
-    def close(self):
-        self.__is_sent = True
-        self.__req_handler.writer.write_eof()
-        self.__req_handler.writer.close()
-
-
-class FilterContextImpl(FilterContext):
-    """Context of a filter"""
-
-    DEFAULT_TIME_OUT = 10
-
-    def __init__(self, req, res, controller: ControllerFunction, model_binding_conf: ModelBindingConf, filters: List[Callable] = None):
-        self.__request: RequestWrapper = req
-        self.__response = res
-        self.__controller: ControllerFunction = controller
-        self.__filters: List[Callable] = filters if filters is not None else []
-        self.__model_binding_conf = model_binding_conf
-
-    @property
-    def request(self) -> RequestWrapper:
-        return self.__request
-
-    @property
-    def response(self) -> ResponseWrapper:
-        return self.__response
-
-    async def _run_ctrl_fun(self):
-        args = await self.__prepare_args()
-        kwargs = await self.__prepare_kwargs()
-        if asyncio.iscoroutinefunction(self.__controller.func):
-            if kwargs is None:
-                ctr_res = await self.__controller.func(*args)
-            else:
-                ctr_res = await self.__controller.func(*args, **kwargs)
-        else:
-            if kwargs is None:
-                ctr_res = self.__controller.func(*args)
-            else:
-                ctr_res = self.__controller.func(*args, **kwargs)
-        return ctr_res
-
-    def _do_res(self, ctr_res):
-        session = self.request.get_session()
-        if session and session.is_valid:
-            exp = datetime.datetime.utcfromtimestamp(
-                session.last_accessed_time + session.max_inactive_interval)
-            sck = Cookies()
-            sck[SESSION_COOKIE_NAME] = session.id
-            sck[SESSION_COOKIE_NAME]["httponly"] = True
-            sck[SESSION_COOKIE_NAME]["path"] = "/"
-            sck[SESSION_COOKIE_NAME]["expires"] = exp.strftime(
-                Cookies.EXPIRE_DATE_FORMAT)
-            self.response.cookies.update(sck)
-        elif session and SESSION_COOKIE_NAME in self.request.cookies:
-            exp = datetime.datetime.utcfromtimestamp(0)
-            sck = Cookies()
-            sck[SESSION_COOKIE_NAME] = session.id
-            sck[SESSION_COOKIE_NAME]["httponly"] = True
-            sck[SESSION_COOKIE_NAME]["path"] = "/"
-            sck[SESSION_COOKIE_NAME]["expires"] = exp.strftime(
-                Cookies.EXPIRE_DATE_FORMAT)
-            self.response.cookies.update(sck)
-
-        if ctr_res is not None:
-            if isinstance(ctr_res, tuple):
-                status, headers, cks, body = self.__decode_tuple_response(
-                    ctr_res)
-                self.response.status_code = status if status is not None else self.response.status_code
-                self.response.body = body if body is not None else self.response.body
-                self.response.add_headers(headers)
-                self.response.cookies.update(cks)
-            elif isinstance(ctr_res, Response):
-                self.response.status_code = ctr_res.status_code
-                self.response.body = ctr_res.body
-                self.response.add_headers(ctr_res.headers)
-            elif isinstance(ctr_res, Redirect):
-                self.response.send_redirect(ctr_res.url)
-            elif isinstance(ctr_res, int) and ctr_res >= 200 and ctr_res < 600:
-                self.response.status_code = ctr_res
-            elif isinstance(ctr_res, Headers):
-                self.response.add_headers(ctr_res)
-            elif isinstance(ctr_res, cookies.BaseCookie):
-                self.response.cookies.update(ctr_res)
-            else:
-                self.response.body = ctr_res
-
-        if self.request.method.upper() == "HEAD":
-            self.response.body = None
-        if not self.response.is_sent:
-            self.response.send_response()
-
-    async def _do_request_async(self):
-        ctr_res = await self._run_ctrl_fun()
-        self._do_res(ctr_res)
-
-    def do_chain(self):
-        if self.response.is_sent:
-            return
-        if self.__filters:
-            filter_func = self.__filters.pop(0)
-            self.request._put_coroutine_task(
-                self._wrap_to_async(filter_func, [self]))
-        else:
-            self.request._put_coroutine_task(self._do_request_async())
-
-    async def _wrap_to_async(self, func: Callable, args: List = [], kwargs: Dict = {}) -> Any:
-        if asyncio.iscoroutinefunction(func):
-            return await func(*args, **kwargs)
-        else:
-            return func(*args, **kwargs)
-
-    def __decode_tuple_response(self, ctr_res):
-        status_code = None
-        headers = Headers()
-        cks = cookies.SimpleCookie()
+        # Message body is omitted for cases described in:
+        #  - RFC7230: 3.3. 1xx, 204(No Content), 304(Not Modified)
+        #  - RFC7231: 6.3.6. 205(Reset Content)
         body = None
-        for item in ctr_res:
-            if isinstance(item, int):
-                if status_code is None:
-                    status_code = item
-            elif isinstance(item, Headers):
-                headers.update(item)
-            elif isinstance(item, cookies.BaseCookie):
-                cks.update(item)
-            elif type(item) in (str, dict, StaticFile, bytes, bytearray):
-                if body is None:
-                    body = item
-        return status_code, headers, cks, body
+        if (code >= 200 and
+            code not in (HTTPStatus.NO_CONTENT,
+                         HTTPStatus.RESET_CONTENT,
+                         HTTPStatus.NOT_MODIFIED)):
+            try:
+                content: Any = self.routing_conf.error_page(code, html.escape(
+                    message, quote=False), html.escape(explain, quote=False))
+            except:
+                content: str = html.escape(
+                    message, quote=False) + ":" + html.escape(explain, quote=False)
+            content_type, body = http_utils.decode_response_body_to_bytes(
+                content)
 
-    async def __prepare_args(self):
-        args = get_function_args(self.__controller.func)
-        arg_vals = []
-        if len(args) > 0:
-            ctr_obj = self.__controller.ctrl_object
-            if ctr_obj is not None:
-                arg_vals.append(self.__controller.ctrl_object)
-                args = args[1:]
-        for arg, arg_type_anno in args:
-            param = await self.__get_params_(arg, arg_type_anno)
-            if param is None:
-                raise HttpError(400, "Missing Paramter",
-                                f"Parameter[{arg}] is required! ")
-            arg_vals.append(param)
+            self.send_header("Content-Type", content_type)
+            self.send_header('Content-Length', str(len(body)))
+        if headers:
+            for h_name, h_val in headers.items():
+                self.send_header(h_name, h_val)
+        self.end_headers()
 
-        return arg_vals
+        if self.command != 'HEAD' and body:
+            self.writer.write(body)
 
-    async def __get_params_(self, arg, arg_type, val=None):
-        if arg_type in self.__model_binding_conf.model_bingding_types:
-            binding_type = self.__model_binding_conf.model_bingding_types[arg_type]
-        else:
-            binding_type = self.__model_binding_conf.default_model_binding_type
+    def send_response(self, code, message=None):
+        """Add the response header to the headers buffer and log the
+        response code.
 
-        binding_obj = binding_type(self.request,
-                                   self.response,
-                                   arg,
-                                   arg_type,
-                                   val)
-        return await self._wrap_to_async(binding_obj.bind)
+        Also send two standard headers with the server software
+        version and the current date.
 
-    async def __prepare_kwargs(self):
-        kwargs = get_function_kwargs(self.__controller.func)
-        if kwargs is None:
-            return None
-        kwarg_vals = {}
-        for k, v, t in kwargs:
-            kwarg_vals[k] = await self.__get_params_(
-                k, type(v) if v is not None else t, v)
+        """
+        self.log_request(code)
+        self.send_response_only(code, message)
+        self.send_header('Server', self.server_version)
+        self.send_header('Date', http_utils.date_time_string())
 
-        return kwarg_vals
+    def send_header(self, keyword: str, value: str):
+        """Send a MIME header to the headers buffer."""
+        if keyword.lower() == 'connection':
+            if value.lower() == 'close':
+                self.close_connection = True
+            elif value.lower() == 'keep-alive':
+                if self._keep_alive:
+                    self.close_connection = False
+                else:
+                    _logger.warning(
+                        f"Keep Alive configuration is set to False, won't send keep-alive header.")
+                    return
 
+        if self.request_version != 'HTTP/0.9':
+            if not hasattr(self, '_headers_buffer'):
+                self._headers_buffer = []
+            self._headers_buffer.append(
+                f"{keyword}: {value}\r\n".encode('latin-1', errors='strict'))
 
-class HTTPRequestHandler:
+    def end_headers(self):
+        """Send the blank line ending the MIME headers."""
+        if self.request_version != 'HTTP/0.9':
+            self._headers_buffer.append(b"\r\n")
+            self.flush_headers()
 
-    def __init__(self, http_protocol_handler, environment={}) -> None:
-        self.method: str = http_protocol_handler.command
-        self.request_path: str = http_protocol_handler.request_path
-        self.query_string: str = http_protocol_handler.query_string
-        self.query_parameters: Dict[str, List[str]
-                                    ] = http_protocol_handler.query_parameters
-        self.headers: Dict[str, str] = http_protocol_handler.headers
+    def flush_headers(self):
+        if hasattr(self, '_headers_buffer'):
+            self.writer.write(b"".join(self._headers_buffer))
+            self._headers_buffer = []
 
-        self.routing_conf: RoutingServer = http_protocol_handler.routing_conf
-        self.reader: StreamReader = http_protocol_handler.reader
+    def send_response_only(self, code, message: str = None):
+        """Send the response header only."""
+        if self.request_version != 'HTTP/0.9':
+            if message is None:
+                if code in self.responses:
+                    message = self.responses[code][0]
+                else:
+                    message = ''
+            if not hasattr(self, '_headers_buffer'):
+                self._headers_buffer = []
+            self._headers_buffer \
+                .append(f"{self.protocol_version} {code} {message}\r\n".encode('latin-1', errors='strict'))
 
-        self.send_header = http_protocol_handler.send_header
-        self.end_headers = http_protocol_handler.end_headers
-        self.send_response = http_protocol_handler.send_response
-        self.send_error = http_protocol_handler.send_error
-        self.writer: StreamWriter = http_protocol_handler.writer
-        self.environment: Dict[str, Any] = environment
+    def log_request(self, code='-', size='-'):
+        if isinstance(code, HTTPStatus):
+            code = code.value
+        self.log_message('"%s" %s %s',
+                         self.requestline, str(code), str(size))
 
-    def __match_one_exp(self, d: Dict[str, Union[List[str], str]], exp: str, where: str) -> bool:
-        if not exp:
-            return True
-        _logger.debug(
-            f"Match controller {where} expression [{exp}] for values: {d}. ")
-        exp_ = str(exp)
-        e_idx = exp_.find("=")
-        if e_idx < 0:
-            _logger.debug(f"cannot find = in exp {exp}")
-            if exp_.startswith('!'):
-                return not exp_[1:] in d.keys()
-            else:
-                return exp_ in d.keys()
-        idx = exp_.find("!=")
-        if idx > 0 and idx < e_idx:
-            k, v = http_utils.break_into(exp_, '!=')
-            if k not in d.keys():
-                return False
-            dvals = d[k]
-            if isinstance(dvals, str):
-                dvals = [dvals]
-            for dv in dvals:
-                if dv == v:
-                    return False
-            return True
+    def log_error(self, format, *args):
+        self.log_message(format, *args)
 
-        idx = exp_.find("^=")
-        if idx > 0 and idx < e_idx:
-            k, v = http_utils.break_into(exp_, "^=")
-            if k not in d.keys():
-                return False
-            dvals = d[k]
-            if isinstance(dvals, str):
-                dvals = [dvals]
-            for dv in dvals:
-                _logger.debug(f"^= mapping:: {dv} ... {v}")
-                if dv.startswith(v):
-                    return True
-            return False
+    def log_message(self, format, *args):
+        _logger.info(f"{format % args}")
 
-        if e_idx > 0:
-            k, v = http_utils.break_into(exp_, '=')
-            if k not in d.keys():
-                return False
-            dvals = d[k]
-            if isinstance(dvals, str):
-                dvals = [dvals]
-            for dv in dvals:
-                if dv == v:
-                    return True
-            return False
+    def set_prefer_keep_alive_params(self):
+        pass
 
-        _logger.error(
-            f"Controller {where} expression [{exp}] is not valied, returning False...")
-        return False
-
-    def __match_exps(self, d: Dict[str, Union[List[str], str]], exps: List[str], all: bool, where: str) -> bool:
-        if not exps:
-            return True
-
-        for exp in exps:
-            res = self.__match_one_exp(d, exp, where)
-            if all and not res:
-                return False
-            if not all and res:  # match one
-                return True
-        # return if all True else False
-        return all
-
-    def __is_req_match_ctl(self, req: RequestWrapper, ctrl: ControllerFunction) -> bool:
-        _logger.debug(f"{ctrl.headers} - {ctrl.params}")
-        return self.__match_exps(req.headers, ctrl.headers, ctrl.match_all_headers_expressions, 'headers') \
-            and self.__match_exps(req.parameters, ctrl.params, ctrl.match_all_params_expressions, 'params')
-
-    def __get_ctrl(self, req: RequestWrapper) -> Tuple[ControllerFunction, Dict, List]:
-        mth = self.method.upper()
-        path = req._path
-        ctrls = self.routing_conf.get_url_controllers(path, mth)
-        for ctrl, pvs, regs in ctrls:
-            if self.__is_req_match_ctl(req, ctrl):
-                return ctrl, pvs, regs
-        return None, {}, []
+    def set_alive_params(self):
+        if "Keep-Alive" in self.headers:
+            ka_header = self.headers["Keep-Alive"]
+            timeout_match = re.match(r"^.*timeout=(\d+).*$", ka_header)
+            if timeout_match:
+                self._connection_idle_time = int(timeout_match.group(1))
+            max_match = re.match(r"^.*max=(\d+).*$", ka_header)
+            if max_match:
+                self._keep_alive_max_req = int(max_match.group(1))
 
     async def handle_request(self):
-        mth = self.method.upper()
-
-        req = await self.__prepare_request(mth)
-
-        ctrl, req.path_values, req.reg_groups = self.__get_ctrl(req)
-
-        res = ResponseWrapper(self)
-        if ctrl is None:
-            res.send_error(404, "Controller Not Found",
-                           "Cannot find a controller for your path")
-        else:
-            filters = self.routing_conf.get_matched_filters(req.path)
-            ctx = FilterContextImpl(
-                req, res, ctrl, self.routing_conf.model_binding_conf, filters)
-            try:
-                ctx.do_chain()
-                if req._coroutine_objects:
-                    _logger.debug(f"wait all the objects in waiting list.")
-                    while req._coroutine_objects:
-                        await req._coroutine_objects.pop(0)
-            except HttpError as e:
-                res.send_error(e.code, e.message, e.explain)
-            except Exception as e:
-                _logger.exception("error occurs! returning 500")
-                res.send_error(500, None, str(e))
-
-    async def __prepare_request(self, method) -> RequestWrapper:
-        path = self.request_path
-        req = RequestWrapper()
-        req.environment = self.environment or {}
-        req.path = "/" + path
-        req._path = path
-        req._session_fac = self.routing_conf.session_factory
-        headers = {}
-        _headers_keys_in_lowers = {}
-        for k in self.headers.keys():
-            headers[k] = self.headers[k]
-            _headers_keys_in_lowers[k.lower()] = self.headers[k]
-        req.headers = headers
-        req._headers_keys_in_lowcase = _headers_keys_in_lowers
-
-        # cookies
-        if "cookie" in _headers_keys_in_lowers.keys():
-            req.cookies.load(_headers_keys_in_lowers["cookie"])
-
-        req.method = method
-
-        req.parameters = self.query_parameters
-
-        if "content-length" in _headers_keys_in_lowers.keys():
-            content_length = int(_headers_keys_in_lowers["content-length"])
-
-            req.reader = RequestBodyReaderWrapper(self.reader, content_length)
-
-            content_type = _headers_keys_in_lowers["content-type"]
-            if content_type.lower().startswith("application/x-www-form-urlencoded"):
-                req._body = await req.reader.read(content_length)
-                data_params = http_utils.decode_query_string(
-                    req._body.decode(DEFAULT_ENCODING))
-            elif content_type.lower().startswith("multipart/form-data"):
-                req._body = await req.reader.read(content_length)
-                data_params = self.__decode_multipart(
-                    content_type, req._body.decode("ISO-8859-1"))
-            elif content_type.lower().startswith("application/json"):
-                req._body = await req.reader.read(content_length)
-                req.json = json.loads(req._body.decode(DEFAULT_ENCODING))
-                data_params = {}
-            else:
-                data_params = {}
-            req.parameters = self.__merge(data_params, req.parameters)
-        else:
-            req.reader = RequestBodyReaderWrapper(self.reader)
-        return req
-
-    def __merge(self, dic0: Dict[str, List[str]], dic1: Dict[str, List[str]]):
-        """Merge tow dictionaries of which the structure is {k:[v1, v2]}"""
-        dic = dic0
-        for k, v in dic1.items():
-            if k not in dic.keys():
-                dic[k] = v
-            else:
-                for i in v:
-                    dic[k].append(i)
-        return dic
-
-    def __decode_multipart(self, content_type, data):
-        boundary = "--" + content_type.split("; ")[1].split("=")[1]
-        fields = data.split(boundary)
-        # ignore the first empty row and the last end symbol
-        fields = fields[1: len(fields) - 1]
-        params = {}
-        for field in fields:
-            # trim the first and the last empty row
-            f = field[field.index("\r\n") + 2: field.rindex("\r\n")]
-            key, val = self.__decode_multipart_field(f)
-            http_utils.put_to(params, key, val)
-        return params
-
-    def __decode_multipart_field(self, field):
-        # first line: Content-Disposition
-        line, rest = self.__read_line(field)
-
-        kvs = self.__decode_content_disposition(line)
-        kname = kvs["name"].encode(
-            "ISO-8859-1", errors="replace").decode(DEFAULT_ENCODING, errors="replace")
-        if len(kvs) == 1:
-            # this is a string field, the second line is an empty line, the rest is the value
-            val = self.__read_line(rest)[1].encode(
-                "ISO-8859-1", errors="replace").decode(DEFAULT_ENCODING, errors="replace")
-        elif "filename" in kvs or "filename*" in kvs:
-            if "filename*" in kvs:
-                name_value = kvs["filename*"]
-                idx = name_value.find("'")
-                if idx <= 0:
-                    encoding = DEFAULT_ENCODING
-                else:
-                    encoding = name_value[0:idx]
-                name_value = name_value[idx + 1:]
-                idx = name_value.find("'")
-                filename = unquote(name_value[idx + 1:], encoding)
-            else:
-                filename = kvs["filename"].encode(
-                    "ISO-8859-1", errors="replace").decode(DEFAULT_ENCODING, errors="replace")
-
-            # the second line is Content-Type line
-            ct_line, rest = self.__read_line(rest)
-            content_type = ct_line.split(":")[1].strip()
-            # the third line is an empty line, the rest is the value
-            content = self.__read_line(rest)[1].encode(
-                "ISO-8859-1", errors="replace")
-
-            val = MultipartFile(kname, filename=filename,
-                                content_type=content_type, content=content)
-        else:
-            val = "UNKNOWN"
-
-        return kname, val
-
-    def __decode_content_disposition(self, line) -> Dict[str, str]:
-        cont_dis = {}
-        es = line.split(";")[1:]
-        for e in es:
-            k, v = http_utils.break_into(e.strip(), "=")
-            if v.startswith('"') and v.endswith('"'):
-                cont_dis[k] = v[1: -1]  # ignore the '"' symbol
-            else:
-                cont_dis[k] = v
-        return cont_dis
-
-    def __read_line(self, txt):
-        return http_utils.break_into(txt, "\r\n")
-
-    def _send_response(self, response):
-        try:
-            headers = response["headers"]
-            cks = response["cookies"]
-            raw_body = response["body"]
-            status_code = response["status_code"]
-            content_type, body = http_utils.decode_response_body(raw_body)
-
-            self._send_res(status_code, headers, content_type, cks, body)
-
-        except HttpError as e:
-            self.send_error(e.code, e.message, e.explain)
-
-    def __send_res_headers(self, status_code: int, headers: Dict[str, str] = {}, content_type: str = "", cks: Cookies = Cookies()):
-        if "Content-Type" not in headers.keys() and "content-type" not in headers.keys():
-            headers["Content-Type"] = content_type
-        elif "content-type" in headers.keys():
-            headers["Content-Type"] = headers["content-type"]
-            del headers["content-type"]
-
-        self.send_response(status_code)
-        self.send_header("Last-Modified", str(http_utils.date_time_string()))
-        for k, v in headers.items():
-            if isinstance(v, str):
-                self.send_header(k, v)
-            elif isinstance(v, list):
-                for iov in v:
-                    if isinstance(iov, str):
-                        self.send_header(k, iov)
-
-        for k in cks:
-            ck = cks[k]
-            self.send_header("Set-Cookie", ck.OutputString())
-
-    def _send_and_end_res_headers(self, *args, **kwargs):
-        """
-        " For response object to send and writer headers.
-        """
-        self.__send_res_headers(*args, **kwargs)
-        self.end_headers()
-
-    def _should_send_gzip(self, headers: Dict[str, str]) -> bool:
-        if "Accept-Encoding" not in self.headers.keys():
-            return False
-        accept_encoding = self.headers["Accept-Encoding"].split(",")
-        acgzip = False
-        for acoding in accept_encoding:
-            if acoding.strip().lower().startswith("gzip"):
-                acgzip = True
-        if not acgzip:
-            return False
-        for ctype in self.routing_conf.gzip_content_types:
-            if headers["Content-Type"].lower().startswith(ctype):
-                return True
-        return False
-
-    def _send_res(self, status_code: int, headers: Dict[str, str] = {}, content_type: str = "", cks: Cookies = Cookies(), body: Union[str, bytes, bytearray, StaticFile] = None):
-        self.__send_res_headers(status_code, headers, content_type, cks)
-        if self._should_send_gzip(headers):
-            self._send_gzip_data(body)
-        else:
-            self._send_raw_data(body)
-
-    def _send_gzip_data(self, body):
-        if body is None:
-            self.send_header("Content-Length", 0)
-            self.end_headers()
+        parse_request_success = await self.parse_request()
+        if not parse_request_success:
             return
-        body_data = b''
-        if isinstance(body, str):
-            body_data = body.encode(DEFAULT_ENCODING, errors="replace")
-        elif isinstance(body, bytes) or isinstance(body, bytearray):
-            body_data = body
-        elif isinstance(body, StaticFile):
-            buffer_size = 1024 * 1024  # 1M
-            with open(body.file_path, "rb") as in_file:
-                buffer_data = in_file.read(buffer_size)
-                while buffer_data:
-                    body_data = body_data + buffer_data
-                    buffer_data = in_file.read(buffer_size)
+        self.set_alive_params()
 
-        gzip_data = gzip.compress(
-            body_data, compresslevel=self.routing_conf.gzip_compress_level)
+        if self.request_version == "HTTP/1.1" and self.command == "GET" and "Upgrade" in self.headers and self.headers["Upgrade"] == "websocket":
+            _logger.debug("This is a websocket connection. ")
+            ws_handler = WebsocketControllerHandler(self)
+            await ws_handler.handle_request()
+            self.writer.write_eof()
+            return
 
-        self.send_header("Content-Encoding", "gzip")
-        self.send_header("Content-Length", len(gzip_data))
-        self.end_headers()
-        self.writer.write(gzip_data)
+        await self.handle_http_request()
+        while not self.close_connection:
+            _logger.debug("Keep-Alive, read next request. ")
+            parse_request_success = await self.parse_request()
+            if not parse_request_success:
+                _logger.debug("parse request fails, return. ")
+                return
+            if self.req_count >= self._keep_alive_max_req:
+                self.send_response("Connection", "close")
+            await self.handle_http_request()
+            _logger.debug("Handle a keep-alive request successfully!")
 
-    def _send_raw_data(self, body):
-        if body is None:
-            self.send_header("Content-Length", 0)
-            self.end_headers()
-        elif isinstance(body, str):
-            data = body.encode(DEFAULT_ENCODING, errors="replace")
-            self.send_header("Content-Length", len(data))
-            self.end_headers()
-            self.writer.write(data)
-        elif isinstance(body, bytes) or isinstance(body, bytearray):
-            self.send_header("Content-Length", len(body))
-            self.end_headers()
-            self.writer.write(body)
-        elif isinstance(body, StaticFile):
-            file_size = os.path.getsize(body.file_path)
-            self.send_header("Content-Length", file_size)
-            self.end_headers()
-            buffer_size = 1024 * 1024  # 1M
-            with open(body.file_path, "rb") as in_file:
-                data = in_file.read(buffer_size)
-                while data:
-                    self.writer.write(data)
-                    data = in_file.read(buffer_size)
+    async def handle_http_request(self):
+        try:
+            http_handler = HTTPControllerHandler(self)
+            await http_handler.handle_request()
+            if self.writer.can_write_eof():
+                self.writer.write_eof()
+        except socket.timeout as e:
+            # a read or a write timed out.  Discard this connection
+            self.log_error("Request timed out: %r", e)
+            self.close_connection = True
+            return
+
+
+class SocketServerStreamRequestHandlerWraper(socketserver.StreamRequestHandler, RequestBodyReader):
+
+    server_version = HttpRequestHandler.server_version
+
+    # Wrapper method for readline
+    async def readline(self):
+        return self.rfile.readline(_LINE_MAX_BYTES)
+
+    async def read(self, n: int = -1):
+        return self.rfile.read(n)
+
+    def write(self, data: bytes):
+        self.wfile.write(data)
+
+    def can_write_eof(self) -> bool:
+        return True
+
+    def write_eof(self):
+        self.wfile.flush()
+
+    def close(self):
+        self.wfile.close()
+
+    def handle(self) -> None:
+        handler: HttpRequestHandler = HttpRequestHandler(
+            self, self, request_writer=self.request, routing_conf=self.server)
+        asyncio.run(handler.handle_request())
+
+    def finish(self) -> None:
+        _logger.debug("Finish a socket connection.")
+        return super().finish()

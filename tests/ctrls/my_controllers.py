@@ -17,7 +17,7 @@ from naja_atra import Parameter
 from naja_atra import MultipartFile
 from naja_atra import Response
 from naja_atra import Request
-from naja_atra import Session
+from naja_atra import HttpSession
 from naja_atra import request_map, route
 from naja_atra import controller
 from naja_atra import error_message
@@ -123,7 +123,7 @@ async def tuple_results():
 
 
 @request_map("session")
-def test_session(session: Session, invalid=False):
+def test_session(session: HttpSession, invalid=False):
     ins = session.get_attribute("in-session")
     if not ins:
         session.set_attribute("in-session", "Hello, Session!")

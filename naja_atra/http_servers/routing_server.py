@@ -34,9 +34,9 @@ from urllib.parse import unquote
 
 from typing import Any, Callable, Dict, List, Set, Tuple, Union
 
-from ..models.basic_models import StaticFile, SessionFactory
-from ..models.model_bindings import ModelBindingConf
-from ..app_conf import WebsocketHandlerClass, ControllerFunction
+from ..models import StaticFile, HttpSessionFactory
+from ..request_handlers.model_bindings import ModelBindingConf
+from ..app_conf import _WebsocketHandlerClass, _ControllerFunction
 
 from ..utils.http_utils import remove_url_first_slash, get_function_args, get_function_kwargs, get_path_reg_pattern
 from ..utils.logger import get_logger
@@ -74,10 +74,10 @@ class RoutingServer:
 
     def __init__(self, res_conf={}, model_binding_conf: ModelBindingConf = ModelBindingConf()):
         self.method_url_mapping: Dict[str,
-                                      Dict[str, List[ControllerFunction]]] = {"_": {}}
-        self.path_val_url_mapping: Dict[str, Dict[str, List[Tuple[ControllerFunction, List[str]]]]] = {
+                                      Dict[str, List[_ControllerFunction]]] = {"_": {}}
+        self.path_val_url_mapping: Dict[str, Dict[str, List[Tuple[_ControllerFunction, List[str]]]]] = {
             "_": {}}
-        self.method_regexp_mapping: Dict[str, Dict[str, List[ControllerFunction]]] = {
+        self.method_regexp_mapping: Dict[str, Dict[str, List[_ControllerFunction]]] = {
             "_": {}}
         for mth in self.HTTP_METHODS:
             self.method_url_mapping[mth] = {}
@@ -88,15 +88,15 @@ class RoutingServer:
         self._res_conf = []
         self.add_res_conf(res_conf)
 
-        self.ws_mapping: Dict[str, ControllerFunction] = {}
-        self.ws_path_val_mapping: Dict[str, ControllerFunction] = {}
-        self.ws_regx_mapping: Dict[str, ControllerFunction] = {}
+        self.ws_mapping: Dict[str, _ControllerFunction] = {}
+        self.ws_path_val_mapping: Dict[str, _ControllerFunction] = {}
+        self.ws_regx_mapping: Dict[str, _ControllerFunction] = {}
 
         self.error_page_mapping = {}
         self.keep_alive = True
         self.__connection_idle_time: float = 60
         self.__keep_alive_max_request: int = 10
-        self.session_factory: SessionFactory = None
+        self.session_factory: HttpSessionFactory = None
         self.model_binding_conf = model_binding_conf
         self.gzip_content_types: Set[str] = set()
         self.gzip_compress_level = 9
@@ -191,7 +191,7 @@ class RoutingServer:
                 val = v + os.path.sep
             self._res_conf.append((key, val))
 
-    def map_controller(self, ctrl: ControllerFunction):
+    def map_controller(self, ctrl: _ControllerFunction):
         url = ctrl.url
         regexp = ctrl.regexp
         method = ctrl.method
@@ -217,7 +217,7 @@ class RoutingServer:
         content_type = _EXT_CONTENT_TYPE.get(ext, "application/octet-stream")
         return StaticFile(fpath, content_type)
 
-    def get_url_controllers(self, path: str = "", method: str = "") -> List[Tuple[ControllerFunction, Dict, List]]:
+    def get_url_controllers(self, path: str = "", method: str = "") -> List[Tuple[_ControllerFunction, Dict, List]]:
         # explicitly url matching
         if path in self.method_url_mapping[method]:
             return [(ctrl, {}, ()) for ctrl in self.method_url_mapping[method][path]]
@@ -250,7 +250,7 @@ class RoutingServer:
 
                 def static_fun():
                     return self._res_(fpath)
-                return [(ControllerFunction(func=static_fun), {}, ())]
+                return [(_ControllerFunction(func=static_fun), {}, ())]
         return []
 
     def __try_get_ctrl_from_regexp(self, path, method):
@@ -308,7 +308,7 @@ class RoutingServer:
                 available_filters.append(val)
         return available_filters
 
-    def map_websocket_handler(self, handler: WebsocketHandlerClass):
+    def map_websocket_handler(self, handler: _WebsocketHandlerClass):
         url = handler.url
         regexp = handler.regexp
         _logger.debug(

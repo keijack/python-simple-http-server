@@ -45,7 +45,7 @@ WEBSOCKET_MESSAGE_PING: str = "WEBSOCKET_MESSAGE_PING"
 WEBSOCKET_MESSAGE_PONG: str = "WEBSOCKET_MESSAGE_PONG"
 
 
-class Session:
+class HttpSession:
 
     def __init__(self):
         self.max_inactive_interval: int = 30 * 60
@@ -87,10 +87,10 @@ class Session:
         return NotImplemented
 
 
-class SessionFactory:
+class HttpSessionFactory:
 
     @abstractmethod
-    def get_session(self, session_id: str, create: bool = False) -> Session:
+    def get_session(self, session_id: str, create: bool = False) -> HttpSession:
         return NotImplemented
 
 
@@ -176,7 +176,7 @@ class Request:
             return self.parameter[key]
 
     @abstractmethod
-    def get_session(self, create: bool = False) -> Session:
+    def get_session(self, create: bool = False) -> HttpSession:
         return NotImplemented
 
 

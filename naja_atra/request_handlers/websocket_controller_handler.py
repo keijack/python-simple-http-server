@@ -36,9 +36,9 @@ from uuid import uuid4
 from socket import error as SocketError
 
 from ..utils.logger import get_logger
-from ..models.basic_models import Headers, WebsocketCloseReason, WebsocketRequest, WebsocketSession
-from ..models.basic_models import WEBSOCKET_OPCODE_BINARY, WEBSOCKET_OPCODE_CLOSE, WEBSOCKET_OPCODE_CONTINUATION, WEBSOCKET_OPCODE_PING, WEBSOCKET_OPCODE_PONG, WEBSOCKET_OPCODE_TEXT
-from ..models.basic_models import DEFAULT_ENCODING
+from ..models import Headers, WebsocketCloseReason, WebsocketRequest, WebsocketSession
+from ..models import WEBSOCKET_OPCODE_BINARY, WEBSOCKET_OPCODE_CLOSE, WEBSOCKET_OPCODE_CONTINUATION, WEBSOCKET_OPCODE_PING, WEBSOCKET_OPCODE_PONG, WEBSOCKET_OPCODE_TEXT
+from ..models import DEFAULT_ENCODING
 
 
 _logger = get_logger("naja_atra.request_handlers.websocket_request_handler")
@@ -112,26 +112,26 @@ class WebsocketException(Exception):
         return self.__reason
 
 
-class WebsocketRequestHandler:
+class WebsocketControllerHandler:
 
-    def __init__(self, http_protocol_handler) -> None:
-        self.http_protocol_handler = http_protocol_handler
-        self.request_writer = http_protocol_handler.request_writer
-        self.routing_conf = http_protocol_handler.routing_conf
-        self.send_response = http_protocol_handler.send_response_only
-        self.send_header = http_protocol_handler.send_header
-        self.reader = http_protocol_handler.reader
+    def __init__(self, http_request_handler) -> None:
+        self.http_request_handler = http_request_handler
+        self.request_writer = http_request_handler.request_writer
+        self.routing_conf = http_request_handler.routing_conf
+        self.send_response = http_request_handler.send_response_only
+        self.send_header = http_request_handler.send_header
+        self.reader = http_request_handler.reader
         self.keep_alive = True
         self.handshake_done = False
 
         handler_class, path_values, regroups = self.routing_conf.get_websocket_handler(
-            http_protocol_handler.request_path)
+            http_request_handler.request_path)
         self.handler = handler_class.ctrl_object if handler_class else None
         self.ws_request = WebsocketRequest()
-        self.ws_request.headers = http_protocol_handler.headers
-        self.ws_request.path = http_protocol_handler.request_path
-        self.ws_request.query_string = http_protocol_handler.query_string
-        self.ws_request.parameters = http_protocol_handler.query_parameters
+        self.ws_request.headers = http_request_handler.headers
+        self.ws_request.path = http_request_handler.request_path
+        self.ws_request.query_string = http_request_handler.query_string
+        self.ws_request.parameters = http_request_handler.query_parameters
         self.ws_request.path_values = path_values
         self.ws_request.reg_groups = regroups
         if "cookie" in self.ws_request.headers:
@@ -147,8 +147,8 @@ class WebsocketRequestHandler:
 
     @property
     def response_headers(self):
-        if hasattr(self.http_protocol_handler, "_headers_buffer"):
-            return self.http_protocol_handler._headers_buffer
+        if hasattr(self.http_request_handler, "_headers_buffer"):
+            return self.http_request_handler._headers_buffer
         else:
             return []
 
@@ -503,7 +503,7 @@ class WebsocketRequestHandler:
 
 class WebsocketSessionImpl(WebsocketSession):
 
-    def __init__(self, handler: WebsocketRequestHandler, request: WebsocketRequest) -> None:
+    def __init__(self, handler: WebsocketControllerHandler, request: WebsocketRequest) -> None:
         self.__id = uuid4().hex
         self.__handler = handler
         self.__request = request

@@ -28,7 +28,7 @@ import time
 
 from typing import Any, Dict, List, Tuple
 from threading import RLock
-from ..models.basic_models import Session, SessionFactory
+from ..models import HttpSession, HttpSessionFactory
 from ..utils.logger import get_logger
 
 _logger = get_logger("naja_atra.request_handlers.http_session_local_impl")
@@ -49,7 +49,7 @@ def _get_from_dict(adict: Dict[str, Any], key: str) -> Any:
 class LocalSessionHolder:
 
     def __init__(self):
-        self.__sessions: Dict[str, Session] = {}
+        self.__sessions: Dict[str, HttpSession] = {}
         self.__session_lock = RLock()
         self.__started = False
         self.__clearing_thread = threading.Thread(target=self._clear_time_out_session_in_bg, daemon=True)
@@ -65,7 +65,7 @@ class LocalSessionHolder:
             self._clear_time_out_session()
 
     def _clear_time_out_session(self):
-        timeout_sessions: List[Session] = []
+        timeout_sessions: List[HttpSession] = []
         for v in self.__sessions.values():
             if not v.is_valid:
                 timeout_sessions.append(v)
@@ -82,19 +82,19 @@ class LocalSessionHolder:
             except KeyError:
                 _logger.debug("Session[#%s] in session cache is already deleted. " % session_id)
 
-    def get_session(self, session_id: str) -> Session:
+    def get_session(self, session_id: str) -> HttpSession:
         if not session_id:
             return None
-        sess: Session = _get_from_dict(self.__sessions, session_id)
+        sess: HttpSession = _get_from_dict(self.__sessions, session_id)
         if sess and sess.is_valid:
             return sess
         else:
             return None
 
-    def cache_session(self,  session: Session):
+    def cache_session(self,  session: HttpSession):
         if not session:
             return None
-        sess: Session = _get_from_dict(self.__sessions, session.id)
+        sess: HttpSession = _get_from_dict(self.__sessions, session.id)
 
         if sess:
             if session is sess:
@@ -107,7 +107,7 @@ class LocalSessionHolder:
             return session
 
 
-class LocalSessionImpl(Session):
+class LocalSessionImpl(HttpSession):
 
     def __init__(self, id: str, creation_time: float, session_holder: LocalSessionHolder):
         super().__init__()
@@ -155,20 +155,20 @@ class LocalSessionImpl(Session):
         self.__session_holder.clean_session(session_id=self.id)
 
 
-class LocalSessionFactory(SessionFactory):
+class LocalSessionFactory(HttpSessionFactory):
 
     def __init__(self):
         self.__session_holder = LocalSessionHolder()
         self.__session_lock = RLock()
 
-    def _create_local_session(self, session_id: str) -> Session:
+    def _create_local_session(self, session_id: str) -> HttpSession:
         if session_id:
             sid = session_id
         else:
             sid = uuid.uuid4().hex
         return LocalSessionImpl(sid, time.time(), self.__session_holder)
 
-    def get_session(self, session_id: str, create: bool = False) -> Session:
+    def get_session(self, session_id: str, create: bool = False) -> HttpSession:
         sess: LocalSessionImpl = self.__session_holder.get_session(session_id)
         if sess:
             sess._set_last_accessed_time(time.time())

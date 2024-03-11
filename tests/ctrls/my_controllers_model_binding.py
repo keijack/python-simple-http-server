@@ -1,6 +1,6 @@
 
 from typing import Any
-from naja_atra.models.model_bindings import ModelBinding
+from naja_atra.request_handlers.model_bindings import ModelBinding
 from naja_atra import model_binding, default_model_binding
 from naja_atra import HttpError, route
 from naja_atra.utils.logger import get_logger
