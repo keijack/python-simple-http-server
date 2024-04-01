@@ -2,24 +2,45 @@
 
 Naja-Atra is a lightweight python web framework. It's designed to make starting a web service easier. 
 
-## Support Python Version
+## Installation
 
-Python 3.7+
+Install and update using [pip](https://pip.pypa.io/en/stable/quickstart/):
 
-## Why choose
+```
+$ pip install -U naja-atra
+```
 
-* Lightway.
-* Functional programing.
-* Filter chain support.
-* Session support, and can support distributed session by [this extention](https://github.com/keijack/python-simple-http-server-redis-session).
-* You can use [this extention](https://github.com/keijack/python-simple-http-server-jinja) to support `jinja` views.
-* Spring MVC like request mapping.
-* SSL support.
-* Gzip support.
-* Websocket support
-* Easy to use.
-* Free style controller writing.
-* Easily integraded with WSGI servers. 
-* Easily integraded with ASGI servers. Websocket will be supported when ASGI server enable websocket functions.
-* Coroutine mode support.
+A Simple Example:
+
+```python
+from naja_atra import route
+
+@route('/')
+def hello(name: str = 'World'):
+    return {'message': f'Hello, {name}!'}
+```
+
+To run the app, simply execute the `naja-atra` command:
+
+```
+$ python3 -m naja_atra
+```
+
+Or, you can run it programmatically:
+
+```python
+from naja_atra import route
+from naja_atra import server
+
+
+@route("/")
+def hello(name: str = 'World'):
+    return {"message": f"Hello {name}"}
+
+def main():
+    server.start(host="0.0.0.0", port=9090)
+
+if __name__ == "__main__":
+    main()
+```
 

@@ -107,6 +107,7 @@ v1/
 
 # for development only
 tests/certs/
+temp/
 
 # vscode
 .vscode/
