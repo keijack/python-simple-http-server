@@ -25,5 +25,5 @@ SOFTWARE.
 from .app_conf import *
 from .models import *
 
-name = "naja_atra"
-version = "1.0.0"
+name = "naja-atra"
+version = "1.0.1"

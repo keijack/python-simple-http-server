@@ -11,7 +11,7 @@ _logger = logger.get_logger("naja_atra.__main__")
 
 def print_help():
     print("""
-    python3 -m simple_http_server [options]
+    python3 -m naja-atra [options]
 
     Options:
     -h    --help        Show this message and exit.
@@ -56,6 +56,7 @@ def main(argv):
             keep_alive=False,
             prefer_coroutine=False)
     except Exception as e:
+        print(f"Start server error: {e}")
         print_help()
 
 
