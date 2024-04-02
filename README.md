@@ -46,5 +46,5 @@ if __name__ == "__main__":
 
 ## More
 
-* [Source Code](https://github.com/naja-atra/naja-atra)
-* [Issues Tracker](https://github.com/naja-atra/naja-atra/issues)
+* Source Code: [https://github.com/naja-atra/naja-atra](https://github.com/naja-atra/naja-atra)
+* Issues Tracker: [https://github.com/naja-atra/naja-atra/issues](https://github.com/naja-atra/naja-atra/issues)
