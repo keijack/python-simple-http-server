@@ -1,6 +1,6 @@
 # Naja-Atra
 
-Naja-Atra is a lightweight python web framework. It's designed to make starting a web service easier. 
+Naja-Atra is a lightweight python web framework. It's designed to make starting a web service easier. It supports both HTTP and WebSocket. 
 
 ## Installation
 
@@ -44,3 +44,7 @@ if __name__ == "__main__":
     main()
 ```
 
+## More
+
+* [Source Code](https://github.com/naja-atra/naja-atra)
+* [Issues Tracker](https://github.com/naja-atra/naja-atra/issues)
