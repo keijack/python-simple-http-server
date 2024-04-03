@@ -11,7 +11,7 @@ _logger = logger.get_logger("naja_atra.__main__")
 
 def print_help():
     print("""
-    python3 -m naja-atra [options]
+    python3 -m naja_atra [options]
 
     Options:
     -h    --help        Show this message and exit.
